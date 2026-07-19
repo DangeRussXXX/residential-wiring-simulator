@@ -9,32 +9,46 @@ type Component = {
 
 function App() {
   const [components, setComponents] = useState<Component[]>([]);
+  const [draggingId, setDraggingId] = useState<number | null>(null);
 
   function addComponent(type: string) {
     const newComponent = {
       id: Date.now(),
       type: type,
-      x: Math.random() * 250,
-      y: Math.random() * 200
+      x: 50,
+      y: 50
     };
 
     setComponents([...components, newComponent]);
   }
 
-  function moveComponent(id: number) {
-    setComponents(
-      components.map((component) => {
-        if (component.id === id) {
-          return {
-            ...component,
-            x: component.x + 20,
-            y: component.y + 20
-          };
-        }
+  function startDrag(id: number) {
+    setDraggingId(id);
+  }
 
-        return component;
-      })
+  function moveComponent(event: React.MouseEvent) {
+    if (draggingId === null) return;
+
+    const workspace = event.currentTarget.getBoundingClientRect();
+
+    const x = event.clientX - workspace.left;
+    const y = event.clientY - workspace.top;
+
+    setComponents(
+      components.map((component) =>
+        component.id === draggingId
+          ? {
+              ...component,
+              x: x,
+              y: y
+            }
+          : component
+      )
     );
+  }
+
+  function stopDrag() {
+    setDraggingId(null);
   }
 
   return (
@@ -43,7 +57,7 @@ function App() {
       <h1>Residential Wiring Simulator</h1>
 
       <p>
-        Version 0.3 - Component Movement
+        Version 0.4 - Drag and Drop Components
       </p>
 
       <hr />
@@ -79,6 +93,8 @@ function App() {
       <h2>Workspace</h2>
 
       <div
+        onMouseMove={moveComponent}
+        onMouseUp={stopDrag}
         style={{
           height: "400px",
           border: "2px solid black",
@@ -92,7 +108,7 @@ function App() {
 
           <div
             key={component.id}
-            onClick={() => moveComponent(component.id)}
+            onMouseDown={() => startDrag(component.id)}
             style={{
               position: "absolute",
               left: component.x,
@@ -100,7 +116,7 @@ function App() {
               border: "2px solid black",
               backgroundColor: "white",
               padding: "15px",
-              cursor: "pointer",
+              cursor: "grab",
               userSelect: "none"
             }}
           >

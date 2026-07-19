@@ -1,28 +1,112 @@
-export type TerminalType =
-  | "hot"
-  | "neutral"
-  | "ground"
-  | "load"
-  | "traveler";
+// Residential Wiring Simulator v2.2
+// Core electrical data types
 
 
-export type Terminal = {
+export type Voltage = 120 | 240;
+
+
+export type BreakerPoles = 1 | 2;
+
+
+export type WireGauge =
+  | "#14"
+  | "#12"
+  | "#10"
+  | "#8";
+
+
+
+export type DeviceType =
+  | "breaker"
+  | "switch"
+  | "light"
+  | "receptacle"
+  | "motor"
+  | "appliance"
+  | string;
+
+
+
+export type SimulationMode =
+  | "APPRENTICE"
+  | "ENGINEERING"
+  | "HYBRID";
+
+
+
+// Electrical device load information
+export interface ElectricalLoad {
+
+  watts: number;
+
+  continuous?: boolean;
+
+}
+
+
+
+// Breaker information
+export interface Breaker {
+
+  id: string;
+
+  amperage: number;
+
+  voltage: Voltage;
+
+  poles: BreakerPoles;
+
+  tripped: boolean;
+
+}
+
+
+
+// Wire information
+export interface Wire {
+
+  id?: string;
+
+  gauge?: WireGauge;
+
+  length?: number;
+
+
+  fromDevice: string;
+
+  fromTerminal: string;
+
+  toDevice: string;
+
+  toTerminal: string;
+
+  color?: string;
+
+}
+
+
+
+// Circuit information
+export interface Circuit {
 
   id: string;
 
   name: string;
 
-  type: TerminalType;
+  voltage: Voltage;
 
-  x: number;
+  breaker: Breaker;
 
-  y: number;
+  wire: Wire;
 
-};
+  devices: ElectricalDevice[];
+
+}
 
 
 
-export type Device = {
+// Terminal information
+export interface DeviceTerminal {
 
   id: string;
 
@@ -34,24 +118,33 @@ export type Device = {
 
   y: number;
 
-  terminals: Terminal[];
-
-};
+}
 
 
 
-export type Wire = {
+// Main device object
+// Matches Workspace.tsx
+export interface ElectricalDevice {
 
   id: string;
 
-  fromDevice: string;
+  name: string;
 
-  fromTerminal: string;
 
-  toDevice: string;
+  // Allows your UI device names:
+  // "Switch", "Light", "GFCI", etc.
+  type: DeviceType;
 
-  toTerminal: string;
 
-  color: string;
+  load?: ElectricalLoad;
 
-};
+
+  // Workspace positioning
+  x: number;
+
+  y: number;
+
+
+  terminals: DeviceTerminal[];
+
+}

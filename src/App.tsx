@@ -1,43 +1,5 @@
-import Workspace from "./simulator/Workspace";
+import SimulatorLayout from "./layout/SimulatorLayout";
 
-
-function App(){
-
-
-return (
-
-<div
-
-style={{
-
-padding:"25px",
-
-fontFamily:"Arial"
-
-}}
-
->
-
-
-<h1>
-Residential Wiring Simulator
-</h1>
-
-
-<p>
-Training Board v2.1
-</p>
-
-
-<Workspace/>
-
-
-</div>
-
-);
-
-
+export default function App() {
+  return <SimulatorLayout />;
 }
-
-
-export default App;

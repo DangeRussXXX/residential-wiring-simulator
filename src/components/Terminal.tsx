@@ -5,11 +5,15 @@ type Props = {
 
 terminal: TerminalType;
 
-selected: boolean;
+selected:boolean;
 
-onClick: () => void;
+onClick:(position:{
+x:number;
+y:number;
+})=>void;
 
 };
+
 
 
 export default function Terminal({
@@ -20,34 +24,51 @@ selected,
 
 onClick
 
-}: Props){
+}:Props){
 
 
-function color(){
+
+function terminalColor(){
+
 
 switch(terminal.type){
 
+
 case "hot":
-return "black";
+
+return "#111111";
+
 
 case "load":
-return "red";
+
+return "#d62828";
+
 
 case "neutral":
-return "white";
+
+return "#ffffff";
+
 
 case "ground":
-return "green";
+
+return "#2a9d45";
+
 
 case "traveler":
-return "blue";
+
+return "#2563eb";
+
 
 default:
-return "gray";
+
+return "#888888";
+
 
 }
 
 }
+
+
 
 
 
@@ -55,53 +76,93 @@ return (
 
 <div
 
+
 title={terminal.name}
+
 
 onClick={(e)=>{
 
+
 e.stopPropagation();
 
-onClick();
+
+const rect =
+e.currentTarget.getBoundingClientRect();
+
+
+
+onClick({
+
+x: rect.left + rect.width / 2,
+
+y: rect.top + rect.height / 2
+
+});
+
 
 }}
+
+
 
 style={{
 
 position:"absolute",
 
-left:terminal.x - 10,
+left:terminal.x - 8,
 
-top:terminal.y - 10,
+top:terminal.y - 8,
 
-width:"20px",
 
-height:"20px",
+width:"16px",
+
+height:"16px",
+
 
 borderRadius:"50%",
 
 
-background:
+background:terminalColor(),
+
+
+
+border:
 
 selected
 
 ?
 
-"yellow"
+"3px solid #00aaff"
 
 :
 
-color(),
+"2px solid #333",
 
 
-border:"2px solid #555",
 
-boxSizing:"border-box",
+boxShadow:
 
-cursor:"crosshair",
+selected
 
-zIndex:10
+?
+
+"0 0 12px #00aaff"
+
+:
+
+"0 2px 5px rgba(0,0,0,.4)",
+
+
+
+cursor:"pointer",
+
+
+zIndex:20,
+
+
+transition:"all .15s"
 
 }}
+
 
 />
 

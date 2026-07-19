@@ -3,28 +3,57 @@ import Terminal from "./Terminal";
 
 
 type Props = {
-  device: DeviceType;
-  wireMode: boolean;
-  onTerminalClick:
-  (
-    deviceId:string,
-    terminalId:string,
-    x:number,
-    y:number
-  )=>void;
+
+device: DeviceType;
+
+wireMode:boolean;
+
+selectedTerminal:string | null;
+
+onTerminalClick:
+(
+deviceId:string,
+terminalId:string
+)=>void;
+
+onStartDrag:
+(
+id:string
+)=>void;
+
 };
 
 
+
 export default function Device({
-  device,
-  wireMode,
-  onTerminalClick
+
+device,
+
+wireMode,
+
+selectedTerminal,
+
+onTerminalClick,
+
+onStartDrag
+
 }:Props){
+
 
 
 return (
 
 <div
+
+onMouseDown={()=>{
+
+if(!wireMode){
+
+onStartDrag(device.id);
+
+}
+
+}}
 
 style={{
 
@@ -34,13 +63,13 @@ left:device.x,
 
 top:device.y,
 
-width:"120px",
+width:"130px",
 
-height:"70px",
+height:"75px",
 
 border:"2px solid black",
 
-background:"white",
+background:"#fff",
 
 display:"flex",
 
@@ -48,10 +77,18 @@ alignItems:"center",
 
 justifyContent:"center",
 
-cursor:wireMode
+fontWeight:"bold",
+
+cursor:
+
+wireMode
+
 ?
+
 "default"
+
 :
+
 "grab"
 
 }}
@@ -59,6 +96,7 @@ cursor:wireMode
 >
 
 {device.name}
+
 
 
 {device.terminals.map(t=>(
@@ -69,7 +107,13 @@ key={t.id}
 
 terminal={t}
 
-selected={false}
+selected={
+
+selectedTerminal===
+
+`${device.id}-${t.id}`
+
+}
 
 onClick={()=>{
 
@@ -77,11 +121,7 @@ onTerminalClick(
 
 device.id,
 
-t.id,
-
-device.x+t.x,
-
-device.y+t.y
+t.id
 
 );
 

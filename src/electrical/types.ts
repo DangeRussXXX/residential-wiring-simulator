@@ -2,20 +2,21 @@ export type TerminalType =
   | "hot"
   | "neutral"
   | "ground"
-  | "load";
+  | "load"
+  | "traveler";
 
 
 export type Terminal = {
 
-  id:string;
+  id: string;
 
-  name:string;
+  name: string;
 
-  type:TerminalType;
+  type: TerminalType;
 
-  x:number;
+  x: number;
 
-  y:number;
+  y: number;
 
 };
 
@@ -23,15 +24,17 @@ export type Terminal = {
 
 export type Device = {
 
-  id:string;
+  id: string;
 
-  name:string;
+  name: string;
 
-  x:number;
+  type: string;
 
-  y:number;
+  x: number;
 
-  terminals:Terminal[];
+  y: number;
+
+  terminals: Terminal[];
 
 };
 
@@ -39,16 +42,16 @@ export type Device = {
 
 export type Wire = {
 
-  id:string;
+  id: string;
 
-  fromDevice:string;
+  fromDevice: string;
 
-  fromTerminal:string;
+  fromTerminal: string;
 
-  toDevice:string;
+  toDevice: string;
 
-  toTerminal:string;
+  toTerminal: string;
 
-  color:string;
+  color: string;
 
 };

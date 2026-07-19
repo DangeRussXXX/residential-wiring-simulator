@@ -3,11 +3,11 @@ import type { Terminal as TerminalType } from "../electrical/types";
 
 type Props = {
 
-terminal:TerminalType;
+terminal: TerminalType;
 
-selected:boolean;
+selected: boolean;
 
-onClick:()=>void;
+onClick: () => void;
 
 };
 
@@ -20,7 +20,35 @@ selected,
 
 onClick
 
-}:Props){
+}: Props){
+
+
+function color(){
+
+switch(terminal.type){
+
+case "hot":
+return "black";
+
+case "load":
+return "red";
+
+case "neutral":
+return "white";
+
+case "ground":
+return "green";
+
+case "traveler":
+return "blue";
+
+default:
+return "gray";
+
+}
+
+}
+
 
 
 return (
@@ -29,19 +57,25 @@ return (
 
 title={terminal.name}
 
-onClick={onClick}
+onClick={(e)=>{
+
+e.stopPropagation();
+
+onClick();
+
+}}
 
 style={{
 
 position:"absolute",
 
-left:terminal.x-8,
+left:terminal.x - 10,
 
-top:terminal.y-8,
+top:terminal.y - 10,
 
-width:"16px",
+width:"20px",
 
-height:"16px",
+height:"20px",
 
 borderRadius:"50%",
 
@@ -56,28 +90,16 @@ selected
 
 :
 
-terminal.type==="hot"
-
-?
-
-"black"
-
-:
-
-terminal.type==="neutral"
-
-?
-
-"white"
-
-:
-
-"green",
+color(),
 
 
-border:"2px solid gray",
+border:"2px solid #555",
 
-cursor:"crosshair"
+boxSizing:"border-box",
+
+cursor:"crosshair",
+
+zIndex:10
 
 }}
 

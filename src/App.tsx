@@ -1,10 +1,17 @@
- import { useState } from "react";
+import { useState } from "react";
+
+type Terminal = {
+  name: string;
+  x: number;
+  y: number;
+};
 
 type Component = {
   id: number;
   type: string;
   x: number;
   y: number;
+  terminals: Terminal[];
 };
 
 function App() {
@@ -12,11 +19,23 @@ function App() {
   const [draggingId, setDraggingId] = useState<number | null>(null);
 
   function addComponent(type: string) {
-    const newComponent = {
+    const newComponent: Component = {
       id: Date.now(),
       type: type,
       x: 50,
-      y: 50
+      y: 50,
+      terminals: [
+        {
+          name: "Hot",
+          x: 10,
+          y: 55
+        },
+        {
+          name: "Neutral",
+          x: 90,
+          y: 55
+        }
+      ]
     };
 
     setComponents([...components, newComponent]);
@@ -26,21 +45,21 @@ function App() {
     setDraggingId(id);
   }
 
-  function moveComponent(event: React.MouseEvent) {
+  function moveComponent(event: React.MouseEvent<HTMLDivElement>) {
     if (draggingId === null) return;
 
     const workspace = event.currentTarget.getBoundingClientRect();
 
-    const x = event.clientX - workspace.left;
-    const y = event.clientY - workspace.top;
+    const x = event.clientX - workspace.left - 40;
+    const y = event.clientY - workspace.top - 20;
 
     setComponents(
       components.map((component) =>
         component.id === draggingId
           ? {
               ...component,
-              x: x,
-              y: y
+              x,
+              y
             }
           : component
       )
@@ -52,12 +71,16 @@ function App() {
   }
 
   return (
-    <div style={{ padding: "30px", fontFamily: "Arial" }}>
-
+    <div
+      style={{
+        padding: "30px",
+        fontFamily: "Arial"
+      }}
+    >
       <h1>Residential Wiring Simulator</h1>
 
       <p>
-        Version 0.4 - Drag and Drop Components
+        Version 0.5 - Electrical Terminals
       </p>
 
       <hr />
@@ -113,14 +136,37 @@ function App() {
               position: "absolute",
               left: component.x,
               top: component.y,
+              width: "100px",
+              height: "50px",
               border: "2px solid black",
               backgroundColor: "white",
-              padding: "15px",
               cursor: "grab",
-              userSelect: "none"
+              userSelect: "none",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center"
             }}
           >
+
             {component.type}
+
+            {component.terminals.map((terminal) => (
+              <div
+                key={terminal.name}
+                title={terminal.name}
+                style={{
+                  position: "absolute",
+                  left: terminal.x,
+                  top: terminal.y,
+                  width: "10px",
+                  height: "10px",
+                  backgroundColor: "red",
+                  borderRadius: "50%",
+                  border: "1px solid black"
+                }}
+              />
+            ))}
+
           </div>
 
         ))}

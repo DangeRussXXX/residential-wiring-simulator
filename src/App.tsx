@@ -3,19 +3,38 @@
 type Component = {
   id: number;
   type: string;
+  x: number;
+  y: number;
 };
 
 function App() {
-
   const [components, setComponents] = useState<Component[]>([]);
 
   function addComponent(type: string) {
     const newComponent = {
       id: Date.now(),
-      type: type
+      type: type,
+      x: Math.random() * 250,
+      y: Math.random() * 200
     };
 
     setComponents([...components, newComponent]);
+  }
+
+  function moveComponent(id: number) {
+    setComponents(
+      components.map((component) => {
+        if (component.id === id) {
+          return {
+            ...component,
+            x: component.x + 20,
+            y: component.y + 20
+          };
+        }
+
+        return component;
+      })
+    );
   }
 
   return (
@@ -24,7 +43,7 @@ function App() {
       <h1>Residential Wiring Simulator</h1>
 
       <p>
-        Version 0.2 - Component Placement
+        Version 0.3 - Component Movement
       </p>
 
       <hr />
@@ -35,18 +54,24 @@ function App() {
         Breaker Panel
       </button>
 
-      <button onClick={() => addComponent("Light")}
-        style={{marginLeft:"10px"}}>
+      <button
+        onClick={() => addComponent("Light")}
+        style={{ marginLeft: "10px" }}
+      >
         Light
       </button>
 
-      <button onClick={() => addComponent("Switch")}
-        style={{marginLeft:"10px"}}>
+      <button
+        onClick={() => addComponent("Switch")}
+        style={{ marginLeft: "10px" }}
+      >
         Switch
       </button>
 
-      <button onClick={() => addComponent("Receptacle")}
-        style={{marginLeft:"10px"}}>
+      <button
+        onClick={() => addComponent("Receptacle")}
+        style={{ marginLeft: "10px" }}
+      >
         Receptacle
       </button>
 
@@ -55,10 +80,11 @@ function App() {
 
       <div
         style={{
-          height:"400px",
-          border:"2px solid black",
-          backgroundColor:"#f5f5f5",
-          padding:"20px"
+          height: "400px",
+          border: "2px solid black",
+          backgroundColor: "#f5f5f5",
+          position: "relative",
+          overflow: "hidden"
         }}
       >
 
@@ -66,17 +92,19 @@ function App() {
 
           <div
             key={component.id}
+            onClick={() => moveComponent(component.id)}
             style={{
-              border:"1px solid black",
-              backgroundColor:"white",
-              padding:"10px",
-              margin:"10px",
-              width:"150px"
+              position: "absolute",
+              left: component.x,
+              top: component.y,
+              border: "2px solid black",
+              backgroundColor: "white",
+              padding: "15px",
+              cursor: "pointer",
+              userSelect: "none"
             }}
           >
-
             {component.type}
-
           </div>
 
         ))}

@@ -1,5 +1,6 @@
 import {
-useRef
+  useRef,
+  useState
 } from "react";
 
 
@@ -13,16 +14,137 @@ import PropertiesPanel from "../components/PropertiesPanel";
 
 
 import type {
-WorkspaceHandle
+  WorkspaceHandle
 } from "../simulator/Workspace";
+
+
+import type {
+  ElectricalDevice
+} from "../electrical/types";
 
 
 
 export default function SimulatorLayout(){
 
 
-const workspaceRef =
-useRef<WorkspaceHandle>(null);
+  const workspaceRef =
+    useRef<WorkspaceHandle>(null);
+
+
+  const resizing =
+    useRef(false);
+
+
+
+  const [selectedDevice,setSelectedDevice] =
+    useState<ElectricalDevice | null>(null);
+
+
+
+  const [devices,setDevices] =
+    useState<ElectricalDevice[]>([]);
+
+
+
+  const [circuitPaths,setCircuitPaths] =
+    useState<string[][]>([]);
+
+
+
+  const [propertiesWidth,setPropertiesWidth] =
+    useState(350);
+
+
+
+
+function startResize(e:React.MouseEvent){
+
+  e.preventDefault();
+
+
+  resizing.current = true;
+
+
+  const startX =
+    e.clientX;
+
+
+  const startWidth =
+    propertiesWidth;
+
+
+
+  const handleMouseMove = (event:MouseEvent)=>{
+
+
+    if(!resizing.current)
+      return;
+
+
+
+    const delta =
+      startX - event.clientX;
+
+
+
+    const newWidth =
+      startWidth + delta;
+
+
+
+    if(
+      newWidth >= 260 &&
+      newWidth <= 700
+    ){
+
+      setPropertiesWidth(newWidth);
+
+    }
+
+  };
+
+
+
+
+  const stopResize = ()=>{
+
+
+    resizing.current = false;
+
+
+
+    window.removeEventListener(
+      "mousemove",
+      handleMouseMove
+    );
+
+
+    window.removeEventListener(
+      "mouseup",
+      stopResize
+    );
+
+
+  };
+
+
+
+  window.addEventListener(
+    "mousemove",
+    handleMouseMove
+  );
+
+
+  window.addEventListener(
+    "mouseup",
+    stopResize
+  );
+
+
+}
+
+
+
 
 
 
@@ -51,6 +173,8 @@ color:"white"
 
 
 
+
+
 <div
 
 style={{
@@ -64,13 +188,19 @@ display:"flex"
 >
 
 
+
+
+{/* Component Library */}
+
 <div
 
 style={{
 
 width:"220px",
 
-background:"#252526"
+background:"#252526",
+
+flexShrink:0
 
 }}
 
@@ -90,6 +220,10 @@ workspaceRef={workspaceRef}
 
 
 
+
+
+{/* Workspace */}
+
 <div
 
 style={{
@@ -98,7 +232,9 @@ flex:1,
 
 padding:"15px",
 
-background:"#303030"
+background:"#303030",
+
+overflow:"hidden"
 
 }}
 
@@ -109,6 +245,12 @@ background:"#303030"
 
 ref={workspaceRef}
 
+onSelectDevice={setSelectedDevice}
+
+onDevicesChange={setDevices}
+
+onCircuitPathsChange={setCircuitPaths}
+
 />
 
 
@@ -118,31 +260,116 @@ ref={workspaceRef}
 
 
 
+
+
+
+
+{/* Properties Panel */}
+
+
 <div
 
 style={{
 
-width:"260px",
+width:`${propertiesWidth}px`,
 
-background:"#252526"
+minWidth:"260px",
+
+maxWidth:"700px",
+
+display:"flex",
+
+background:"#252526",
+
+flexShrink:0
 
 }}
 
 >
 
 
-<PropertiesPanel />
 
+{/* Resize Handle */}
+
+<div
+
+onMouseDown={startResize}
+
+style={{
+
+width:"10px",
+
+cursor:"col-resize",
+
+background:"#444",
+
+flexShrink:0,
+
+userSelect:"none"
+
+}}
+
+/>
+
+
+
+
+
+
+
+{/* Properties Content */}
+
+<div
+
+style={{
+
+flex:1,
+
+overflow:"auto"
+
+}}
+
+>
+
+
+<PropertiesPanel
+
+device={selectedDevice}
+
+devices={devices}
+
+circuitPaths={circuitPaths}
+
+
+onUpdateDevice={(updated)=>{
+
+
+setSelectedDevice(updated);
+
+
+workspaceRef.current?.updateDevice(updated);
+
+
+}}
+
+
+/>
+
+
+</div>
 
 
 </div>
 
 
 
+
+
 </div>
 
 
 </div>
+
 
 );
 

@@ -16,15 +16,19 @@ export type WireGauge =
 
 
 
-export type DeviceType =
+export type DeviceType   =
   | "breaker"
   | "switch"
   | "light"
   | "receptacle"
   | "motor"
   | "appliance"
-  | string;
-
+  | "Breaker Panel"
+  | "Switch"
+  | "Light"
+  | "Receptacle"
+  | "GFCI"
+   | string;
 
 
 export type SimulationMode =
@@ -124,27 +128,49 @@ export interface DeviceTerminal {
 
 // Main device object
 // Matches Workspace.tsx
+// Main device object
+// Matches Workspace.tsx
 export interface ElectricalDevice {
 
-  id: string;
+  id:string;
 
-  name: string;
+  name:string;
 
+    type:DeviceType;
 
-  // Allows your UI device names:
-  // "Switch", "Light", "GFCI", etc.
-  type: DeviceType;
-
-
-  load?: ElectricalLoad;
+  load?:ElectricalLoad;
 
 
-  // Workspace positioning
-  x: number;
+  voltage?:Voltage;
 
-  y: number;
+  amperage?:number;
+
+  poles?:BreakerPoles;
+
+  tripped?:boolean;
 
 
-  terminals: DeviceTerminal[];
+  breakerSize?:number;
+
+
+  // NEW
+  mainBreaker?:number;
+
+  calculatedLoad?:number;
+
+  calculatedAmps?:number;
+
+
+  connectedDevices?:string[];
+
+
+  description?:string;
+
+
+  x:number;
+
+  y:number;
+
+  terminals:DeviceTerminal[];
 
 }

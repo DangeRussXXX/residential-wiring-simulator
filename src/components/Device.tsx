@@ -3,9 +3,12 @@ import type { Device as DeviceType } from "../electrical/types";
 import Terminal from "./Terminal";
 
 
+import type { ElectricalDevice } from "../electrical/types";
+
+
 type Props={
 
-device:DeviceType;
+device: ElectricalDevice;
 
 wireMode:boolean;
 
@@ -15,18 +18,10 @@ selected:boolean;
 
 onSelect:(id:string)=>void;
 
-
-onTerminalClick:
-
-(
-deviceId:string,
-terminalId:string,
-position:{
-x:number;
-y:number;
-}
+onTerminalClick:(
+  deviceId:string,
+  terminalId:string
 )=>void;
-
 
 onStartDrag:(id:string)=>void;
 

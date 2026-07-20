@@ -16,18 +16,23 @@ export type WireGauge =
 
 
 
-export type DeviceType   =
+export type DeviceType =
+  | "Breaker Panel"
+  | "Sub Panel"
+  | "Switch"
+  | "3-Way Switch"
+  | "Dimmer"
+  | "Light"
+  | "Receptacle"
+  | "GFCI"
+  | "Appliance"
+  | "Motor"
   | "breaker"
   | "switch"
   | "light"
   | "receptacle"
   | "motor"
   | "appliance"
-  | "Breaker Panel"
-  | "Switch"
-  | "Light"
-  | "Receptacle"
-  | "GFCI"
    | string;
 
 
@@ -116,11 +121,23 @@ export interface DeviceTerminal {
 
   name: string;
 
-  type: string;
+  type:
+    | "hot"
+    | "neutral"
+    | "ground"
+    | "load"
+    | "traveler"
+    | "control";
 
   x: number;
 
   y: number;
+
+  side?: 
+    | "left"
+    | "right"
+    | "top"
+    | "bottom";
 
 }
 

@@ -1,3 +1,5 @@
+import { componentCatalog } from "../electrical/componentCatalog";
+
 import {
   useState,
   useImperativeHandle,
@@ -18,7 +20,7 @@ import type {
 
 export type WorkspaceHandle = {
 
-  addDevice:(type:string)=>void;
+ addDevice:(name:string)=>void;
 
   updateDevice:(device:ElectricalDevice)=>void;
 
@@ -102,135 +104,80 @@ const svgRef =
 
 
 
-function createDevice(type:DeviceType){
+function createDevice(name:string){
+
+const definition =
+  componentCatalog.find(
+    c => c.name === name
+  );
 
 
-let terminals:any[] = [];
+if(!definition)
+  return;
 
 
-
-
-
-
+const terminals =
+definition.terminals.map(t=>({
+ ...t,
+ id:`${t.id}-${crypto.randomUUID()}`
+}));
 
 
 const device:ElectricalDevice = {
 
-
 id:crypto.randomUUID(),
 
+name:definition.name,
 
-name:type,
+type:definition.type,
 
+connectedDevices:[],
 
-type,
+calculatedLoad:0,
 
+calculatedAmps:0,
 
-load:{
-watts:0
-},
+amperage:definition.electrical?.amps,
 
+poles:definition.electrical?.poles,
 
-voltage:
-
-type === "Breaker Panel"
-?
-240
-:
-120,
-
-
-amperage:
-
-type === "Breaker Panel"
-?
-200
-:
-undefined,
-
-
-poles:
-
-type === "Breaker Panel"
-?
-2
-:
-undefined,
-
-
-breakerSize:
-
-type === "Breaker Panel"
-?
-200
-:
-undefined,
-
+breakerSize:definition.electrical?.amps,
 
 mainBreaker:
+ definition.type === "Breaker Panel"
+ ? definition.electrical?.amps
+ : undefined,
 
-type === "Breaker Panel"
-?
-200
-:
-undefined,
+terminals,
 
+load:{
+ watts:definition.electrical?.watts ?? 0
+},
 
-connectedDevices:
-
-type === "Breaker Panel"
-?
-[]
-:
-undefined,
-
-
-calculatedLoad:
-
-type === "Breaker Panel"
-?
-0
-:
-undefined,
-
-
-calculatedAmps:
-
-type === "Breaker Panel"
-?
-0
-:
-undefined,
-
-
-tripped:false,
-
+voltage:
+ definition.electrical?.voltage ?? 120,
 
 x:150,
 
-
 y:120,
 
-
-terminals
+tripped:false
 
 };
 
 
+setDevices(prev=>{
 
-setDevices(prev => {
+ const updated=[
+   ...prev,
+   device
+ ];
 
-  const updated = [
-    ...prev,
-    device
-  ];
+ onDevicesChange?.(updated);
 
-  onDevicesChange?.(updated);
-
-  return updated;
+ return updated;
 
 });
-
 
 }
 

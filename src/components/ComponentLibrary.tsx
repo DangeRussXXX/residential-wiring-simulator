@@ -6,6 +6,8 @@ import type {
   WorkspaceHandle
 } from "../simulator/Workspace";
 
+import { componentCatalog } from "../electrical/componentCatalog";
+
 
 interface Props {
 
@@ -13,7 +15,6 @@ interface Props {
   React.RefObject<WorkspaceHandle | null>;
 
 }
-
 
 
 type ComponentItem = {
@@ -29,62 +30,22 @@ type ComponentItem = {
 };
 
 
+const components:ComponentItem[] =
+componentCatalog.map(c=>({
 
-const components:ComponentItem[] = [
+  name:c.name,
 
+  type:c.name,
 
-{
-name:"Breaker Panel",
-type:"Breaker Panel",
-category:"Panels",
-description:"Residential service panel"
-},
+  category:c.category,
 
+  description:c.description
 
-{
-name:"Switch",
-type:"Switch",
-category:"Switches",
-description:"Single pole light switch"
-},
-
-
-{
-name:"Light",
-type:"Light",
-category:"Lighting",
-description:"Ceiling light fixture"
-},
-
-
-{
-name:"Receptacle",
-type:"Receptacle",
-category:"Receptacles",
-description:"Standard 120V outlet"
-},
-
-
-{
-name:"GFCI",
-type:"GFCI",
-category:"Safety",
-description:"Ground fault protected outlet"
-}
-
-
-];
-
+}));
 
 
 const categories = [
-
-"Panels",
-"Switches",
-"Lighting",
-"Receptacles",
-"Safety"
-
+  ...new Set(componentCatalog.map(c => c.category))
 ];
 
 
@@ -101,7 +62,7 @@ useState("");
 
 
 const [openCategories,setOpenCategories] =
-useState<string[]>(categories);
+useState<string[]>(() => categories);
 
 
 

@@ -1,4 +1,4 @@
-import type { Device as DeviceType } from "../electrical/types";
+
 
 import Terminal from "./Terminal";
 
@@ -171,6 +171,7 @@ style={{
 
 position:"absolute",
 
+
 left:device.x,
 
 top:device.y,
@@ -180,6 +181,7 @@ width:"150px",
 
 height:"95px",
 
+overflow:"visible",
 
 background:style.color,
 
@@ -302,19 +304,12 @@ selectedTerminal===
 
 
 
-onClick={(position)=>{
-
+onClick={()=>{
 
 onTerminalClick(
-
-device.id,
-
-t.id,
-
-position
-
+  device.id,
+  t.id
 );
-
 
 }}
 

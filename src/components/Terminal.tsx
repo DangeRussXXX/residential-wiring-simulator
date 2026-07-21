@@ -1,4 +1,4 @@
-import type { Terminal as TerminalType } from "../electrical/types";
+import type { DeviceTerminal as TerminalType } from "../electrical/types";
 
 
 type Props = {

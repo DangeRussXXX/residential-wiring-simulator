@@ -11,7 +11,6 @@ import Device from "../components/Device";
 
 import type {
   ElectricalDevice,
-  DeviceType,
   Wire,
   Voltage,
   BreakerPoles
@@ -139,7 +138,8 @@ calculatedAmps:0,
 
 amperage:definition.electrical?.amps,
 
-poles:definition.electrical?.poles,
+poles:
+  definition.electrical?.poles as BreakerPoles,
 
 breakerSize:definition.electrical?.amps,
 
@@ -155,7 +155,7 @@ load:{
 },
 
 voltage:
- definition.electrical?.voltage ?? 120,
+ (definition.electrical?.voltage ?? 120) as Voltage,
 
 x:150,
 

@@ -1,7 +1,7 @@
 // Residential Wiring Simulator v2.2
 // Breaker rules and trip logic
 
-import { Breaker } from "./types";
+import type { Breaker } from "./types";
 
 
 // Standard breaker sizes

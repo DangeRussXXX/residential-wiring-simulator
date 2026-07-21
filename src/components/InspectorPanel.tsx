@@ -1,7 +1,7 @@
 // Residential Wiring Simulator v2.2
 // Apprentice Inspector Display
 
-import { InspectionResult } from "../electrical/inspector";
+import type { InspectionResult } from "../electrical/inspector";
 
 
 interface InspectorPanelProps {

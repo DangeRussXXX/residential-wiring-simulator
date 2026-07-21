@@ -1,7 +1,7 @@
 // Residential Wiring Simulator v2.2
 // Wire sizing rules and inspection logic
 
-import { WireGauge } from "./types";
+import type { WireGauge } from "./types";
 
 
 // Copper conductor ampacity

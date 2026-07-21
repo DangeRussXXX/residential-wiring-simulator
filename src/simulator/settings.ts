@@ -2,7 +2,7 @@
 // Simulator settings manager
 
 
-import {
+import type {
   SimulationMode
 } from "./modes";
 

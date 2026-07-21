@@ -1,7 +1,7 @@
 // Residential Wiring Simulator v2.2
 // Electrical calculation engine
 
-import { ElectricalDevice, Circuit } from "./types";
+import type { ElectricalDevice, Circuit } from "./types";
 
 
 // Convert watts to amps
@@ -26,7 +26,7 @@ export function calculateTotalWatts(
 
   return devices.reduce(
     (total, device) =>
-      total + device.load.watts,
+      total + (device.load?.watts ?? 0),
     0
   );
 
@@ -89,8 +89,8 @@ export function calculateContinuousLoad(
   const watts = circuit.devices.reduce(
     (total, device) => {
 
-      if (device.load.continuous) {
-        return total + device.load.watts;
+      if (device.load?.continuous) {
+        return total + (device.load?.watts ?? 0);
       }
 
       return total;

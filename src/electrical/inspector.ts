@@ -1,11 +1,10 @@
 // Residential Wiring Simulator v2.2
 // Apprentice electrical inspection engine
 
-import { Circuit } from "./types";
+import type { Circuit } from "./types";
 
 import {
   calculateCircuitAmps,
-  calculateBreakerLoad,
   calculateContinuousLoad
 } from "./calculations";
 
@@ -59,7 +58,7 @@ export function inspectCircuit(
 
   const wireCorrect =
     isWireCorrect(
-      circuit.wire.gauge,
+      circuit.wire.gauge!,
       circuit.breaker.amperage
     );
 
@@ -94,7 +93,7 @@ export function inspectCircuit(
 
     issues.push(
       getWireStatus(
-        circuit.wire.gauge,
+        circuit.wire.gauge!,
         circuit.breaker.amperage
       )
     );

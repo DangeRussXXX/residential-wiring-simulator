@@ -1,3 +1,14 @@
+// Residential Wiring Simulator v2.3
+// Main simulator layout
+//
+// Handles:
+// - component library
+// - workspace
+// - properties panel
+// - simulation panel
+// - live circuit graph
+
+
 import {
   useRef,
   useState
@@ -6,11 +17,18 @@ import {
 
 import Workspace from "../simulator/Workspace";
 
+
+import SimulationPanel from "../simulator/SimulationPanel";
+
+
 import ComponentLibrary from "../components/ComponentLibrary";
+
 
 import TopToolbar from "../components/TopToolbar";
 
+
 import PropertiesPanel from "../components/PropertiesPanel";
+
 
 
 import type {
@@ -23,41 +41,121 @@ import type {
 } from "../electrical/types";
 
 
+import type {
+  Connection
+} from "../electrical/connections";
+
+
+import type {
+  CircuitGraph
+} from "../electrical/circuitGraph";
+
+
+
+
+
+
+
+
 
 export default function SimulatorLayout(){
 
 
+
   const workspaceRef =
+
     useRef<WorkspaceHandle>(null);
 
 
+
+
+
   const resizing =
+
     useRef(false);
 
 
 
+
+
+
+
   const [selectedDevice,setSelectedDevice] =
+
     useState<ElectricalDevice | null>(null);
 
 
 
+
+
+
+
   const [devices,setDevices] =
+
     useState<ElectricalDevice[]>([]);
 
 
 
+
+
+
+
+  const [connections,setConnections] =
+
+    useState<Connection[]>([]);
+
+
+
+
+
+
+
   const [circuitPaths,setCircuitPaths] =
+
     useState<string[][]>([]);
 
 
 
+
+
+
+
   const [propertiesWidth,setPropertiesWidth] =
+
     useState(350);
 
 
 
 
-function startResize(e:React.MouseEvent){
+
+
+
+  const [graph,setGraph] =
+
+    useState<CircuitGraph>({
+
+      devices:[],
+
+      connections:[]
+
+    });
+
+
+
+
+
+
+
+
+
+// ---------------------------------
+// Resize properties panel
+// ---------------------------------
+
+function startResize(
+  e:React.MouseEvent
+){
+
 
   e.preventDefault();
 
@@ -65,43 +163,63 @@ function startResize(e:React.MouseEvent){
   resizing.current = true;
 
 
+
   const startX =
+
     e.clientX;
 
 
+
   const startWidth =
+
     propertiesWidth;
 
 
 
-  const handleMouseMove = (event:MouseEvent)=>{
 
 
-    if(!resizing.current)
-      return;
+  const handleMouseMove =
+
+    (event:MouseEvent)=>{
 
 
+      if(!resizing.current)
 
-    const delta =
-      startX - event.clientX;
-
-
-
-    const newWidth =
-      startWidth + delta;
+        return;
 
 
 
-    if(
-      newWidth >= 260 &&
-      newWidth <= 700
-    ){
+      const delta =
 
-      setPropertiesWidth(newWidth);
+        startX - event.clientX;
 
-    }
 
-  };
+
+      const newWidth =
+
+        startWidth + delta;
+
+
+
+
+
+      if(
+
+        newWidth >=260 &&
+
+        newWidth <=700
+
+      ){
+
+        setPropertiesWidth(newWidth);
+
+      }
+
+
+    };
+
+
+
 
 
 
@@ -114,14 +232,21 @@ function startResize(e:React.MouseEvent){
 
 
     window.removeEventListener(
+
       "mousemove",
+
       handleMouseMove
+
     );
 
 
+
     window.removeEventListener(
+
       "mouseup",
+
       stopResize
+
     );
 
 
@@ -129,19 +254,110 @@ function startResize(e:React.MouseEvent){
 
 
 
+
+
   window.addEventListener(
+
     "mousemove",
+
     handleMouseMove
+
   );
 
 
+
   window.addEventListener(
+
     "mouseup",
+
     stopResize
+
   );
 
 
 }
+
+
+
+
+
+
+
+
+
+// ---------------------------------
+// Workspace updates
+// ---------------------------------
+
+function handleDevicesChange(
+
+  updatedDevices:ElectricalDevice[]
+
+){
+
+
+  setDevices(updatedDevices);
+
+
+
+  setGraph({
+
+    devices:updatedDevices,
+
+    connections
+
+  });
+
+
+}
+
+
+
+
+
+
+
+
+
+function handleRefreshSimulation(){
+
+
+
+  const currentConnections =
+
+    workspaceRef.current?.getConnections()
+
+    ??
+
+    [];
+
+
+
+
+
+  setConnections(
+
+    currentConnections
+
+  );
+
+
+
+
+
+  setGraph({
+
+    devices,
+
+    connections:currentConnections
+
+  });
+
+
+}
+
+
+
 
 
 
@@ -169,7 +385,14 @@ color:"white"
 >
 
 
+
+
+
 <TopToolbar />
+
+
+
+
 
 
 
@@ -186,6 +409,11 @@ display:"flex"
 }}
 
 >
+
+
+
+
+
 
 
 
@@ -222,6 +450,8 @@ workspaceRef={workspaceRef}
 
 
 
+
+
 {/* Workspace */}
 
 <div
@@ -241,17 +471,23 @@ overflow:"hidden"
 >
 
 
+
+
+
 <Workspace
 
 ref={workspaceRef}
 
 onSelectDevice={setSelectedDevice}
 
-onDevicesChange={setDevices}
+onDevicesChange={handleDevicesChange}
 
 onCircuitPathsChange={setCircuitPaths}
 
 />
+
+
+
 
 
 </div>
@@ -264,8 +500,7 @@ onCircuitPathsChange={setCircuitPaths}
 
 
 
-{/* Properties Panel */}
-
+{/* Right Panel */}
 
 <div
 
@@ -289,7 +524,11 @@ flexShrink:0
 
 
 
-{/* Resize Handle */}
+
+
+
+
+
 
 <div
 
@@ -317,7 +556,7 @@ userSelect:"none"
 
 
 
-{/* Properties Content */}
+
 
 <div
 
@@ -325,11 +564,76 @@ style={{
 
 flex:1,
 
-overflow:"auto"
+overflow:"auto",
+
+display:"flex",
+
+flexDirection:"column",
+
+gap:"10px"
 
 }}
 
 >
+
+
+
+
+
+
+
+<button
+
+onClick={handleRefreshSimulation}
+
+style={{
+
+margin:"10px"
+
+}}
+
+>
+
+Update Simulation
+
+</button>
+
+
+
+
+
+
+
+
+
+<SimulationPanel
+
+graph={graph}
+
+sourceId={
+
+devices.find(
+
+device =>
+
+device.type==="Breaker Panel"
+
+)?.id
+
+??
+
+""
+
+}
+
+/>
+
+
+
+
+
+
+
 
 
 <PropertiesPanel
@@ -341,13 +645,20 @@ devices={devices}
 circuitPaths={circuitPaths}
 
 
+
 onUpdateDevice={(updated)=>{
 
 
 setSelectedDevice(updated);
 
 
-workspaceRef.current?.updateDevice(updated);
+
+workspaceRef.current?.updateDevice(
+
+updated
+
+);
+
 
 
 }}
@@ -356,7 +667,11 @@ workspaceRef.current?.updateDevice(updated);
 />
 
 
-</div>
+
+
+
+
+
 
 
 </div>
@@ -365,12 +680,30 @@ workspaceRef.current?.updateDevice(updated);
 
 
 
-</div>
+
+
 
 
 </div>
 
+
+
+
+
+
+
+
+
+</div>
+
+
+
+
+
+
+</div>
 
 );
+
 
 }

@@ -1,193 +1,443 @@
-// Residential Wiring Simulator v2.2
+// Residential Wiring Simulator v2.3
 // Core electrical data types
+//
+// Master definitions used throughout:
+// - devices
+// - circuits
+// - breakers
+// - wires
+// - simulation modes
 
 
-export type Voltage = 120 | 240;
+
+// --------------------------------
+// Voltage definitions
+// --------------------------------
 
 
-export type BreakerPoles = 1 | 2;
+export type Voltage =
+
+  | 120
+
+  | 240;
+
+
+
+
+
+// --------------------------------
+// Breaker definitions
+// --------------------------------
+
+
+export type BreakerPoles =
+
+  | 1
+
+  | 2;
+
+
+
+
+
+
+
+export type BreakerType =
+
+  | "STANDARD"
+
+  | "AFCI"
+
+  | "GFCI"
+
+  | "DUAL_FUNCTION";
+
+
+
+
+
+
+
+// Individual circuit breaker
+
+export interface Breaker {
+
+
+  id:string;
+
+
+  amperage:number;
+
+
+  voltage:Voltage;
+
+
+  poles:BreakerPoles;
+
+
+
+  breakerType:BreakerType;
+
+
+
+  // Circuit assigned to breaker
+
+  circuitId?:string;
+
+
+
+  // Electrical state
+
+  energized:boolean;
+
+
+  tripped:boolean;
+
+
+  tripReason?:string;
+
+
+}
+
+
+
+
+
+
+
+
+
+// --------------------------------
+// Wire definitions
+// --------------------------------
 
 
 export type WireGauge =
+
   | "#14"
+
   | "#12"
+
   | "#10"
+
   | "#8";
 
 
 
-export type DeviceType =
-  | "Breaker Panel"
-  | "Sub Panel"
-  | "Switch"
-  | "3-Way Switch"
-  | "Dimmer"
-  | "Light"
-  | "Receptacle"
-  | "GFCI"
-  | "Appliance"
-  | "Motor"
-  | "breaker"
-  | "switch"
-  | "light"
-  | "receptacle"
-  | "motor"
-  | "appliance"
-   | string;
-
-
-export type SimulationMode =
-  | "APPRENTICE"
-  | "ENGINEERING"
-  | "HYBRID";
 
 
 
-// Electrical device load information
-export interface ElectricalLoad {
-
-  watts: number;
-
-  continuous?: boolean;
-
-}
 
 
-
-// Breaker information
-export interface Breaker {
-
-  id: string;
-
-  amperage: number;
-
-  voltage: Voltage;
-
-  poles: BreakerPoles;
-
-  tripped: boolean;
-
-}
-
-
-
-// Wire information
 export interface Wire {
 
-  id?: string;
 
-  gauge?: WireGauge;
-
-  length?: number;
+  id?:string;
 
 
-  fromDevice: string;
+  gauge?:WireGauge;
 
-  fromTerminal: string;
 
-  toDevice: string;
+  length?:number;
 
-  toTerminal: string;
 
-  color?: string;
+
+  fromDevice:string;
+
+
+  fromTerminal:string;
+
+
+
+  toDevice:string;
+
+
+  toTerminal:string;
+
+
+
+  color?:string;
+
 
 }
 
 
 
-// Circuit information
+
+
+
+
+
+
+// --------------------------------
+// Electrical load
+// --------------------------------
+
+
+export interface ElectricalLoad {
+
+
+  watts:number;
+
+
+  continuous?:boolean;
+
+
+}
+
+
+
+
+
+
+
+
+
+// --------------------------------
+// Circuit definition
+// --------------------------------
+
+
 export interface Circuit {
 
-  id: string;
-
-  name: string;
-
-  voltage: Voltage;
-
-  breaker: Breaker;
-
-  wire: Wire;
-
-  devices: ElectricalDevice[];
-
-}
-
-
-
-// Terminal information
-export interface DeviceTerminal {
-
-  id: string;
-
-  name: string;
-
-  type:
-    | "hot"
-    | "neutral"
-    | "ground"
-    | "load"
-    | "traveler"
-    | "control";
-
-  x: number;
-
-  y: number;
-
-  side?: 
-    | "left"
-    | "right"
-    | "top"
-    | "bottom";
-
-}
-
-
-
-// Main device object
-// Matches Workspace.tsx
-// Main device object
-// Matches Workspace.tsx
-export interface ElectricalDevice {
 
   id:string;
 
+
   name:string;
 
-    type:DeviceType;
-
-  load?:ElectricalLoad;
 
 
-  voltage?:Voltage;
-
-  amperage?:number;
-
-  poles?:BreakerPoles;
-
-  tripped?:boolean;
+  voltage:Voltage;
 
 
-  breakerSize?:number;
+
+  breaker:Breaker;
 
 
-  // NEW
-  mainBreaker?:number;
 
-  calculatedLoad?:number;
-
-  calculatedAmps?:number;
+  wire:Wire;
 
 
-  connectedDevices?:string[];
+
+  devices:ElectricalDevice[];
+
+
+}
+
+
+
+
+
+
+
+
+
+// --------------------------------
+// Device terminal
+// --------------------------------
+
+
+export interface DeviceTerminal {
+
+
+  id:string;
+
+
+  name:string;
+
+
+
+  type:
+
+    | "hot"
+
+    | "neutral"
+
+    | "ground"
+
+    | "load"
+
+    | "traveler"
+
+    | "control";
+
+
+
+  x:number;
+
+
+  y:number;
+
+
+
+  side?:
+
+    | "left"
+
+    | "right"
+
+    | "top"
+
+    | "bottom";
+
+
+}
+
+
+
+
+
+
+
+
+
+// --------------------------------
+// Device types
+// --------------------------------
+
+
+export type DeviceType =
+
+  | "Breaker Panel"
+
+  | "Sub Panel"
+
+  | "Switch"
+
+  | "3-Way Switch"
+
+  | "Dimmer"
+
+  | "Light"
+
+  | "Receptacle"
+
+  | "GFCI"
+
+  | "Appliance"
+
+  | "Motor"
+
+  | "breaker"
+
+  | "switch"
+
+  | "light"
+
+  | "receptacle"
+
+  | "motor"
+
+  | "appliance"
+
+  | string;
+
+
+
+
+
+
+
+
+
+// --------------------------------
+// Electrical device
+// --------------------------------
+
+
+export interface ElectricalDevice {
+
+
+  id:string;
+
+
+  name:string;
+
+
+  type:DeviceType;
+
 
 
   description?:string;
 
 
+
+  // Electrical properties
+
+  load?:ElectricalLoad;
+
+
+
+  voltage?:Voltage;
+
+
+  amperage?:number;
+
+
+  poles?:BreakerPoles;
+
+
+
+  // Breaker panel properties
+
+  breakerSize?:number;
+
+
+  mainBreaker?:number;
+
+
+
+  // Simulation values
+
+  tripped?:boolean;
+
+
+  calculatedLoad?:number;
+
+
+  calculatedAmps?:number;
+
+
+
+  connectedDevices?:string[];
+
+
+
+  // Position on workspace
+
   x:number;
+
 
   y:number;
 
+
+
   terminals:DeviceTerminal[];
 
+
 }
+
+
+
+
+
+
+
+
+
+// --------------------------------
+// Simulation modes
+// --------------------------------
+
+
+export type SimulationMode =
+
+
+  | "APPRENTICE"
+
+
+  | "ENGINEERING"
+
+
+  | "HYBRID";

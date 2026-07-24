@@ -1,138 +1,241 @@
-// Residential Wiring Simulator v2.2
-// Breaker rules and trip logic
-
-import type { Breaker } from "./types";
+// Residential Wiring Simulator v2.3
+// Breaker management utilities
 
 
-// Standard breaker sizes
-export const BREAKER_SIZES = [
-  15,
-  20,
-  30,
-  40,
-  50
-];
+import type {
+  Breaker
+} from "./breaker";
 
 
-// Create a breaker
-export function createBreaker(
-  id: string,
-  amperage: number,
-  voltage: 120 | 240,
-  poles: 1 | 2
-): Breaker {
 
-  return {
 
-    id,
 
-    amperage,
+// Find breaker by circuit assignment
 
-    voltage,
 
-    poles,
+export function findBreakerByCircuit(
 
-    tripped: false
+breakers:Breaker[],
 
-  };
+circuitId:string
+
+):Breaker | undefined {
+
+
+return breakers.find(
+
+breaker =>
+
+breaker.circuitId === circuitId
+
+);
+
 
 }
 
 
-// Continuous load limit
-// NEC style 80% rule
-export function getRecommendedLoad(
-  breaker: Breaker
-): number {
 
-  return Number(
-    (breaker.amperage * 0.8)
-      .toFixed(1)
-  );
+
+
+
+
+// Find unused breaker
+
+
+export function findAvailableBreaker(
+
+breakers:Breaker[]
+
+):Breaker | undefined {
+
+
+return breakers.find(
+
+breaker =>
+
+!breaker.circuitId
+
+);
+
 
 }
 
 
-// Determine if breaker should trip
-export function shouldBreakerTrip(
-  breaker: Breaker,
-  circuitAmps: number
-): boolean {
 
-  return circuitAmps >
-    breaker.amperage;
+
+
+
+
+// Assign circuit to breaker
+
+
+export function assignCircuitToBreaker(
+
+breaker:Breaker,
+
+circuitId:string
+
+):Breaker {
+
+
+return {
+
+
+...breaker,
+
+
+circuitId
+
+
+};
+
 
 }
 
 
-// Trip breaker
-export function tripBreaker(
-  breaker: Breaker
-): Breaker {
 
-  return {
 
-    ...breaker,
 
-    tripped: true
 
-  };
+
+// Remove circuit assignment
+
+
+export function removeCircuitFromBreaker(
+
+breaker:Breaker
+
+):Breaker {
+
+
+return {
+
+
+...breaker,
+
+
+circuitId:undefined
+
+
+};
+
 
 }
 
 
-// Reset breaker
-export function resetBreaker(
-  breaker: Breaker
-): Breaker {
-
-  return {
-
-    ...breaker,
-
-    tripped: false
-
-  };
-
-}
 
 
-// Breaker status message
+
+
+
+// Get breaker status for UI
+
+
 export function getBreakerStatus(
-  breaker: Breaker,
-  circuitAmps: number
-): string {
+
+breaker:Breaker | undefined
+
+):string {
 
 
-  if (breaker.tripped) {
 
-    return "🚨 BREAKER TRIPPED";
+if(!breaker)
 
-  }
-
-
-  if (
-    shouldBreakerTrip(
-      breaker,
-      circuitAmps
-    )
-  ) {
-
-    return "❌ OVERLOAD - BREAKER SHOULD TRIP";
-
-  }
+return "NO BREAKER";
 
 
-  if (
-    circuitAmps >
-    getRecommendedLoad(breaker)
-  ) {
 
-    return "⚠ HIGH LOAD";
+if(breaker.tripped)
 
-  }
+{
+
+return breaker.tripReason
+
+?
+
+`TRIPPED - ${breaker.tripReason}`
+
+:
+
+"TRIPPED";
+
+}
 
 
-  return "✓ BREAKER OK";
+
+if(!breaker.energized)
+
+return "OFF";
+
+
+
+return "ENERGIZED";
+
+
+}
+
+
+
+
+
+
+
+// Calculate breaker loading
+
+
+export function calculateBreakerLoad(
+
+breaker:Breaker,
+
+watts:number
+
+){
+
+
+return {
+
+
+amps:
+
+Number(
+
+(
+watts /
+
+breaker.voltage
+
+)
+.toFixed(2)
+
+),
+
+
+percent:
+
+Number(
+
+(
+(
+watts /
+
+breaker.voltage
+)
+
+/
+
+breaker.amperage
+
+*
+
+100
+
+)
+.toFixed(1)
+
+)
+
+
+};
+
 
 }

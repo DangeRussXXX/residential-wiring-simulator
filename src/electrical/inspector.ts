@@ -1,168 +1,371 @@
-// Residential Wiring Simulator v2.2
+// Residential Wiring Simulator v2.3
 // Apprentice electrical inspection engine
+//
+// Checks:
+// - breaker sizing
+// - conductor sizing
+// - continuous loads
+// - breaker condition
+// - NEC style warnings
 
-import type { Circuit } from "./types";
+
+import type {
+  Circuit
+} from "./types";
+
 
 import {
   calculateCircuitAmps,
   calculateContinuousLoad
 } from "./calculations";
 
+
 import {
   getWireStatus,
   isWireCorrect
 } from "./wires";
+
 
 import {
   getBreakerStatus
 } from "./breakers";
 
 
+
+
+
+
 // Inspection result format
 
 export interface InspectionResult {
 
-  passed: boolean;
 
-  issues: string[];
+  passed:boolean;
 
-  warnings: string[];
 
-  summary: string;
+  issues:string[];
+
+
+  warnings:string[];
+
+
+  summary:string;
+
 
 }
+
+
+
+
+
+
+
 
 
 // Main circuit inspection
 
 export function inspectCircuit(
-  circuit: Circuit
-): InspectionResult {
+
+circuit:Circuit
+
+):InspectionResult {
 
 
-  const issues: string[] = [];
 
-  const warnings: string[] = [];
-
-
-  const amps =
-    calculateCircuitAmps(circuit);
+const issues:string[]=[];
 
 
-  const breakerStatus =
-    getBreakerStatus(
-      circuit.breaker,
-      amps
-    );
+const warnings:string[]=[];
 
 
-  const wireCorrect =
-    isWireCorrect(
-      circuit.wire.gauge!,
-      circuit.breaker.amperage
-    );
 
 
-  const continuousLoad =
-    calculateContinuousLoad(
-      circuit
-    );
 
 
-  //
-  // Breaker inspection
-  //
-
-  if (
-    amps >
-    circuit.breaker.amperage
-  ) {
-
-    issues.push(
-      "Circuit load exceeds breaker rating."
-    );
-
-  }
+// --------------------------------
+// Calculate circuit values
+// --------------------------------
 
 
-  //
-  // Wire inspection
-  //
+const amps =
 
-  if (!wireCorrect) {
+calculateCircuitAmps(
 
-    issues.push(
-      getWireStatus(
-        circuit.wire.gauge!,
-        circuit.breaker.amperage
-      )
-    );
+circuit
 
-  }
+);
 
 
-  //
-  // Continuous load inspection
-  //
-
-  if (
-    continuousLoad >
-    circuit.breaker.amperage * 0.8
-  ) {
-
-    warnings.push(
-      "Continuous load exceeds 80% recommendation."
-    );
-
-  }
 
 
-  //
-  // Breaker status warning
-  //
-
-  if (
-    breakerStatus.includes("HIGH")
-  ) {
-
-    warnings.push(
-      breakerStatus
-    );
-
-  }
 
 
-  const passed =
-    issues.length === 0;
+const continuousLoad =
+
+calculateContinuousLoad(
+
+circuit
+
+);
 
 
-  let summary = "";
 
 
-  if (passed) {
-
-    summary =
-      "✓ Circuit passes inspection.";
-
-  }
-  else {
-
-    summary =
-      "❌ Circuit failed inspection. Review issues.";
-
-  }
 
 
-  return {
 
-    passed,
 
-    issues,
+// --------------------------------
+// Breaker inspection
+// --------------------------------
 
-    warnings,
 
-    summary
+const breakerStatus =
 
-  };
+getBreakerStatus(
+
+circuit.breaker
+
+);
+
+
+
+
+
+if(
+
+circuit.breaker.tripped
+
+){
+
+
+issues.push(
+
+`Breaker is tripped${
+
+circuit.breaker.tripReason
+
+?
+
+": " + circuit.breaker.tripReason
+
+:
+
+"."
+
+}`
+
+);
+
+
+}
+
+
+
+
+
+
+if(
+
+amps >
+
+circuit.breaker.amperage
+
+){
+
+
+issues.push(
+
+"Circuit load exceeds breaker rating."
+
+);
+
+
+}
+
+
+
+
+
+
+
+
+// --------------------------------
+// Wire inspection
+// --------------------------------
+
+
+if(
+
+!circuit.wire.gauge
+
+){
+
+
+issues.push(
+
+"No wire gauge selected."
+
+);
+
+
+}
+
+else {
+
+
+
+const wireCorrect =
+
+isWireCorrect(
+
+circuit.wire.gauge,
+
+circuit.breaker.amperage
+
+);
+
+
+
+
+if(!wireCorrect){
+
+
+issues.push(
+
+getWireStatus(
+
+circuit.wire.gauge,
+
+circuit.breaker.amperage
+
+)
+
+);
+
+
+}
+
+
+}
+
+
+
+
+
+
+
+
+
+// --------------------------------
+// Continuous load inspection
+// --------------------------------
+
+
+if(
+
+continuousLoad >
+
+circuit.breaker.amperage * 0.8
+
+){
+
+
+warnings.push(
+
+"Continuous load exceeds 80% recommendation."
+
+);
+
+
+}
+
+
+
+
+
+
+
+
+// --------------------------------
+// Breaker status inspection
+// --------------------------------
+
+
+if(
+
+breakerStatus !== "ENERGIZED" &&
+
+breakerStatus !== "OFF"
+
+){
+
+
+warnings.push(
+
+breakerStatus
+
+);
+
+
+}
+
+
+
+
+
+
+
+
+
+// --------------------------------
+// Final result
+// --------------------------------
+
+
+const passed =
+
+issues.length === 0;
+
+
+
+
+
+const summary =
+
+passed
+
+?
+
+"✓ Circuit passes inspection."
+
+:
+
+"❌ Circuit failed inspection. Review issues.";
+
+
+
+
+
+
+
+return {
+
+
+passed,
+
+
+issues,
+
+
+warnings,
+
+
+summary
+
+
+};
+
+
 
 }

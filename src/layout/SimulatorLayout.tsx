@@ -61,77 +61,48 @@ import type {
 export default function SimulatorLayout(){
 
 
-
   const workspaceRef =
-
     useRef<WorkspaceHandle>(null);
 
 
 
-
-
   const resizing =
-
     useRef(false);
 
 
 
 
-
-
-
   const [selectedDevice,setSelectedDevice] =
-
     useState<ElectricalDevice | null>(null);
 
 
 
 
-
-
-
   const [devices,setDevices] =
-
     useState<ElectricalDevice[]>([]);
 
 
 
 
-
-
-
   const [connections,setConnections] =
-
     useState<Connection[]>([]);
 
 
 
 
-
-
-
   const [circuitPaths,setCircuitPaths] =
-
     useState<string[][]>([]);
 
 
 
 
-
-
-
   const [propertiesWidth,setPropertiesWidth] =
-
     useState(350);
 
 
 
 
-
-
-
   const [graph,setGraph] =
-
     useState<CircuitGraph>({
 
       devices:[],
@@ -165,13 +136,11 @@ function startResize(
 
 
   const startX =
-
     e.clientX;
 
 
 
   const startWidth =
-
     propertiesWidth;
 
 
@@ -179,7 +148,6 @@ function startResize(
 
 
   const handleMouseMove =
-
     (event:MouseEvent)=>{
 
 
@@ -190,13 +158,11 @@ function startResize(
 
 
       const delta =
-
         startX - event.clientX;
 
 
 
       const newWidth =
-
         startWidth + delta;
 
 
@@ -204,11 +170,8 @@ function startResize(
 
 
       if(
-
         newWidth >=260 &&
-
         newWidth <=700
-
       ){
 
         setPropertiesWidth(newWidth);
@@ -223,7 +186,6 @@ function startResize(
 
 
 
-
   const stopResize = ()=>{
 
 
@@ -232,21 +194,15 @@ function startResize(
 
 
     window.removeEventListener(
-
       "mousemove",
-
       handleMouseMove
-
     );
 
 
 
     window.removeEventListener(
-
       "mouseup",
-
       stopResize
-
     );
 
 
@@ -257,21 +213,15 @@ function startResize(
 
 
   window.addEventListener(
-
     "mousemove",
-
     handleMouseMove
-
   );
 
 
 
   window.addEventListener(
-
     "mouseup",
-
     stopResize
-
   );
 
 
@@ -286,18 +236,14 @@ function startResize(
 
 
 // ---------------------------------
-// Workspace updates
+// Device updates from workspace
 // ---------------------------------
 
 function handleDevicesChange(
-
   updatedDevices:ElectricalDevice[]
-
 ){
 
-
   setDevices(updatedDevices);
-
 
 
   setGraph({
@@ -319,6 +265,41 @@ function handleDevicesChange(
 
 
 
+// ---------------------------------
+// Connection updates from workspace
+// ---------------------------------
+
+function handleConnectionsChange(
+  updatedConnections:Connection[]
+){
+
+  setConnections(updatedConnections);
+
+
+
+  setGraph({
+
+    devices,
+
+    connections:updatedConnections
+
+  });
+
+
+}
+
+
+
+
+
+
+
+
+
+// ---------------------------------
+// Manual simulation refresh
+// ---------------------------------
+
 function handleRefreshSimulation(){
 
 
@@ -335,12 +316,7 @@ function handleRefreshSimulation(){
 
 
 
-  setConnections(
-
-    currentConnections
-
-  );
-
+  setConnections(currentConnections);
 
 
 
@@ -478,11 +454,26 @@ overflow:"hidden"
 
 ref={workspaceRef}
 
-onSelectDevice={setSelectedDevice}
 
-onDevicesChange={handleDevicesChange}
+onSelectDevice={
+  setSelectedDevice
+}
 
-onCircuitPathsChange={setCircuitPaths}
+
+onDevicesChange={
+  handleDevicesChange
+}
+
+
+onConnectionsChange={
+  handleConnectionsChange
+}
+
+
+onCircuitPathsChange={
+  setCircuitPaths
+}
+
 
 />
 
@@ -500,7 +491,7 @@ onCircuitPathsChange={setCircuitPaths}
 
 
 
-{/* Right Panel */}
+{/* Right Side Panel */}
 
 <div
 
@@ -529,6 +520,8 @@ flexShrink:0
 
 
 
+
+{/* Resize Handle */}
 
 <div
 

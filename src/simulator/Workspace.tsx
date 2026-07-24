@@ -48,7 +48,6 @@ Connection
 
 
 
-
 export type WorkspaceHandle = {
 
 
@@ -83,7 +82,7 @@ type WorkspaceProps = {
 onSelectDevice?:
 
 (
-device:ElectricalDevice | null
+device:ElectricalDevice|null
 )=>void;
 
 
@@ -92,6 +91,14 @@ onDevicesChange?:
 
 (
 devices:ElectricalDevice[]
+)=>void;
+
+
+
+onConnectionsChange?:
+
+(
+connections:Connection[]
 )=>void;
 
 
@@ -120,6 +127,8 @@ onSelectDevice,
 
 onDevicesChange,
 
+onConnectionsChange,
+
 onCircuitPathsChange
 
 },
@@ -132,18 +141,12 @@ ref
 
 
 
-
-
 const [devices,setDevices] =
 
 useState<ElectricalDevice[]>([]);
 
 
 
-
-
-
-// Visual drawing wires
 
 const [wires,setWires] =
 
@@ -152,16 +155,9 @@ useState<Wire[]>([]);
 
 
 
-
-
-// Electrical simulation connections
-
 const [connections,setConnections] =
 
 useState<Connection[]>([]);
-
-
-
 
 
 
@@ -173,16 +169,9 @@ useState(false);
 
 
 
-
-
-
 const [wireColor,setWireColor] =
 
 useState("black");
-
-
-
-
 
 
 
@@ -195,12 +184,7 @@ deviceId:string;
 
 terminalId:string;
 
-
 }|null>(null);
-
-
-
-
 
 
 
@@ -212,15 +196,9 @@ useState<ElectricalDevice|null>(null);
 
 
 
-
-
-
 const [dragging,setDragging] =
 
 useState<string|null>(null);
-
-
-
 
 
 
@@ -241,9 +219,7 @@ useRef<SVGSVGElement|null>(null);
 // Create device from catalog
 // ----------------------------------
 
-
 function createDevice(name:string){
-
 
 
 const definition =
@@ -259,8 +235,6 @@ c=>c.name===name
 if(!definition)
 
 return;
-
-
 
 
 
@@ -285,10 +259,7 @@ id:
 
 
 
-
-
 const device:ElectricalDevice = {
-
 
 
 id:
@@ -388,9 +359,7 @@ y:120,
 tripped:false
 
 
-
 };
-
 
 
 
@@ -413,6 +382,7 @@ device
 onDevicesChange?.(updated);
 
 
+
 return updated;
 
 
@@ -433,13 +403,11 @@ return updated;
 // Update device
 // ----------------------------------
 
-
 function updateDevice(
 
 updatedDevice:ElectricalDevice
 
 ){
-
 
 
 setDevices(prev=>{
@@ -448,8 +416,6 @@ setDevices(prev=>{
 const updated =
 
 prev.map(device=>
-
-
 
 device.id===updatedDevice.id
 
@@ -460,7 +426,6 @@ updatedDevice
 :
 
 device
-
 
 );
 
@@ -473,13 +438,13 @@ onDevicesChange?.(updated);
 return updated;
 
 
-
 });
 
 
 
 
 setSelectedDevice(updatedDevice);
+
 
 
 onSelectDevice?.(updatedDevice);
@@ -495,23 +460,32 @@ onSelectDevice?.(updatedDevice);
 
 
 
-useImperativeHandle(ref,()=>({
+// ----------------------------------
+// Expose workspace API
+// ----------------------------------
 
+useImperativeHandle(ref,()=>({
 
 
 addDevice:createDevice,
 
 
-
 updateDevice,
-
 
 
 getConnections:()=>connections
 
 
-
 }));
+
+
+
+
+
+
+
+
+
 // ----------------------------------
 // Select device
 // ----------------------------------
@@ -533,11 +507,10 @@ return;
 
 
 
+if(device.type==="Breaker Panel"){
+
+
 const paths =
-
-device.type==="Breaker Panel"
-
-?
 
 getCircuitPaths(
 
@@ -545,22 +518,12 @@ device,
 
 devices
 
-)
-
-:
-
-[];
-
+);
 
 
 
 onCircuitPathsChange?.(paths);
 
-
-
-
-
-if(device.type==="Breaker Panel"){
 
 
 const load =
@@ -575,7 +538,7 @@ devices
 
 
 
-const updatedDevice = {
+device = {
 
 
 ...device,
@@ -590,7 +553,6 @@ load /
 
 (device.voltage ?? 120)
 
-
 };
 
 
@@ -599,11 +561,11 @@ setDevices(prev=>
 
 prev.map(d=>
 
-d.id===updatedDevice.id
+d.id===device?.id
 
 ?
 
-updatedDevice
+device!
 
 :
 
@@ -615,12 +577,14 @@ d
 
 
 
-device = updatedDevice;
+onDevicesChange?.(
+
+devices
+
+);
 
 
 }
-
-
 
 
 
@@ -631,15 +595,6 @@ onSelectDevice?.(device);
 
 
 }
-
-
-
-
-
-
-
-
-
 // ----------------------------------
 // Terminal wiring
 // ----------------------------------
@@ -653,11 +608,9 @@ terminalId:string
 ){
 
 
-
 if(!wireMode)
 
 return;
-
 
 
 
@@ -668,23 +621,17 @@ if(!selectedTerminal){
 
 setSelectedTerminal({
 
-
 deviceId,
-
 
 terminalId
 
-
 });
-
 
 
 return;
 
 
 }
-
-
 
 
 
@@ -802,13 +749,33 @@ wire
 
 
 
-setConnections(prev=>[
+
+
+setConnections(prev=>{
+
+
+const updated=[
 
 ...prev,
 
 connection
 
-]);
+];
+
+
+
+onConnectionsChange?.(
+
+updated
+
+);
+
+
+
+return updated;
+
+
+});
 
 
 
@@ -907,8 +874,8 @@ onDevicesChange?.(updated);
 return updated;
 
 
-
 });
+
 
 
 
@@ -1036,7 +1003,7 @@ device
 
 
 // ----------------------------------
-// Clear board
+// Clear workspace
 // ----------------------------------
 
 function clearWorkspace(){
@@ -1044,18 +1011,19 @@ function clearWorkspace(){
 
 setDevices([]);
 
-
 setWires([]);
-
 
 setConnections([]);
 
-
 setSelectedTerminal(null);
-
 
 setSelectedDevice(null);
 
+
+
+onDevicesChange?.([]);
+
+onConnectionsChange?.([]);
 
 onCircuitPathsChange?.([]);
 
@@ -1071,7 +1039,7 @@ onCircuitPathsChange?.([]);
 
 
 // ----------------------------------
-// Circuit path finder
+// Find circuit paths
 // ----------------------------------
 
 function getCircuitPaths(
@@ -1095,6 +1063,7 @@ return [];
 
 
 
+
 const nextVisited =
 
 new Set(visited);
@@ -1107,6 +1076,8 @@ nextVisited.add(device.id);
 
 
 let paths:string[][]=[];
+
+
 
 
 
@@ -1131,7 +1102,6 @@ return;
 
 
 
-
 if(nextVisited.has(connected.id))
 
 return;
@@ -1150,7 +1120,11 @@ connected.name
 
 
 
+
+
 paths.push(newPath);
+
+
 
 
 
@@ -1178,6 +1152,7 @@ nextVisited
 
 
 
+
 return paths;
 
 
@@ -1190,6 +1165,10 @@ return paths;
 
 
 
+
+// ----------------------------------
+// Calculate connected load
+// ----------------------------------
 
 function calculateLoad(
 
@@ -1214,6 +1193,8 @@ visited.add(device.id);
 
 
 
+
+
 return (
 
 device.connectedDevices ?? []
@@ -1234,6 +1215,8 @@ d=>d.id===id
 if(!connected)
 
 return total;
+
+
 
 
 
@@ -1272,6 +1255,10 @@ visited
 
 
 
+// ----------------------------------
+// Find terminal screen position
+// ----------------------------------
+
 function getTerminalPosition(
 
 deviceId:string,
@@ -1292,6 +1279,8 @@ d=>d.id===deviceId
 
 
 
+
+
 const terminal =
 
 device?.terminals.find(
@@ -1307,6 +1296,7 @@ t=>t.id===terminalId
 if(!device || !terminal)
 
 return null;
+
 
 
 
@@ -1331,13 +1321,9 @@ device.y + terminal.y
 
 }
 
-
-
-
-
-
-
-
+// ----------------------------------
+// Render
+// ----------------------------------
 
 return (
 
@@ -1384,6 +1370,7 @@ wireMode
 
 
 
+
 <select
 
 value={wireColor}
@@ -1397,22 +1384,35 @@ setWireColor(e.target.value)
 >
 
 <option value="black">
+
 Hot
+
 </option>
+
 
 <option value="red">
+
 Load
+
 </option>
+
 
 <option value="white">
+
 Neutral
+
 </option>
+
 
 <option value="green">
+
 Ground
+
 </option>
 
+
 </select>
+
 
 
 
@@ -1431,6 +1431,7 @@ Clear
 
 
 </div>
+
 
 
 
@@ -1473,6 +1474,8 @@ position:"relative"
 
 
 
+
+
 <div
 
 style={{
@@ -1486,6 +1489,11 @@ position:"relative"
 }}
 
 >
+
+
+
+
+
 
 
 
@@ -1513,6 +1521,9 @@ pointerEvents:"none"
 >
 
 
+
+
+
 {
 
 wires.map(w=>{
@@ -1530,6 +1541,8 @@ w.fromTerminal
 
 
 
+
+
 const end =
 
 getTerminalPosition(
@@ -1542,9 +1555,13 @@ w.toTerminal
 
 
 
+
+
 if(!start || !end)
 
 return null;
+
+
 
 
 
@@ -1572,12 +1589,16 @@ strokeWidth="5"
 );
 
 
+
 })
 
 }
 
 
+
 </svg>
+
+
 
 
 
@@ -1590,6 +1611,7 @@ strokeWidth="5"
 devices.map(device=>(
 
 
+
 <Device
 
 
@@ -1599,7 +1621,9 @@ key={device.id}
 device={device}
 
 
+
 wireMode={wireMode}
+
 
 
 
@@ -1619,6 +1643,8 @@ null
 
 
 
+
+
 selected={
 
 selectedDevice?.id===device.id
@@ -1627,7 +1653,10 @@ selectedDevice?.id===device.id
 
 
 
+
 onSelect={selectDevice}
+
+
 
 
 
@@ -1635,10 +1664,16 @@ onTerminalClick={terminalClick}
 
 
 
+
+
 onStartDrag={startDrag}
 
 
+
+
+
 />
+
 
 
 ))
@@ -1649,15 +1684,31 @@ onStartDrag={startDrag}
 
 
 
+
+
+
+
+
 </div>
 
 
+
+
+
 </div>
 
 
+
+
+
+
+
 </div>
+
 
 );
+
+
 
 
 });

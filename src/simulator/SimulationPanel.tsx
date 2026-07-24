@@ -27,15 +27,11 @@ import type {
 
 
 
-
 interface SimulationPanelProps {
-
 
   graph:CircuitGraph;
 
-
   sourceId:string;
-
 
 }
 
@@ -46,25 +42,19 @@ interface SimulationPanelProps {
 
 
 
-export default function SimulationPanel(
-
-{
+export default function SimulationPanel({
 
 graph,
 
 sourceId
 
-}:SimulationPanelProps
-
-){
+}:SimulationPanelProps){
 
 
 
 const [result,setResult] =
 
-useState<SimulationControllerResult | null>(null);
-
-
+useState<SimulationControllerResult|null>(null);
 
 
 
@@ -81,8 +71,22 @@ useState(false);
 function runSimulation(){
 
 
-
 setRunning(true);
+
+
+
+if(!sourceId){
+
+
+setResult(null);
+
+setRunning(false);
+
+return;
+
+
+}
+
 
 
 
@@ -111,11 +115,7 @@ sourceId
 
 
 
-setResult(
-
-simulation
-
-);
+setResult(simulation);
 
 
 
@@ -139,26 +139,93 @@ return (
 
 style={{
 
-border:"2px solid #444",
+border:"2px solid #666",
 
 borderRadius:"8px",
 
 padding:"15px",
 
-background:"#f5f5f5",
+background:"#1e1e1e",
 
-marginTop:"10px"
+color:"white",
+
+marginBottom:"15px"
 
 }}
 
 >
 
 
+
+
+
 <h2>
 
-Electrical Simulation
+⚡ Electrical Simulation
 
 </h2>
+
+
+
+
+
+<div
+
+style={{
+
+background:"#333",
+
+padding:"10px",
+
+borderRadius:"5px",
+
+marginBottom:"10px"
+
+}}
+
+>
+
+
+<div>
+
+Devices: {graph.devices.length}
+
+</div>
+
+
+<div>
+
+Connections: {graph.connections.length}
+
+</div>
+
+
+<div>
+
+Source:
+
+{" "}
+
+{
+
+sourceId
+
+?
+
+"Breaker Panel"
+
+:
+
+"No breaker panel"
+
+}
+
+</div>
+
+
+</div>
+
+
 
 
 
@@ -173,7 +240,11 @@ disabled={running}
 
 style={{
 
-padding:"10px",
+width:"100%",
+
+padding:"12px",
+
+fontWeight:"bold",
 
 cursor:"pointer"
 
@@ -181,13 +252,14 @@ cursor:"pointer"
 
 >
 
+
 {
 
 running
 
 ?
 
-"Testing..."
+"Testing Circuit..."
 
 :
 
@@ -195,7 +267,30 @@ running
 
 }
 
+
 </button>
+
+
+
+
+
+
+
+
+
+{
+
+!result && (
+
+<p>
+
+Press TEST CIRCUIT to run inspection.
+
+</p>
+
+)
+
+}
 
 
 
@@ -229,7 +324,27 @@ Status:
 
 {" "}
 
-<span>
+{
+
+result.state==="COMPLETE"
+
+&&
+
+"✅ "
+
+}
+
+
+{
+
+result.state==="FAILED"
+
+&&
+
+"❌ "
+
+}
+
 
 {
 
@@ -237,9 +352,8 @@ result.state
 
 }
 
-</span>
-
 </h3>
+
 
 
 
@@ -258,41 +372,79 @@ Validation
 
 {
 
-result.validation.valid
+result.validation.messages.length===0
 
 ?
 
 <p>
 
-✅ All connections valid
+✅ No issues found.
 
 </p>
 
 :
 
-(
+result.validation.messages.map(
 
-<ul>
+(message,index)=>(
+
+
+<div
+
+key={index}
+
+style={{
+
+marginBottom:"5px"
+
+}}
+
+>
+
 
 {
 
-result.validation.messages.map(
-(message,index)=>(
-  <div key={index}>
+message.level==="ERROR"
 
-    {message.level === "ERROR" && "❌ "}
-    {message.level === "WARNING" && "⚠️ "}
-    {message.level === "INFO" && "ℹ️ "}
+&&
 
-    {message.message}
-
-  </div>
-)
-)
+"❌ "
 
 }
 
-</ul>
+
+{
+
+message.level==="WARNING"
+
+&&
+
+"⚠️ "
+
+}
+
+
+{
+
+message.level==="INFO"
+
+&&
+
+"ℹ️ "
+
+}
+
+
+
+{message.message}
+
+
+
+</div>
+
+
+)
+
 
 )
 
@@ -314,31 +466,20 @@ Power Flow
 
 
 
-<h4>
 
-Energized Devices
-
-</h4>
-
-
-
-{
-
-result.powerFlow.energizedDevices.length === 0
-
-?
 
 <p>
 
-No energized devices.
+⚡ Energized Devices:
+
+{" "}
+
+{result.powerFlow.energizedDevices.length}
 
 </p>
 
-:
 
-(
 
-<ul>
 
 {
 
@@ -346,11 +487,11 @@ result.powerFlow.energizedDevices.map(
 
 (id)=>(
 
-<li key={id}>
+<div key={id}>
 
 ⚡ {id}
 
-</li>
+</div>
 
 )
 
@@ -358,11 +499,6 @@ result.powerFlow.energizedDevices.map(
 
 }
 
-</ul>
-
-)
-
-}
 
 
 
@@ -370,33 +506,20 @@ result.powerFlow.energizedDevices.map(
 
 
 
-
-
-<h4>
-
-Energized Connections
-
-</h4>
-
-
-
-{
-
-result.powerFlow.energizedConnections.length === 0
-
-?
 
 <p>
 
-No energized connections.
+🔌 Energized Connections:
+
+{" "}
+
+{result.powerFlow.energizedConnections.length}
 
 </p>
 
-:
 
-(
 
-<ul>
+
 
 {
 
@@ -404,11 +527,11 @@ result.powerFlow.energizedConnections.map(
 
 (id)=>(
 
-<li key={id}>
+<div key={id}>
 
 🔌 {id}
 
-</li>
+</div>
 
 )
 
@@ -416,11 +539,6 @@ result.powerFlow.energizedConnections.map(
 
 }
 
-</ul>
-
-)
-
-}
 
 
 
@@ -428,33 +546,20 @@ result.powerFlow.energizedConnections.map(
 
 
 
-
-
-<h4>
-
-Failed Connections
-
-</h4>
-
-
-
-{
-
-result.powerFlow.failedConnections.length === 0
-
-?
 
 <p>
 
-✅ No failures detected.
+⚠️ Failed Connections:
+
+{" "}
+
+{result.powerFlow.failedConnections.length}
 
 </p>
 
-:
 
-(
 
-<ul>
+
 
 {
 
@@ -462,23 +567,18 @@ result.powerFlow.failedConnections.map(
 
 (id)=>(
 
-<li key={id}>
+<div key={id}>
 
-⚠️ {id}
+❌ {id}
 
-</li>
-
-)
+</div>
 
 )
-
-}
-
-</ul>
 
 )
 
 }
+
 
 
 
@@ -497,34 +597,24 @@ Animation Queue
 
 {
 
-result.animations.length === 0
+result.animations.length===0
 
 ?
 
-<p>
-
-No animation events.
-
-</p>
+<p>No events</p>
 
 :
-
-(
-
-<ul>
-
-{
 
 result.animations.map(
 
 (animation,index)=>(
 
 
-<li key={index}>
+<div key={index}>
 
 {animation.state}
 
-&nbsp;
+:
 
 {
 
@@ -534,15 +624,9 @@ animation.connectionId
 
 }
 
-&nbsp;
+({animation.delay}ms)
 
-(
-
-{animation.delay}ms
-
-)
-
-</li>
+</div>
 
 
 )
@@ -551,11 +635,7 @@ animation.connectionId
 
 }
 
-</ul>
 
-)
-
-}
 
 
 
@@ -566,6 +646,7 @@ animation.connectionId
 )
 
 }
+
 
 
 

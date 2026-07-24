@@ -1,4 +1,4 @@
-// Residential Wiring Simulator v2.3
+// Residential Wiring Simulator v2.4
 // Main simulator layout
 //
 // Handles:
@@ -7,6 +7,7 @@
 // - properties panel
 // - simulation panel
 // - live circuit graph
+// - breaker monitoring
 
 
 import {
@@ -22,6 +23,8 @@ import SimulationPanel from "../simulator/SimulationPanel";
 import ComponentLibrary from "../components/ComponentLibrary";
 
 import TopToolbar from "../components/TopToolbar";
+
+import BreakerPanel from "../components/BreakerPanel";
 
 import PropertiesPanel from "../components/PropertiesPanel";
 
@@ -49,30 +52,19 @@ import type {
 
 
 
-
-
 export default function SimulatorLayout(){
 
 
-
 const workspaceRef =
-
 useRef<WorkspaceHandle>(null);
 
 
 
-
-// Existing properties resize
-
 const resizing =
-
 useRef(false);
 
 
-// New component library resize
-
 const componentResizing =
-
 useRef(false);
 
 
@@ -80,62 +72,49 @@ useRef(false);
 
 
 const [selectedDevice,setSelectedDevice] =
-
 useState<ElectricalDevice|null>(null);
 
 
 
-
-
 const [devices,setDevices] =
-
 useState<ElectricalDevice[]>([]);
 
 
 
-
-
 const [,setConnections] =
-
 useState<Connection[]>([]);
 
 
 
-
-
 const [circuitPaths,setCircuitPaths] =
-
 useState<string[][]>([]);
 
 
 
-
-
 const [propertiesWidth,setPropertiesWidth] =
-
 useState(350);
 
 
 
-
-// New component panel width
-
 const [componentWidth,setComponentWidth] =
-
 useState(220);
+
+
+
+// NEW: electrical system status
+const [circuitStatus,setCircuitStatus] =
+useState<
+"READY" | "WARNING" | "FAULT"
+>("READY");
 
 
 
 
 
 const [graph,setGraph] =
-
 useState<CircuitGraph>({
-
 devices:[],
-
 connections:[]
-
 });
 
 
@@ -151,25 +130,17 @@ connections:[]
 // ---------------------------------
 
 function startResize(
-
 e:React.MouseEvent
-
 ){
 
-
 e.preventDefault();
-
 
 resizing.current=true;
 
 
-
 const startX=e.clientX;
 
-
 const startWidth=propertiesWidth;
-
-
 
 
 
@@ -177,13 +148,10 @@ const handleMouseMove=(event:MouseEvent)=>{
 
 
 if(!resizing.current)
-
 return;
 
 
-
 const delta=startX-event.clientX;
-
 
 
 const width=startWidth+delta;
@@ -196,10 +164,7 @@ setPropertiesWidth(width);
 
 }
 
-
 };
-
-
 
 
 
@@ -210,52 +175,32 @@ const stopResize=()=>{
 resizing.current=false;
 
 
-
 window.removeEventListener(
-
 "mousemove",
-
 handleMouseMove
-
 );
-
 
 
 window.removeEventListener(
-
 "mouseup",
-
 stopResize
-
 );
-
-
 
 };
 
 
 
 
-
 window.addEventListener(
-
 "mousemove",
-
 handleMouseMove
-
 );
-
 
 
 window.addEventListener(
-
 "mouseup",
-
 stopResize
-
 );
-
-
 
 }
 
@@ -272,11 +217,8 @@ stopResize
 // ---------------------------------
 
 function startComponentResize(
-
 e:React.MouseEvent
-
 ){
-
 
 e.preventDefault();
 
@@ -292,19 +234,14 @@ const startWidth=componentWidth;
 
 
 
-
-
 const handleMouseMove=(event:MouseEvent)=>{
 
 
 if(!componentResizing.current)
-
 return;
 
 
-
 const delta=event.clientX-startX;
-
 
 
 const width=startWidth+delta;
@@ -317,10 +254,7 @@ setComponentWidth(width);
 
 }
 
-
 };
-
-
 
 
 
@@ -331,52 +265,32 @@ const stopResize=()=>{
 componentResizing.current=false;
 
 
-
 window.removeEventListener(
-
 "mousemove",
-
 handleMouseMove
-
 );
-
 
 
 window.removeEventListener(
-
 "mouseup",
-
 stopResize
-
 );
-
-
 
 };
 
 
 
 
-
 window.addEventListener(
-
 "mousemove",
-
 handleMouseMove
-
 );
-
 
 
 window.addEventListener(
-
 "mouseup",
-
 stopResize
-
 );
-
-
 
 }
 
@@ -393,27 +307,19 @@ stopResize
 // ---------------------------------
 
 function handleDevicesChange(
-
 updatedDevices:ElectricalDevice[]
-
 ){
-
 
 setDevices(updatedDevices);
 
 
-
 setGraph(prev=>({
-
 
 devices:updatedDevices,
 
-
 connections:prev.connections
 
-
 }));
-
 
 }
 
@@ -430,27 +336,19 @@ connections:prev.connections
 // ---------------------------------
 
 function handleConnectionsChange(
-
 updatedConnections:Connection[]
-
 ){
-
 
 setConnections(updatedConnections);
 
 
-
 setGraph(prev=>({
-
 
 devices:prev.devices,
 
-
 connections:updatedConnections
 
-
 }));
-
 
 }
 
@@ -491,7 +389,6 @@ connections:currentConnections
 
 });
 
-
 }
 
 
@@ -529,8 +426,26 @@ overflow:"hidden"
 >
 
 
-<TopToolbar />
 
+<TopToolbar
+
+circuitStatus={circuitStatus}
+
+onResetBreaker={()=>
+
+setCircuitStatus("READY")
+
+}
+
+/>
+
+
+
+<BreakerPanel
+
+circuitStatus={circuitStatus}
+
+/>
 
 
 
@@ -745,8 +660,6 @@ userSelect:"none"
 
 
 
-{/* SCROLL AREA */}
-
 <div
 
 style={{
@@ -772,6 +685,9 @@ gap:"10px"
 >
 
 
+
+
+
 <button
 
 style={{
@@ -787,6 +703,7 @@ fontWeight:"bold"
 TEST CIRCUIT
 
 </button>
+
 
 
 
@@ -807,7 +724,6 @@ fontWeight:"bold"
 Update Simulation
 
 </button>
-
 
 
 
@@ -845,7 +761,6 @@ device.type==="Breaker Panel"
 
 
 
-
 <PropertiesPanel
 
 device={selectedDevice}
@@ -858,21 +773,22 @@ onUpdateDevice={(updated)=>{
 
 setSelectedDevice(updated);
 
-workspaceRef.current?.updateDevice(
-
-updated
-
-);
+workspaceRef.current?.updateDevice(updated);
 
 }}
 
 />
 
-</div>
+
 
 </div>
 
+
 </div>
+
+
+</div>
+
 
 </div>
 

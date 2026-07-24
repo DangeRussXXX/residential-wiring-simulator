@@ -1,4 +1,47 @@
-export default function TopToolbar() {
+type TopToolbarProps = {
+  circuitStatus?: "READY" | "WARNING" | "FAULT";
+  onResetBreaker?: () => void;
+};
+
+
+export default function TopToolbar({
+  circuitStatus = "READY",
+  onResetBreaker,
+}: TopToolbarProps) {
+
+
+  const statusColor =
+    circuitStatus === "FAULT"
+      ? "#ff4040"
+      : circuitStatus === "WARNING"
+      ? "#ffd700"
+      : "#39ff14";
+
+
+  const statusText =
+    circuitStatus === "FAULT"
+      ? "⚠ BREAKER TRIPPED | CIRCUIT FAULT"
+      : circuitStatus === "WARNING"
+      ? "⚡ CHECK CONNECTIONS | INCOMPLETE"
+      : "⚡ SYSTEM READY | 120V AC | FAULTS: 0";
+
+
+  const flowColor =
+    circuitStatus === "FAULT"
+      ? "#ff4040"
+      : circuitStatus === "WARNING"
+      ? "#ffd700"
+      : "#00eaff";
+
+
+  const flowSpeed =
+    circuitStatus === "FAULT"
+      ? "0.6s"
+      : circuitStatus === "WARNING"
+      ? "1s"
+      : "2s";
+
+
   return (
     <div
       style={{
@@ -15,7 +58,7 @@ export default function TopToolbar() {
       }}
     >
 
-      {/* flowing electricity line */}
+      {/* Electrical current flow */}
       <div
         style={{
           position: "absolute",
@@ -24,13 +67,15 @@ export default function TopToolbar() {
           height: "3px",
           width: "100%",
           background:
-            "linear-gradient(90deg, transparent, #00eaff, transparent)",
-          animation: "electricFlow 2s linear infinite",
+            `linear-gradient(90deg, transparent, ${flowColor}, transparent)`,
+          animation:
+            `electricFlow ${flowSpeed} linear infinite`,
         }}
       />
 
 
-      {/* LEFT - Simulator Name */}
+
+      {/* LEFT */}
       <div
         style={{
           flex: 1,
@@ -38,6 +83,7 @@ export default function TopToolbar() {
           alignItems: "center",
         }}
       >
+
         <h2
           style={{
             margin: 0,
@@ -50,11 +96,13 @@ export default function TopToolbar() {
         >
           ⚡ Residential Wiring Simulator
         </h2>
+
       </div>
 
 
 
-      {/* CENTER - Creator + System Status */}
+
+      {/* CENTER */}
       <div
         style={{
           flex: 1,
@@ -66,7 +114,8 @@ export default function TopToolbar() {
         }}
       >
 
-        {/* Creator link */}
+
+        {/* Creator Link */}
         <div
           onClick={() =>
             window.open(
@@ -74,6 +123,7 @@ export default function TopToolbar() {
               "_blank"
             )
           }
+
           style={{
             color: "#39ff14",
             fontSize: "17px",
@@ -82,11 +132,13 @@ export default function TopToolbar() {
             cursor: "pointer",
             transition: "all .2s ease",
           }}
+
           onMouseEnter={(e) => {
             e.currentTarget.style.color = "#00eaff";
             e.currentTarget.style.textShadow =
               "0 0 8px #00eaff";
           }}
+
           onMouseLeave={(e) => {
             e.currentTarget.style.color = "#39ff14";
             e.currentTarget.style.textShadow = "none";
@@ -96,6 +148,8 @@ export default function TopToolbar() {
         </div>
 
 
+
+
         {/* System Status */}
         <div
           style={{
@@ -103,28 +157,35 @@ export default function TopToolbar() {
             alignItems: "center",
             gap: "8px",
             fontSize: "12px",
-            color: "#9eefff",
+            color: statusColor,
             letterSpacing: "1px",
+            fontWeight: "700",
           }}
         >
+
           <span
             style={{
               height: "10px",
               width: "10px",
               borderRadius: "50%",
-              background: "#39ff14",
+              background: statusColor,
               display: "inline-block",
+              boxShadow:
+                `0 0 8px ${statusColor}`,
             }}
           />
 
-          SYSTEM READY | 120V AC | FAULTS: 0
+          {statusText}
+
         </div>
 
       </div>
 
 
 
-      {/* RIGHT - Controls */}
+
+
+      {/* RIGHT */}
       <div
         style={{
           flex: 1,
@@ -134,21 +195,51 @@ export default function TopToolbar() {
         }}
       >
 
+
+        {circuitStatus === "FAULT" && (
+          <button
+            onClick={onResetBreaker}
+
+            style={{
+              padding: "12px 20px",
+              borderRadius: "8px",
+              border:
+                "1px solid #ff4040",
+              background:
+                "linear-gradient(#3b1010,#140000)",
+              color: "#ff8080",
+              fontWeight: "800",
+              cursor: "pointer",
+              letterSpacing: "1px",
+            }}
+          >
+            🔄 RESET BREAKER
+          </button>
+        )}
+
+
+
+
+
         {["Save", "Load", "Print", "Lessons"].map((item) => (
+
           <button
             key={item}
+
             onClick={
               item === "Print"
                 ? () => window.print()
                 : undefined
             }
+
             style={{
               padding: "12px 22px",
               minWidth: "95px",
               borderRadius: "8px",
-              border: "1px solid #176070",
+              border:
+                "1px solid #176070",
               background:
-                "linear-gradient(#17202b, #080b10)",
+                "linear-gradient(#17202b,#080b10)",
               color: "#9eefff",
               fontSize: "15px",
               fontWeight: "700",
@@ -157,7 +248,9 @@ export default function TopToolbar() {
               transition: "all .2s ease",
             }}
 
-            onMouseEnter={(e) => {
+
+            onMouseEnter={(e)=>{
+
               e.currentTarget.style.background =
                 "#00eaff";
 
@@ -169,11 +262,14 @@ export default function TopToolbar() {
 
               e.currentTarget.style.boxShadow =
                 "0 0 12px rgba(0,234,255,.6)";
+
             }}
 
-            onMouseLeave={(e) => {
+
+            onMouseLeave={(e)=>{
+
               e.currentTarget.style.background =
-                "linear-gradient(#17202b, #080b10)";
+                "linear-gradient(#17202b,#080b10)";
 
               e.currentTarget.style.color =
                 "#9eefff";
@@ -183,29 +279,46 @@ export default function TopToolbar() {
 
               e.currentTarget.style.boxShadow =
                 "none";
+
             }}
+
           >
+
             {item}
+
           </button>
+
         ))}
 
+
       </div>
+
+
 
 
 
       <style>
         {`
           @keyframes electricFlow {
+
             0% {
               transform: translateX(-100%);
+              opacity: .4;
+            }
+
+            50% {
+              opacity: 1;
             }
 
             100% {
               transform: translateX(100%);
+              opacity: .4;
             }
+
           }
         `}
       </style>
+
 
     </div>
   );

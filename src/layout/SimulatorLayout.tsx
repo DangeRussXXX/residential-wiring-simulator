@@ -17,18 +17,13 @@ import {
 
 import Workspace from "../simulator/Workspace";
 
-
 import SimulationPanel from "../simulator/SimulationPanel";
-
 
 import ComponentLibrary from "../components/ComponentLibrary";
 
-
 import TopToolbar from "../components/TopToolbar";
 
-
 import PropertiesPanel from "../components/PropertiesPanel";
-
 
 
 import type {
@@ -56,60 +51,92 @@ import type {
 
 
 
-
-
 export default function SimulatorLayout(){
 
 
-  const workspaceRef =
-    useRef<WorkspaceHandle>(null);
 
+const workspaceRef =
 
-
-  const resizing =
-    useRef(false);
-
-
-
-
-  const [selectedDevice,setSelectedDevice] =
-    useState<ElectricalDevice | null>(null);
+useRef<WorkspaceHandle>(null);
 
 
 
 
-  const [devices,setDevices] =
-    useState<ElectricalDevice[]>([]);
+// Existing properties resize
+
+const resizing =
+
+useRef(false);
+
+
+// New component library resize
+
+const componentResizing =
+
+useRef(false);
 
 
 
 
-  const [connections,setConnections] =
-    useState<Connection[]>([]);
+
+const [selectedDevice,setSelectedDevice] =
+
+useState<ElectricalDevice|null>(null);
 
 
 
 
-  const [circuitPaths,setCircuitPaths] =
-    useState<string[][]>([]);
+
+const [devices,setDevices] =
+
+useState<ElectricalDevice[]>([]);
 
 
 
 
-  const [propertiesWidth,setPropertiesWidth] =
-    useState(350);
+
+const [,setConnections] =
+
+useState<Connection[]>([]);
 
 
 
 
-  const [graph,setGraph] =
-    useState<CircuitGraph>({
 
-      devices:[],
+const [circuitPaths,setCircuitPaths] =
 
-      connections:[]
+useState<string[][]>([]);
 
-    });
+
+
+
+
+const [propertiesWidth,setPropertiesWidth] =
+
+useState(350);
+
+
+
+
+// New component panel width
+
+const [componentWidth,setComponentWidth] =
+
+useState(220);
+
+
+
+
+
+const [graph,setGraph] =
+
+useState<CircuitGraph>({
+
+devices:[],
+
+connections:[]
+
+});
 
 
 
@@ -120,109 +147,114 @@ export default function SimulatorLayout(){
 
 
 // ---------------------------------
-// Resize properties panel
+// Resize right panel
 // ---------------------------------
 
 function startResize(
-  e:React.MouseEvent
+
+e:React.MouseEvent
+
 ){
 
 
-  e.preventDefault();
+e.preventDefault();
 
 
-  resizing.current = true;
-
-
-
-  const startX =
-    e.clientX;
+resizing.current=true;
 
 
 
-  const startWidth =
-    propertiesWidth;
+const startX=e.clientX;
+
+
+const startWidth=propertiesWidth;
 
 
 
 
 
-  const handleMouseMove =
-    (event:MouseEvent)=>{
+const handleMouseMove=(event:MouseEvent)=>{
 
 
-      if(!resizing.current)
+if(!resizing.current)
 
-        return;
-
-
-
-      const delta =
-        startX - event.clientX;
+return;
 
 
 
-      const newWidth =
-        startWidth + delta;
+const delta=startX-event.clientX;
 
 
 
+const width=startWidth+delta;
 
 
-      if(
-        newWidth >=260 &&
-        newWidth <=700
-      ){
 
-        setPropertiesWidth(newWidth);
+if(width>=260 && width<=700){
 
-      }
+setPropertiesWidth(width);
+
+}
 
 
-    };
+};
 
 
 
 
 
 
-  const stopResize = ()=>{
+const stopResize=()=>{
 
 
-    resizing.current = false;
-
-
-
-    window.removeEventListener(
-      "mousemove",
-      handleMouseMove
-    );
+resizing.current=false;
 
 
 
-    window.removeEventListener(
-      "mouseup",
-      stopResize
-    );
+window.removeEventListener(
 
+"mousemove",
 
-  };
+handleMouseMove
 
-
-
-
-
-  window.addEventListener(
-    "mousemove",
-    handleMouseMove
-  );
+);
 
 
 
-  window.addEventListener(
-    "mouseup",
-    stopResize
-  );
+window.removeEventListener(
+
+"mouseup",
+
+stopResize
+
+);
+
+
+
+};
+
+
+
+
+
+window.addEventListener(
+
+"mousemove",
+
+handleMouseMove
+
+);
+
+
+
+window.addEventListener(
+
+"mouseup",
+
+stopResize
+
+);
+
 
 
 }
@@ -236,23 +268,151 @@ function startResize(
 
 
 // ---------------------------------
-// Device updates from workspace
+// Resize component library
+// ---------------------------------
+
+function startComponentResize(
+
+e:React.MouseEvent
+
+){
+
+
+e.preventDefault();
+
+
+componentResizing.current=true;
+
+
+
+const startX=e.clientX;
+
+
+const startWidth=componentWidth;
+
+
+
+
+
+const handleMouseMove=(event:MouseEvent)=>{
+
+
+if(!componentResizing.current)
+
+return;
+
+
+
+const delta=event.clientX-startX;
+
+
+
+const width=startWidth+delta;
+
+
+
+if(width>=160 && width<=500){
+
+setComponentWidth(width);
+
+}
+
+
+};
+
+
+
+
+
+
+const stopResize=()=>{
+
+
+componentResizing.current=false;
+
+
+
+window.removeEventListener(
+
+"mousemove",
+
+handleMouseMove
+
+);
+
+
+
+window.removeEventListener(
+
+"mouseup",
+
+stopResize
+
+);
+
+
+
+};
+
+
+
+
+
+window.addEventListener(
+
+"mousemove",
+
+handleMouseMove
+
+);
+
+
+
+window.addEventListener(
+
+"mouseup",
+
+stopResize
+
+);
+
+
+
+}
+
+
+
+
+
+
+
+
+
+// ---------------------------------
+// Device updates
 // ---------------------------------
 
 function handleDevicesChange(
-  updatedDevices:ElectricalDevice[]
+
+updatedDevices:ElectricalDevice[]
+
 ){
 
-  setDevices(updatedDevices);
+
+setDevices(updatedDevices);
 
 
-  setGraph({
 
-    devices:updatedDevices,
+setGraph(prev=>({
 
-    connections
 
-  });
+devices:updatedDevices,
+
+
+connections:prev.connections
+
+
+}));
 
 
 }
@@ -266,24 +426,30 @@ function handleDevicesChange(
 
 
 // ---------------------------------
-// Connection updates from workspace
+// Connection updates
 // ---------------------------------
 
 function handleConnectionsChange(
-  updatedConnections:Connection[]
+
+updatedConnections:Connection[]
+
 ){
 
-  setConnections(updatedConnections);
+
+setConnections(updatedConnections);
 
 
 
-  setGraph({
+setGraph(prev=>({
 
-    devices,
 
-    connections:updatedConnections
+devices:prev.devices,
 
-  });
+
+connections:updatedConnections
+
+
+}));
 
 
 }
@@ -297,37 +463,33 @@ function handleConnectionsChange(
 
 
 // ---------------------------------
-// Manual simulation refresh
+// Manual refresh
 // ---------------------------------
 
-function handleRefreshSimulation(){
+function refreshSimulation(){
+
+
+const currentConnections =
+
+workspaceRef.current?.getConnections()
+
+??
+
+[];
 
 
 
-  const currentConnections =
-
-    workspaceRef.current?.getConnections()
-
-    ??
-
-    [];
+setConnections(currentConnections);
 
 
 
+setGraph({
 
+devices:devices,
 
-  setConnections(currentConnections);
+connections:currentConnections
 
-
-
-
-  setGraph({
-
-    devices,
-
-    connections:currentConnections
-
-  });
+});
 
 
 }
@@ -339,6 +501,10 @@ function handleRefreshSimulation(){
 
 
 
+
+// ---------------------------------
+// Render
+// ---------------------------------
 
 return (
 
@@ -354,14 +520,13 @@ flexDirection:"column",
 
 background:"#202124",
 
-color:"white"
+color:"white",
+
+overflow:"hidden"
 
 }}
 
 >
-
-
-
 
 
 <TopToolbar />
@@ -380,7 +545,11 @@ style={{
 
 flex:1,
 
-display:"flex"
+display:"flex",
+
+minHeight:0,
+
+overflow:"hidden"
 
 }}
 
@@ -394,15 +563,21 @@ display:"flex"
 
 
 
-{/* Component Library */}
+{/* COMPONENT LIBRARY */}
 
 <div
 
 style={{
 
-width:"220px",
+width:`${componentWidth}px`,
 
 background:"#252526",
+
+height:"100%",
+
+overflowY:"auto",
+
+overflowX:"hidden",
 
 flexShrink:0
 
@@ -428,7 +603,37 @@ workspaceRef={workspaceRef}
 
 
 
-{/* Workspace */}
+{/* COMPONENT RESIZE BAR */}
+
+<div
+
+onMouseDown={startComponentResize}
+
+style={{
+
+width:"10px",
+
+cursor:"col-resize",
+
+background:"#444",
+
+flexShrink:0,
+
+userSelect:"none"
+
+}}
+
+/>
+
+
+
+
+
+
+
+
+
+{/* WORKSPACE */}
 
 <div
 
@@ -440,45 +645,30 @@ padding:"15px",
 
 background:"#303030",
 
-overflow:"hidden"
+overflow:"hidden",
+
+minWidth:0,
+
+minHeight:0
 
 }}
 
 >
 
 
-
-
-
 <Workspace
 
 ref={workspaceRef}
 
+onSelectDevice={setSelectedDevice}
 
-onSelectDevice={
-  setSelectedDevice
-}
+onDevicesChange={handleDevicesChange}
 
+onConnectionsChange={handleConnectionsChange}
 
-onDevicesChange={
-  handleDevicesChange
-}
-
-
-onConnectionsChange={
-  handleConnectionsChange
-}
-
-
-onCircuitPathsChange={
-  setCircuitPaths
-}
-
+onCircuitPathsChange={setCircuitPaths}
 
 />
-
-
-
 
 
 </div>
@@ -491,7 +681,7 @@ onCircuitPathsChange={
 
 
 
-{/* Right Side Panel */}
+{/* RIGHT SIDE PANELS */}
 
 <div
 
@@ -507,6 +697,10 @@ display:"flex",
 
 background:"#252526",
 
+height:"100%",
+
+minHeight:0,
+
 flexShrink:0
 
 }}
@@ -521,7 +715,7 @@ flexShrink:0
 
 
 
-{/* Resize Handle */}
+{/* RESIZE BAR */}
 
 <div
 
@@ -551,13 +745,21 @@ userSelect:"none"
 
 
 
+{/* SCROLL AREA */}
+
 <div
 
 style={{
 
 flex:1,
 
-overflow:"auto",
+minHeight:0,
+
+overflowY:"auto",
+
+overflowX:"hidden",
+
+padding:"10px",
 
 display:"flex",
 
@@ -570,18 +772,33 @@ gap:"10px"
 >
 
 
+<button
 
+style={{
 
+padding:"12px",
+
+fontWeight:"bold"
+
+}}
+
+>
+
+TEST CIRCUIT
+
+</button>
 
 
 
 <button
 
-onClick={handleRefreshSimulation}
+onClick={refreshSimulation}
 
 style={{
 
-margin:"10px"
+padding:"12px",
+
+fontWeight:"bold"
 
 }}
 
@@ -607,7 +824,7 @@ sourceId={
 
 devices.find(
 
-device =>
+device=>
 
 device.type==="Breaker Panel"
 
@@ -637,14 +854,9 @@ devices={devices}
 
 circuitPaths={circuitPaths}
 
-
-
 onUpdateDevice={(updated)=>{
 
-
 setSelectedDevice(updated);
-
-
 
 workspaceRef.current?.updateDevice(
 
@@ -652,51 +864,18 @@ updated
 
 );
 
-
-
 }}
-
 
 />
 
-
-
-
-
-
-
-
+</div>
 
 </div>
 
-
-
-
-
-
-
-
-
 </div>
-
-
-
-
-
-
-
-
-
-</div>
-
-
-
-
-
 
 </div>
 
 );
-
 
 }

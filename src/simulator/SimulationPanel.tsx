@@ -147,9 +147,11 @@ padding:"15px",
 
 background:"#1e1e1e",
 
-color:"white",
+color:"#ffffff",
 
-marginBottom:"15px"
+marginBottom:"15px",
+
+overflow:"auto"
 
 }}
 
@@ -159,7 +161,17 @@ marginBottom:"15px"
 
 
 
-<h2>
+<h2
+
+style={{
+
+color:"#00d9ff",
+
+marginTop:0
+
+}}
+
+>
 
 ⚡ Electrical Simulation
 
@@ -169,17 +181,22 @@ marginBottom:"15px"
 
 
 
+
+
+
 <div
 
 style={{
 
-background:"#333",
+background:"#2b2b2b",
 
 padding:"10px",
 
 borderRadius:"5px",
 
-marginBottom:"10px"
+marginBottom:"10px",
+
+color:"#ffffff"
 
 }}
 
@@ -188,42 +205,136 @@ marginBottom:"10px"
 
 <div>
 
-Devices: {graph.devices.length}
+<strong>Devices:</strong>{" "}
+
+{graph.devices.length}
 
 </div>
 
 
+
 <div>
 
-Connections: {graph.connections.length}
+<strong>Connections:</strong>{" "}
+
+{graph.connections.length}
 
 </div>
 
 
+
 <div>
 
-Source:
+<strong>Source:</strong>{" "}
 
-{" "}
+{sourceId || "NONE"}
+
+</div>
+
+
+
+
+
+<hr/>
+
+
+
+
+
+<strong>Device List</strong>
+
+
 
 {
 
-sourceId
+graph.devices.length===0
 
 ?
 
-"Breaker Panel"
+<p>No devices loaded.</p>
 
 :
 
-"No breaker panel"
+graph.devices.map(device=>(
+
+<div
+
+key={device.id}
+
+style={{
+
+marginTop:"4px"
+
+}}
+
+>
+
+⚡ {device.name}
+
+({device.type})
+
+</div>
+
+))
 
 }
 
-</div>
 
 
+
+
+<hr/>
+
+
+
+
+
+<strong>Connection List</strong>
+
+
+
+{
+
+graph.connections.length===0
+
+?
+
+<p>No connections loaded.</p>
+
+:
+
+graph.connections.map(connection=>(
+
+<div
+
+key={connection.id}
+
+style={{
+
+marginTop:"4px"
+
+}}
+
+>
+
+🔌 {connection.from.deviceId}
+
+→
+
+{connection.to.deviceId}
+
 </div>
+
+))
+
+}
+
+
+
+
+
+</div>
+
 
 
 
@@ -318,7 +429,25 @@ marginTop:"15px"
 
 
 
-<h3>
+<h3
+
+style={{
+
+color:
+
+result.state==="COMPLETE"
+
+?
+
+"#00ff88"
+
+:
+
+"#ff5555"
+
+}}
+
+>
 
 Status:
 
@@ -328,27 +457,13 @@ Status:
 
 result.state==="COMPLETE"
 
-&&
+?
 
-"✅ "
+"✅ COMPLETE"
 
-}
+:
 
-
-{
-
-result.state==="FAILED"
-
-&&
-
-"❌ "
-
-}
-
-
-{
-
-result.state
+"❌ FAILED"
 
 }
 
@@ -477,6 +592,7 @@ Power Flow
 {result.powerFlow.energizedDevices.length}
 
 </p>
+
 
 
 
@@ -641,11 +757,69 @@ animation.connectionId
 
 
 
+
+
 </div>
 
 )
 
 }
+
+
+
+
+
+
+
+
+
+<hr/>
+
+
+
+
+
+<h3>
+
+Graph Debug
+
+</h3>
+
+
+
+<div>
+
+Devices loaded:
+
+{" "}
+
+{graph.devices.length}
+
+</div>
+
+
+
+<div>
+
+Connections loaded:
+
+{" "}
+
+{graph.connections.length}
+
+</div>
+
+
+
+<div>
+
+Source:
+
+{" "}
+
+{sourceId || "NONE"}
+
+</div>
 
 
 

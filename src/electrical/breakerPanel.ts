@@ -1,10 +1,10 @@
 // Residential Wiring Simulator v2.5
-// Breaker panel definitions
-//
-// Handles:
-// - breaker panel model
-// - breaker slots
-// - panel creation
+// Breaker Panel System
+
+import {
+  createBreaker
+} from "./breaker";
+
 
 
 import type {
@@ -12,46 +12,50 @@ import type {
 } from "./breaker";
 
 
+import type {
+  BreakerPoles
+} from "./types";
 
 
-// --------------------------------
-// Breaker slot
-// --------------------------------
 
 export interface BreakerSlot {
 
-  id:string;
+id:string;
 
-  slot:number;
+slot:number;
 
-  installed:boolean;
+installed:boolean;
 
-  breaker:Breaker | null;
+breaker:Breaker | null;
+
+
+occupiedBy?:string;
 
 }
 
 
-
-
-
-
-// --------------------------------
-// Breaker panel
-// --------------------------------
 
 export interface BreakerPanel {
 
 
   id:string;
 
-
   name:string;
+
+
+  manufacturer?:string;
+
+
+  model?:string;
 
 
   mainBreaker:number;
 
 
   voltage:240;
+
+
+  spaces:number;
 
 
   serviceConnected:boolean;
@@ -62,7 +66,6 @@ export interface BreakerPanel {
 
   breakers:BreakerSlot[];
 
-
 }
 
 
@@ -70,10 +73,8 @@ export interface BreakerPanel {
 
 
 
-
-
 // --------------------------------
-// Create breaker panel
+// Create Panel
 // --------------------------------
 
 export function createBreakerPanel(
@@ -89,7 +90,6 @@ export function createBreakerPanel(
 ):BreakerPanel {
 
 
-
 return {
 
 
@@ -97,10 +97,19 @@ id,
 
 name,
 
+
+manufacturer:"Generic",
+
+model:"Residential Load Center",
+
+
 mainBreaker,
 
 
 voltage:240,
+
+
+spaces:slots,
 
 
 serviceConnected:true,
@@ -109,21 +118,135 @@ serviceConnected:true,
 grounded:true,
 
 
-
 breakers:
 
 Array.from(
 
 {length:slots},
 
-(_,index)=>(
-
-
-{
+(_,index)=>({
 
 id:`slot-${index+1}`,
 
 slot:index+1,
+
+installed:false,
+
+breaker:null
+
+})
+
+)
+
+
+};
+
+
+}
+
+
+
+
+
+
+
+// --------------------------------
+// Install Breaker
+// --------------------------------
+
+export function installBreaker(
+
+panel:BreakerPanel,
+
+breaker:Breaker
+
+):BreakerPanel {
+
+
+
+return {
+
+
+...panel,
+
+
+breakers:
+
+panel.breakers.map(slot=>{
+
+
+if(slot.slot !== breaker.slot)
+
+return slot;
+
+
+
+return {
+
+
+...slot,
+
+
+installed:true,
+
+
+breaker
+
+
+};
+
+
+})
+
+
+};
+
+
+
+}
+
+
+
+
+
+
+
+
+// --------------------------------
+// Remove Breaker
+// --------------------------------
+
+export function removeBreaker(
+
+panel:BreakerPanel,
+
+slotNumber:number
+
+):BreakerPanel {
+
+
+
+return {
+
+
+...panel,
+
+
+breakers:
+
+panel.breakers.map(slot=>{
+
+
+if(slot.slot !== slotNumber)
+
+return slot;
+
+
+
+return {
+
+
+...slot,
 
 
 installed:false,
@@ -132,15 +255,83 @@ installed:false,
 breaker:null
 
 
-}
+};
 
 
-)
-
-)
+})
 
 
 };
+
+
+
+}
+
+
+
+
+
+
+
+// --------------------------------
+// Find Slot
+// --------------------------------
+
+export function getBreakerSlot(
+
+panel:BreakerPanel,
+
+slotNumber:number
+
+){
+
+
+return panel.breakers.find(
+
+slot=>slot.slot===slotNumber
+
+);
+
+
+}
+// --------------------------------
+// Add Standard Breaker
+// --------------------------------
+
+export function addStandardBreaker(
+
+  panel: BreakerPanel,
+
+  slotNumber:number,
+
+  amperage:number
+
+):BreakerPanel {
+
+
+const breaker = createBreaker(
+
+`breaker-${slotNumber}`,
+
+slotNumber,
+
+amperage,
+
+1 as BreakerPoles,
+
+"STANDARD"
+
+);
+
+
+
+return installBreaker(
+
+panel,
+
+breaker
+
+);
 
 
 }

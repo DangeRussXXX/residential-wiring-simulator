@@ -1,9 +1,8 @@
-
-
 import Terminal from "./Terminal";
 
-
-import type { ElectricalDevice } from "../electrical/types";
+import type {
+  ElectricalDevice
+} from "../electrical/types";
 
 
 type Props={
@@ -29,8 +28,6 @@ onStartDrag:(id:string)=>void;
 
 
 
-
-
 export default function Device({
 
 device,
@@ -53,91 +50,408 @@ onStartDrag
 
 
 
-function appearance(){
+function renderDeviceBody(){
 
 
-switch(device.type){
-
-
-case "Breaker Panel":
-
-return {
-
-icon:"⚡",
-
-color:"#bdbdbd"
-
-};
+switch(device.symbol){
 
 
 
-case "Switch":
+case "breaker-panel":
 
-return {
+return (
 
-icon:"◐",
+<div
 
-color:"#ffffff"
+style={{
 
-};
+width:"90px",
+
+height:"65px",
+
+background:"#b7b7b7",
+
+border:"2px solid #222",
+
+borderRadius:"4px",
+
+padding:"5px",
+
+boxSizing:"border-box"
+
+}}
+
+>
+
+<div
+
+style={{
+
+fontSize:"9px",
+
+fontWeight:"bold",
+
+textAlign:"center"
+
+}}
+
+>
+
+MAIN {device.mainBreaker}A
+
+</div>
+
+
+<div
+
+style={{
+
+display:"grid",
+
+gridTemplateColumns:"repeat(4,1fr)",
+
+gap:"3px",
+
+marginTop:"6px"
+
+}}
+
+>
+
+{
+
+Array.from({
+
+length:12
+
+}).map((_,i)=>(
+
+<div
+
+key={i}
+
+style={{
+
+height:"8px",
+
+background:"#222",
+
+borderRadius:"2px"
+
+}}
+
+/>
+
+))
+
+}
+
+</div>
+
+
+</div>
+
+);
 
 
 
-case "Light":
+case "switch-single":
 
-return {
+return (
 
-icon:"💡",
+<div
 
-color:"#fff2a8"
+style={{
 
-};
+width:"45px",
+
+height:"65px",
+
+background:"#eee",
+
+border:"2px solid #333",
+
+borderRadius:"3px"
+
+}}
+
+>
+
+<div
+
+style={{
+
+width:"4px",
+
+height:"35px",
+
+background:"#555",
+
+margin:"12px auto"
+
+}}
+
+/>
+
+</div>
+
+);
 
 
 
-case "Receptacle":
+case "outlet":
 
-return {
+return (
 
-icon:"🔌",
+<div
 
-color:"#f5f5f5"
+style={{
 
-};
+width:"55px",
+
+height:"70px",
+
+background:"#eee",
+
+border:"2px solid #333",
+
+borderRadius:"4px"
+
+}}
+
+>
+
+<div
+
+style={{
+
+marginTop:"15px",
+
+fontSize:"22px",
+
+textAlign:"center"
+
+}}
+
+>
+
+||
+
+</div>
+
+
+<div
+
+style={{
+
+fontSize:"10px",
+
+textAlign:"center"
+
+}}
+
+>
+
+120V
+
+</div>
+
+
+</div>
+
+);
 
 
 
-case "GFCI":
+case "gfci":
 
-return {
+return (
 
-icon:"GFCI",
+<div
 
-color:"#eeeeee"
+style={{
 
-};
+width:"60px",
+
+height:"75px",
+
+background:"#eee",
+
+border:"2px solid #333",
+
+borderRadius:"4px"
+
+}}
+
+>
+
+<button
+
+style={{
+
+fontSize:"8px",
+
+margin:"8px"
+
+}}
+
+>
+
+TEST
+
+</button>
+
+
+<button
+
+style={{
+
+fontSize:"8px"
+
+}}
+
+>
+
+RESET
+
+</button>
+
+
+</div>
+
+);
+
+
+
+case "light-ceiling":
+
+return (
+
+<div
+
+style={{
+
+fontSize:"40px"
+
+}}
+
+>
+
+◉
+
+</div>
+
+);
+
+
+
+case "range":
+
+return (
+
+<div
+
+style={{
+
+width:"80px",
+
+height:"65px",
+
+background:"#555",
+
+border:"2px solid black",
+
+borderRadius:"5px",
+
+color:"white",
+
+fontSize:"12px",
+
+display:"flex",
+
+alignItems:"center",
+
+justifyContent:"center"
+
+}}
+
+>
+
+RANGE
+
+</div>
+
+);
+
+
+
+case "hvac":
+
+return (
+
+<div
+
+style={{
+
+width:"80px",
+
+height:"70px",
+
+background:"#777",
+
+border:"2px solid #222",
+
+borderRadius:"5px",
+
+color:"white",
+
+fontSize:"12px",
+
+display:"flex",
+
+alignItems:"center",
+
+justifyContent:"center"
+
+}}
+
+>
+
+HVAC
+
+</div>
+
+);
 
 
 
 default:
 
-return {
+return (
 
-icon:"▣",
+<div
 
-color:"#ffffff"
+style={{
 
-};
+fontSize:"32px"
+
+}}
+
+>
+
+▣
+
+</div>
+
+);
+
 
 }
 
+
 }
 
 
-
-
-
-const style=appearance();
 
 
 
@@ -147,7 +461,9 @@ return (
 
 <div
 
+
 className="device-component"
+
 
 onMouseDown={(e)=>{
 
@@ -155,7 +471,6 @@ e.stopPropagation();
 
 
 onSelect(device.id);
-
 
 
 if(!wireMode){
@@ -167,11 +482,9 @@ onStartDrag(device.id);
 }}
 
 
-
 style={{
 
 position:"absolute",
-
 
 left:device.x,
 
@@ -180,11 +493,12 @@ top:device.y,
 
 width:"150px",
 
-height:"95px",
+height:"120px",
 
 overflow:"visible",
 
-background:style.color,
+
+background:"transparent",
 
 
 border:
@@ -197,7 +511,7 @@ selected
 
 :
 
-"2px solid #333",
+"none",
 
 
 borderRadius:"8px",
@@ -213,8 +527,7 @@ selected
 
 :
 
-"0 4px 12px rgba(0,0,0,.25)",
-
+"none",
 
 
 display:"flex",
@@ -224,10 +537,6 @@ flexDirection:"column",
 alignItems:"center",
 
 justifyContent:"center",
-
-
-
-fontWeight:"bold",
 
 
 cursor:
@@ -243,35 +552,34 @@ wireMode
 "grab",
 
 
-
 userSelect:"none",
 
 zIndex:10
 
 }}
 
-
-
 >
+
+
+{renderDeviceBody()}
+
 
 
 <div
 
 style={{
 
-fontSize:"28px"
+fontSize:"12px",
+
+fontWeight:"bold",
+
+marginTop:"5px",
+
+color:"#111"
 
 }}
 
 >
-
-{style.icon}
-
-</div>
-
-
-
-<div>
 
 {device.name}
 
@@ -304,12 +612,14 @@ selectedTerminal===
 }
 
 
-
 onClick={()=>{
 
 onTerminalClick(
-  device.id,
-  t.id
+
+device.id,
+
+t.id
+
 );
 
 }}

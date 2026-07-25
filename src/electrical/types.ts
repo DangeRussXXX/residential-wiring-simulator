@@ -325,14 +325,13 @@ export type DeviceType =
 
 export interface ElectricalDevice {
 
+id:string;
 
-  id:string;
+name:string;
 
+symbol:string;
 
-  name:string;
-
-
-  type:DeviceType;
+type:DeviceType;
 
 
 

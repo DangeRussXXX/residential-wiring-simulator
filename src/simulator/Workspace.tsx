@@ -64,12 +64,12 @@ import type {
 export type WorkspaceHandle = {
 
 
-  addDevice:
-
-  (
-    name:string
-  )=>void;
-
+addDevice:
+(
+ name:string,
+ x?:number,
+ y?:number
+)=>void;
 
 
   updateDevice:
@@ -227,7 +227,11 @@ useRef<SVGSVGElement|null>(null);
 
 function createDevice(
 
-  name:string
+  name:string,
+
+  dropX:number = 150,
+
+  dropY:number = 120
 
 ){
 
@@ -273,17 +277,19 @@ id:
 
 const device:ElectricalDevice = {
 
-
 id:
 
 crypto.randomUUID(),
-
 
 
 name:
 
 definition.name,
 
+
+symbol:
+
+definition.symbol,
 
 
 type:
@@ -360,11 +366,9 @@ definition.electrical?.voltage ?? 120
 
 
 
-x:150,
+x:dropX,
 
-
-
-y:120,
+y:dropY,
 
 
 
@@ -1360,7 +1364,75 @@ device.y + terminal.y
 
 
 
+// ----------------------------------
+// COMPONENT LIBRARY DRAG DROP
+// ----------------------------------
 
+function allowDrop(
+e:React.DragEvent<HTMLDivElement>
+){
+
+e.preventDefault();
+
+}
+
+
+
+function dropComponent(
+e:React.DragEvent<HTMLDivElement>
+){
+
+e.preventDefault();
+
+
+const componentName =
+
+e.dataTransfer.getData(
+"componentType"
+);
+
+
+
+if(!componentName)
+
+return;
+
+
+
+const rect =
+
+e.currentTarget.getBoundingClientRect();
+
+
+
+const x =
+
+e.clientX -
+
+rect.left;
+
+
+
+const y =
+
+e.clientY -
+
+rect.top;
+
+
+
+createDevice(
+
+componentName,
+
+x,
+
+y
+
+);
+
+
+}
 
 
 
@@ -1490,6 +1562,11 @@ Clear
 <div
 
 className="training-board"
+
+onDragOver={allowDrop}
+
+onDrop={dropComponent}
+
 
 onMouseDown={(e)=>{
 

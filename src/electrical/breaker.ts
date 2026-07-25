@@ -1,8 +1,5 @@
 // Residential Wiring Simulator v2.5
 // Individual breaker system
-//
-// Represents physical breakers installed inside panels
-
 
 import type {
   BreakerPoles,
@@ -11,10 +8,7 @@ import type {
 
 
 
-
-
 export type BreakerType =
-
   | "STANDARD"
   | "AFCI"
   | "GFCI"
@@ -22,116 +16,65 @@ export type BreakerType =
 
 
 
-
-
 export type BreakerStatus =
-
   | "OFF"
   | "ON"
   | "TRIPPED";
 
 
 
-
-
 export interface BreakerTerminal {
-
 
   id:string;
 
-
   type:
-
     | "HOT"
-
     | "NEUTRAL";
 
-
 }
-
-
-
-
-
 
 
 
 export interface Breaker {
 
-
   id:string;
 
-
-
-  // Panel position
-
   slot:number;
-
-
 
   label:string;
 
 
-
-  // Electrical rating
-
   amperage:number;
-
-
 
   poles:BreakerPoles;
 
-
-
   voltage:Voltage;
-
 
 
   breakerType:BreakerType;
 
 
-
-  // Physical terminals
-
   terminals:BreakerTerminal[];
 
-
-
-
-  // Circuit assigned
 
   circuitId?:string;
 
 
-
-  // Devices downstream
-
   connectedDevices:string[];
 
 
-
-
-  // State
-
   status:BreakerStatus;
-
 
 
   energized:boolean;
 
 
-
   tripped:boolean;
-
 
 
   tripReason?:string;
 
-
 }
-
-
-
 
 
 
@@ -153,41 +96,30 @@ breakerType:BreakerType="STANDARD"
 ):Breaker {
 
 
-
 return {
 
-
 id,
-
 
 slot,
 
 
 label:
-
-`${amperage}A Breaker`,
+`${amperage}A ${breakerType}`,
 
 
 
 amperage,
 
 
-
 poles,
-
 
 
 voltage:
 
 poles===2
 
-?
-
-240
-
-:
-
-120,
+?240
+:120,
 
 
 
@@ -195,16 +127,11 @@ breakerType,
 
 
 
-terminals:
-
-[
+terminals:[
 
 {
-
 id:"line",
-
 type:"HOT"
-
 }
 
 ],
@@ -218,20 +145,52 @@ connectedDevices:[],
 status:"OFF",
 
 
-
 energized:false,
 
 
 tripped:false
 
-
 };
-
 
 }
 
 
 
+
+
+
+// --------------------------------
+// Library breaker presets
+// --------------------------------
+
+
+export function createLibraryBreaker(
+
+amperage:number,
+
+poles:BreakerPoles,
+
+breakerType:BreakerType
+
+):Breaker {
+
+
+return createBreaker(
+
+crypto.randomUUID(),
+
+0,
+
+amperage,
+
+poles,
+
+breakerType
+
+);
+
+
+}
 
 
 
@@ -247,32 +206,21 @@ reason:string
 ):Breaker {
 
 
-
 return {
-
 
 ...breaker,
 
-
 status:"TRIPPED",
-
 
 energized:false,
 
-
 tripped:true,
-
 
 tripReason:reason
 
-
 };
 
-
 }
-
-
-
 
 
 
@@ -286,32 +234,21 @@ breaker:Breaker
 ):Breaker {
 
 
-
 return {
-
 
 ...breaker,
 
-
 status:"OFF",
-
 
 energized:false,
 
-
 tripped:false,
-
 
 tripReason:undefined
 
-
 };
 
-
 }
-
-
-
 
 
 
@@ -325,7 +262,6 @@ breaker:Breaker
 ):Breaker {
 
 
-
 if(breaker.tripped)
 
 return breaker;
@@ -334,17 +270,12 @@ return breaker;
 
 return {
 
-
 ...breaker,
-
 
 status:"ON",
 
-
 energized:true
 
-
 };
-
 
 }

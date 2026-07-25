@@ -1,10 +1,18 @@
-import type { BreakerPanel as BreakerPanelType } from "../electrical/breakerPanel";
+import {
+  useState
+} from "react";
+
+
+import type {
+  BreakerPanel as BreakerPanelType
+} from "../electrical/breakerPanel";
 
 
 type BreakerPanelProps = {
+
   panel: BreakerPanelType;
 
-  circuitStatus?: 
+  circuitStatus?:
     | "READY"
     | "WARNING"
     | "FAULT";
@@ -12,197 +20,632 @@ type BreakerPanelProps = {
   onTrip?: () => void;
 
   onReset?: () => void;
+
 };
 
 
 
+
+
 export default function BreakerPanel({
+
   panel,
+
   circuitStatus = "READY",
+
   onTrip,
+
   onReset,
+
 }: BreakerPanelProps) {
 
 
-  const statusColor =
-    circuitStatus === "FAULT"
-      ? "#ff4040"
-      : circuitStatus === "WARNING"
-      ? "#ffd700"
-      : "#39ff14";
 
+const [
 
-  const statusText =
-    circuitStatus === "FAULT"
-      ? "BREAKER TRIPPED"
-      : circuitStatus === "WARNING"
-      ? "CHECK CONNECTIONS"
-      : "BREAKER READY";
+selectedSlot,
 
+setSelectedSlot
 
-
-  return (
-
-    <div
-      style={{
-        background:
-          "linear-gradient(135deg,#111827,#050505)",
-        border:"1px solid #176070",
-        borderRadius:"10px",
-        padding:"15px",
-        color:"white",
-        display:"flex",
-        flexDirection:"column",
-        gap:"12px",
-      }}
-    >
-
-
-      <h3
-        style={{
-          margin:0,
-          color:"#00eaff",
-          letterSpacing:"1px",
-        }}
-      >
-        ⚡ Main Breaker Panel
-      </h3>
-
-
-
-      <div
-        style={{
-          display:"flex",
-          justifyContent:"space-between",
-          alignItems:"center",
-        }}
-      >
-
-        <span>
-          {panel.name}
-        </span>
-
-
-        <span
-          style={{
-            color:statusColor,
-            fontWeight:800,
-          }}
-        >
-          ● {statusText}
-        </span>
-
-      </div>
+]=useState<number | null>(null);
 
 
 
 
-      <div
-        style={{
-          display:"grid",
-          gridTemplateColumns:"1fr 1fr",
-          gap:"10px",
-        }}
-      >
 
 
-        <div
-          style={{
-            background:"#080b10",
-            padding:"10px",
-            borderRadius:"6px",
-            border:"1px solid #176070",
-          }}
-        >
+const statusColor =
 
-          Main Breaker
+  circuitStatus === "FAULT"
 
-          <br/>
+    ? "#ff4040"
 
-          <strong>
-            {panel.mainBreaker}A
-          </strong>
+    : circuitStatus === "WARNING"
 
-        </div>
+    ? "#ffd700"
 
-
-
-        <div
-          style={{
-            background:"#080b10",
-            padding:"10px",
-            borderRadius:"6px",
-            border:"1px solid #176070",
-          }}
-        >
-
-          Circuits
-
-          <br/>
-
-          <strong>
-            12
-          </strong>
-
-        </div>
-
-
-      </div>
+    : "#39ff14";
 
 
 
 
-      <div
-        style={{
-          display:"flex",
-          gap:"10px",
-        }}
-      >
 
 
-        <button
-          onClick={onTrip}
-          style={{
-            flex:1,
-            padding:"10px",
-            borderRadius:"6px",
-            border:"1px solid #ff4040",
-            background:
-              "linear-gradient(#3b1010,#140000)",
-            color:"#ff8080",
-            fontWeight:800,
-            cursor:"pointer",
-          }}
-        >
-          ⚠ TRIP BREAKER
-        </button>
+const statusText =
+
+  circuitStatus === "FAULT"
+
+    ? "BREAKER TRIPPED"
+
+    : circuitStatus === "WARNING"
+
+    ? "CHECK CONNECTIONS"
+
+    : "BREAKER READY";
 
 
 
 
-        <button
-          onClick={onReset}
-          style={{
-            flex:1,
-            padding:"10px",
-            borderRadius:"6px",
-            border:"1px solid #39ff14",
-            background:
-              "linear-gradient(#123b12,#001400)",
-            color:"#39ff14",
-            fontWeight:800,
-            cursor:"pointer",
-          }}
-        >
-          🔄 RESET
-        </button>
 
 
-      </div>
+return (
+
+<div
+
+style={{
+
+background:
+"linear-gradient(135deg,#111827,#050505)",
+
+border:"1px solid #176070",
+
+borderRadius:"10px",
+
+padding:"15px",
+
+color:"white",
+
+display:"flex",
+
+flexDirection:"column",
+
+gap:"12px",
+
+}}
+
+>
 
 
-    </div>
 
-  );
+
+<h3
+
+style={{
+
+margin:0,
+
+color:"#00eaff",
+
+letterSpacing:"1px",
+
+}}
+
+>
+
+⚡ Main Breaker Panel
+
+</h3>
+
+
+
+
+
+
+
+<div
+
+style={{
+
+display:"flex",
+
+justifyContent:"space-between",
+
+alignItems:"center",
+
+}}
+
+>
+
+
+<span>
+
+{panel.name}
+
+</span>
+
+
+
+<span
+
+style={{
+
+color:statusColor,
+
+fontWeight:800,
+
+}}
+
+>
+
+● {statusText}
+
+</span>
+
+
+</div>
+
+
+
+
+
+
+
+
+{/* PANEL INFORMATION */}
+
+<div
+
+style={{
+
+display:"grid",
+
+gridTemplateColumns:"1fr 1fr",
+
+gap:"10px",
+
+}}
+
+>
+
+
+
+<div
+
+style={{
+
+background:"#080b10",
+
+padding:"10px",
+
+borderRadius:"6px",
+
+border:"1px solid #176070",
+
+}}
+
+>
+
+Main Breaker
+
+<br/>
+
+<strong>
+
+{panel.mainBreaker}A
+
+</strong>
+
+</div>
+
+
+
+
+
+<div
+
+style={{
+
+background:"#080b10",
+
+padding:"10px",
+
+borderRadius:"6px",
+
+border:"1px solid #176070",
+
+}}
+
+>
+
+Breaker Slots
+
+<br/>
+
+<strong>
+
+{panel.breakers.length}
+
+</strong>
+
+</div>
+
+
+
+</div>
+
+
+
+
+
+
+
+
+{/* BREAKER SLOTS */}
+
+<div
+
+style={{
+
+display:"grid",
+
+gridTemplateColumns:"repeat(4,1fr)",
+
+gap:"8px",
+
+}}
+
+>
+
+
+{
+
+panel.breakers.map((slot)=>(
+
+
+<div
+
+key={slot.id}
+
+onClick={()=>{
+
+setSelectedSlot(slot.slot);
+
+}}
+
+style={{
+
+background:
+
+slot.installed
+
+?
+
+"#123b12"
+
+:
+
+selectedSlot === slot.slot
+
+?
+
+"#17202b"
+
+:
+
+"#080b10",
+
+
+border:
+
+selectedSlot === slot.slot
+
+?
+
+"2px solid #00eaff"
+
+:
+
+slot.installed
+
+?
+
+"1px solid #39ff14"
+
+:
+
+"1px solid #176070",
+
+
+borderRadius:"6px",
+
+padding:"8px",
+
+textAlign:"center",
+
+fontSize:"12px",
+
+cursor:"pointer",
+
+transition:".2s",
+
+}}
+
+>
+
+
+<div>
+
+SLOT {slot.slot}
+
+</div>
+
+
+
+
+<div
+
+style={{
+
+marginTop:"5px",
+
+color:
+
+slot.installed
+
+?
+
+"#39ff14"
+
+:
+
+"#777",
+
+fontWeight:800,
+
+}}
+
+>
+
+
+{
+
+slot.installed && slot.breaker
+
+?
+
+`${slot.breaker.amperage}A ${slot.breaker.breakerType}`
+
+:
+
+"EMPTY"
+
+}
+
+
+</div>
+
+
+</div>
+
+
+))
+
+}
+
+
+</div>
+
+
+
+
+
+
+
+
+
+{/* SELECTED SLOT */}
+
+{
+
+selectedSlot &&
+
+(
+
+<div
+
+style={{
+
+background:"#080b10",
+
+border:"1px solid #176070",
+
+borderRadius:"8px",
+
+padding:"12px",
+
+}}
+
+>
+
+
+<h4>
+
+Slot {selectedSlot} Selected
+
+</h4>
+
+
+
+<p
+
+style={{
+
+color:"#9eefff"
+
+}}
+
+>
+
+Breaker installation interface ready.
+
+</p>
+
+
+
+<button
+
+onClick={()=>{
+
+console.log(
+
+"Install breaker requested",
+
+selectedSlot
+
+);
+
+}}
+
+style={{
+
+padding:"10px",
+
+width:"100%",
+
+background:"#123b12",
+
+color:"#39ff14",
+
+border:"1px solid #39ff14",
+
+borderRadius:"6px",
+
+fontWeight:800,
+
+cursor:"pointer",
+
+}}
+
+>
+
+Install 20A Standard Breaker
+
+</button>
+
+
+
+</div>
+
+)
+
+}
+
+
+
+
+
+
+
+
+
+
+{/* CONTROLS */}
+
+<div
+
+style={{
+
+display:"flex",
+
+gap:"10px",
+
+}}
+
+>
+
+
+
+<button
+
+onClick={onTrip}
+
+style={{
+
+flex:1,
+
+padding:"10px",
+
+borderRadius:"6px",
+
+border:"1px solid #ff4040",
+
+background:
+
+"linear-gradient(#3b1010,#140000)",
+
+color:"#ff8080",
+
+fontWeight:800,
+
+cursor:"pointer",
+
+}}
+
+>
+
+⚠ TRIP BREAKER
+
+</button>
+
+
+
+
+
+
+
+<button
+
+onClick={onReset}
+
+style={{
+
+flex:1,
+
+padding:"10px",
+
+borderRadius:"6px",
+
+border:"1px solid #39ff14",
+
+background:
+
+"linear-gradient(#123b12,#001400)",
+
+color:"#39ff14",
+
+fontWeight:800,
+
+cursor:"pointer",
+
+}}
+
+>
+
+🔄 RESET
+
+</button>
+
+
+
+</div>
+
+
+
+
+
+</div>
+
+);
+
 
 }

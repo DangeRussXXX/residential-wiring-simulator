@@ -38,35 +38,39 @@ cable:CableType
 ):CircuitGraph {
 
 
-
 const connection:Connection = {
-
 
 id:crypto.randomUUID(),
 
-
 from,
-
 
 to,
 
-
 cable,
 
+wire:{
+
+gauge:"#14",
+
+conductors:2,
+
+cableType:cable,
+
+length:0,
+
+ampacity:15,
+
+color:"BLACK"
+
+},
+
+installationMethod:"NM-B",
 
 status:"CONNECTED",
 
-
-// NEW
-// Starts off not energized.
-// Power flow engine will update this.
-
 energized:false
 
-
-
 };
-
 
 
 return addConnectionToGraph(

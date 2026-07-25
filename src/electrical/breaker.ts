@@ -1,6 +1,7 @@
-// Residential Wiring Simulator v2.3
+// Residential Wiring Simulator v2.5
 // Individual breaker system
-// Represents a physical circuit breaker
+//
+// Represents physical breakers installed inside panels
 
 
 import type {
@@ -23,6 +24,36 @@ export type BreakerType =
 
 
 
+export type BreakerStatus =
+
+  | "OFF"
+  | "ON"
+  | "TRIPPED";
+
+
+
+
+
+export interface BreakerTerminal {
+
+
+  id:string;
+
+
+  type:
+
+    | "HOT"
+
+    | "NEUTRAL";
+
+
+}
+
+
+
+
+
+
 
 
 export interface Breaker {
@@ -31,10 +62,25 @@ export interface Breaker {
   id:string;
 
 
+
+  // Panel position
+
+  slot:number;
+
+
+
+  label:string;
+
+
+
+  // Electrical rating
+
   amperage:number;
 
 
+
   poles:BreakerPoles;
+
 
 
   voltage:Voltage;
@@ -45,18 +91,38 @@ export interface Breaker {
 
 
 
-  // Circuit assigned to breaker
+  // Physical terminals
+
+  terminals:BreakerTerminal[];
+
+
+
+
+  // Circuit assigned
 
   circuitId?:string;
 
 
 
-  // Electrical state
+  // Devices downstream
+
+  connectedDevices:string[];
+
+
+
+
+  // State
+
+  status:BreakerStatus;
+
+
 
   energized:boolean;
 
 
+
   tripped:boolean;
+
 
 
   tripReason?:string;
@@ -71,9 +137,12 @@ export interface Breaker {
 
 
 
+
 export function createBreaker(
 
 id:string,
+
+slot:number,
 
 amperage:number,
 
@@ -91,15 +160,26 @@ return {
 id,
 
 
+slot,
+
+
+label:
+
+`${amperage}A Breaker`,
+
+
+
 amperage,
+
 
 
 poles,
 
 
+
 voltage:
 
-poles === 2
+poles===2
 
 ?
 
@@ -110,7 +190,33 @@ poles === 2
 120,
 
 
+
 breakerType,
+
+
+
+terminals:
+
+[
+
+{
+
+id:"line",
+
+type:"HOT"
+
+}
+
+],
+
+
+
+connectedDevices:[],
+
+
+
+status:"OFF",
+
 
 
 energized:false,
@@ -141,10 +247,14 @@ reason:string
 ):Breaker {
 
 
+
 return {
 
 
 ...breaker,
+
+
+status:"TRIPPED",
 
 
 energized:false,
@@ -176,10 +286,14 @@ breaker:Breaker
 ):Breaker {
 
 
+
 return {
 
 
 ...breaker,
+
+
+status:"OFF",
 
 
 energized:false,
@@ -222,6 +336,9 @@ return {
 
 
 ...breaker,
+
+
+status:"ON",
 
 
 energized:true

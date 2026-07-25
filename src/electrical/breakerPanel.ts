@@ -1,6 +1,10 @@
-// Residential Wiring Simulator v2.3
-// Breaker panel hierarchy system
-// Panel contains breaker slots which contain breakers
+// Residential Wiring Simulator v2.5
+// Breaker panel definitions
+//
+// Handles:
+// - breaker panel model
+// - breaker slots
+// - panel creation
 
 
 import type {
@@ -10,29 +14,19 @@ import type {
 
 
 
+// --------------------------------
+// Breaker slot
+// --------------------------------
 
 export interface BreakerSlot {
 
-
   id:string;
-
-
-  // Physical position
 
   slot:number;
 
-
-
-  // Installed breaker
-
-  breaker?:Breaker;
-
-
-
-  // Slot state
-
   installed:boolean;
 
+  breaker:Breaker | null;
 
 }
 
@@ -41,7 +35,9 @@ export interface BreakerSlot {
 
 
 
-
+// --------------------------------
+// Breaker panel
+// --------------------------------
 
 export interface BreakerPanel {
 
@@ -52,28 +48,21 @@ export interface BreakerPanel {
   name:string;
 
 
-
-  // Main service breaker
-
   mainBreaker:number;
-
 
 
   voltage:240;
 
 
-
-  breakers:BreakerSlot[];
-
-
-
   serviceConnected:boolean;
-
 
 
   grounded:boolean;
 
 
+  breakers:BreakerSlot[];
+
+
 }
 
 
@@ -82,50 +71,22 @@ export interface BreakerPanel {
 
 
 
+
+// --------------------------------
+// Create breaker panel
+// --------------------------------
 
 export function createBreakerPanel(
 
-id:string,
+  id:string,
 
-name:string,
+  name:string,
 
-mainBreaker:number,
+  mainBreaker:number,
 
-spaces:number
+  slots:number
 
 ):BreakerPanel {
-
-
-
-const breakers:BreakerSlot[]=[];
-
-
-
-
-for(
-let i=1;
-i<=spaces;
-i++
-){
-
-
-breakers.push({
-
-
-id:`slot-${i}`,
-
-
-slot:i,
-
-
-installed:false
-
-
-});
-
-
-}
-
 
 
 
@@ -134,9 +95,7 @@ return {
 
 id,
 
-
 name,
-
 
 mainBreaker,
 
@@ -144,13 +103,41 @@ mainBreaker,
 voltage:240,
 
 
-breakers,
+serviceConnected:true,
 
 
-serviceConnected:false,
+grounded:true,
 
 
-grounded:false
+
+breakers:
+
+Array.from(
+
+{length:slots},
+
+(_,index)=>(
+
+
+{
+
+id:`slot-${index+1}`,
+
+slot:index+1,
+
+
+installed:false,
+
+
+breaker:null
+
+
+}
+
+
+)
+
+)
 
 
 };

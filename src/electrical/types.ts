@@ -20,8 +20,28 @@ export type Voltage =
   | 120
 
   | 240;
+// --------------------------------
+// Breaker Panel definitions
+// --------------------------------
+
+import type {
+  BreakerPanel
+} from "./breakerPanel";
 
 
+
+// --------------------------------
+// Breaker definitions
+// --------------------------------
+
+import type {
+  Breaker
+} from "./breaker";
+
+
+export type {
+  Breaker
+} from "./breaker";
 
 
 
@@ -55,49 +75,6 @@ export type BreakerType =
 
 
 
-
-
-
-// Individual circuit breaker
-
-export interface Breaker {
-
-
-  id:string;
-
-
-  amperage:number;
-
-
-  voltage:Voltage;
-
-
-  poles:BreakerPoles;
-
-
-
-  breakerType:BreakerType;
-
-
-
-  // Circuit assigned to breaker
-
-  circuitId?:string;
-
-
-
-  // Electrical state
-
-  energized:boolean;
-
-
-  tripped:boolean;
-
-
-  tripReason?:string;
-
-
-}
 
 
 
@@ -362,35 +339,38 @@ export interface ElectricalDevice {
   description?:string;
 
 
+// Electrical properties
 
-  // Electrical properties
-
-  load?:ElectricalLoad;
-
+load?:ElectricalLoad;
 
 
-  voltage?:Voltage;
+voltage?:Voltage;
 
 
-  amperage?:number;
+amperage?:number;
 
 
-  poles?:BreakerPoles;
+poles?:BreakerPoles;
 
 
 
-  // Breaker panel properties
+// Breaker panel properties
 
-  breakerSize?:number;
-
-
-  mainBreaker?:number;
+breakerSize?:number;
 
 
+mainBreaker?:number;
 
-  // Simulation values
 
-  tripped?:boolean;
+// Full breaker panel model
+
+panel?:BreakerPanel;
+
+
+
+// Simulation values
+
+tripped?:boolean;
 
 
   calculatedLoad?:number;

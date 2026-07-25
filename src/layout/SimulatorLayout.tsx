@@ -1,14 +1,5 @@
-// Residential Wiring Simulator v2.4
+// Residential Wiring Simulator v2.5
 // Main simulator layout
-//
-// Handles:
-// - component library
-// - workspace
-// - properties panel
-// - simulation panel
-// - live circuit graph
-// - breaker monitoring
-
 
 import {
   useRef,
@@ -22,11 +13,11 @@ import SimulationPanel from "../simulator/SimulationPanel";
 
 import ComponentLibrary from "../components/ComponentLibrary";
 
-import TopToolbar from "../components/TopToolbar";
-
 import BreakerPanel from "../components/BreakerPanel";
 
 import PropertiesPanel from "../components/PropertiesPanel";
+
+import Toolbar from "../toolbar/Toolbar";
 
 
 import type {
@@ -34,20 +25,14 @@ import type {
 } from "../simulator/Workspace";
 
 
-import type {
-  ElectricalDevice
-} from "../electrical/types";
+import {
+  useSimulator
+} from "../simulator/SimulatorContext";
 
 
-import type {
-  Connection
-} from "../electrical/connections";
-
-
-import type {
-  CircuitGraph
-} from "../electrical/circuitGraph";
-
+import {
+  createBreakerPanel
+} from "../electrical/breakerPanel";
 
 
 
@@ -57,7 +42,6 @@ export default function SimulatorLayout(){
 
 const workspaceRef =
 useRef<WorkspaceHandle>(null);
-
 
 
 const resizing =
@@ -71,39 +55,60 @@ useRef(false);
 
 
 
-const [selectedDevice,setSelectedDevice] =
-useState<ElectricalDevice|null>(null);
+const {
+
+devices,
+
+setDevices,
+
+connections,
+
+setConnections,
+
+selectedDevice,
+
+setSelectedDevice
+
+}=useSimulator();
 
 
 
-const [devices,setDevices] =
-useState<ElectricalDevice[]>([]);
+
+
+const [
+
+propertiesWidth,
+
+setPropertiesWidth
+
+]=useState(350);
 
 
 
-const [,setConnections] =
-useState<Connection[]>([]);
+const [
+
+componentWidth,
+
+setComponentWidth
+
+]=useState(220);
 
 
 
-const [circuitPaths,setCircuitPaths] =
-useState<string[][]>([]);
+const [
+
+circuitPaths,
+
+setCircuitPaths
+
+]=useState<string[][]>([]);
 
 
 
-const [propertiesWidth,setPropertiesWidth] =
-useState(350);
-
-
-
-const [componentWidth,setComponentWidth] =
-useState(220);
-
-
-
-// NEW: electrical system status
-const [circuitStatus,setCircuitStatus] =
-useState<
+const [
+  circuitStatus,
+  setCircuitStatus
+]=useState<
 "READY" | "WARNING" | "FAULT"
 >("READY");
 
@@ -111,11 +116,79 @@ useState<
 
 
 
-const [graph,setGraph] =
-useState<CircuitGraph>({
-devices:[],
-connections:[]
-});
+
+
+// ---------------------------------
+// ACTIVE BREAKER PANEL
+// ---------------------------------
+
+const panelDevice =
+
+selectedDevice?.type === "Breaker Panel"
+
+?
+
+selectedDevice
+
+:
+
+null;
+
+
+
+const panel = panelDevice
+
+?
+
+createBreakerPanel(
+
+panelDevice.id,
+
+panelDevice.name,
+
+panelDevice.mainBreaker ?? 200,
+
+12
+
+)
+
+:
+
+null;
+
+
+
+
+
+
+
+// ---------------------------------
+// UPDATE DEVICE
+// ---------------------------------
+
+function updateDevice(
+updatedDevice:any
+){
+
+setDevices(prev=>
+
+prev.map(device=>
+
+device.id===updatedDevice.id
+
+?
+
+updatedDevice
+
+:
+
+device
+
+)
+
+);
+
+}
 
 
 
@@ -126,7 +199,44 @@ connections:[]
 
 
 // ---------------------------------
-// Resize right panel
+// REFRESH SIMULATION
+// ---------------------------------
+
+function refreshSimulation(){
+
+const currentConnections =
+
+workspaceRef.current?.getConnections()
+
+??
+
+[];
+
+
+setConnections(
+currentConnections
+);
+
+}
+
+
+// ---------------------------------
+// RESET BREAKER
+// ---------------------------------
+
+function resetBreaker(){
+
+  setCircuitStatus("READY");
+
+}
+
+
+
+
+
+
+// ---------------------------------
+// RESIZE RIGHT PANEL
 // ---------------------------------
 
 function startResize(
@@ -135,10 +245,12 @@ e:React.MouseEvent
 
 e.preventDefault();
 
+
 resizing.current=true;
 
 
 const startX=e.clientX;
+
 
 const startWidth=propertiesWidth;
 
@@ -148,13 +260,15 @@ const handleMouseMove=(event:MouseEvent)=>{
 
 
 if(!resizing.current)
+
 return;
 
 
-const delta=startX-event.clientX;
+const width =
 
+startWidth +
 
-const width=startWidth+delta;
+(startX-event.clientX);
 
 
 
@@ -213,7 +327,7 @@ stopResize
 
 
 // ---------------------------------
-// Resize component library
+// RESIZE COMPONENT LIBRARY
 // ---------------------------------
 
 function startComponentResize(
@@ -224,7 +338,6 @@ e.preventDefault();
 
 
 componentResizing.current=true;
-
 
 
 const startX=e.clientX;
@@ -238,13 +351,15 @@ const handleMouseMove=(event:MouseEvent)=>{
 
 
 if(!componentResizing.current)
+
 return;
 
 
-const delta=event.clientX-startX;
+const width =
 
+startWidth +
 
-const width=startWidth+delta;
+(event.clientX-startX);
 
 
 
@@ -302,107 +417,6 @@ stopResize
 
 
 
-// ---------------------------------
-// Device updates
-// ---------------------------------
-
-function handleDevicesChange(
-updatedDevices:ElectricalDevice[]
-){
-
-setDevices(updatedDevices);
-
-
-setGraph(prev=>({
-
-devices:updatedDevices,
-
-connections:prev.connections
-
-}));
-
-}
-
-
-
-
-
-
-
-
-
-// ---------------------------------
-// Connection updates
-// ---------------------------------
-
-function handleConnectionsChange(
-updatedConnections:Connection[]
-){
-
-setConnections(updatedConnections);
-
-
-setGraph(prev=>({
-
-devices:prev.devices,
-
-connections:updatedConnections
-
-}));
-
-}
-
-
-
-
-
-
-
-
-
-// ---------------------------------
-// Manual refresh
-// ---------------------------------
-
-function refreshSimulation(){
-
-
-const currentConnections =
-
-workspaceRef.current?.getConnections()
-
-??
-
-[];
-
-
-
-setConnections(currentConnections);
-
-
-
-setGraph({
-
-devices:devices,
-
-connections:currentConnections
-
-});
-
-}
-
-
-
-
-
-
-
-
-
-// ---------------------------------
-// Render
-// ---------------------------------
-
 return (
 
 <div
@@ -425,27 +439,52 @@ overflow:"hidden"
 
 >
 
-
-
-<TopToolbar
-
-circuitStatus={circuitStatus}
-
-onResetBreaker={()=>
-
-setCircuitStatus("READY")
-
-}
-
+<Toolbar
+  circuitStatus={circuitStatus}
+  onResetBreaker={resetBreaker}
 />
 
 
+
+
+
+{
+
+panel &&
+
+(
+
+<div
+
+style={{
+
+flexShrink:0,
+
+background:"#181818",
+
+padding:"10px"
+
+}}
+
+>
 
 <BreakerPanel
 
+panel={panel}
+
 circuitStatus={circuitStatus}
 
+onTrip={() => setCircuitStatus("FAULT")}
+
+onReset={resetBreaker}
+
 />
+
+</div>
+
+)
+
+}
 
 
 
@@ -475,9 +514,6 @@ overflow:"hidden"
 
 
 
-
-
-
 {/* COMPONENT LIBRARY */}
 
 <div
@@ -491,8 +527,6 @@ background:"#252526",
 height:"100%",
 
 overflowY:"auto",
-
-overflowX:"hidden",
 
 flexShrink:0
 
@@ -516,9 +550,7 @@ workspaceRef={workspaceRef}
 
 
 
-
-
-{/* COMPONENT RESIZE BAR */}
+{/* COMPONENT RESIZE */}
 
 <div
 
@@ -532,14 +564,11 @@ cursor:"col-resize",
 
 background:"#444",
 
-flexShrink:0,
-
-userSelect:"none"
+flexShrink:0
 
 }}
 
 />
-
 
 
 
@@ -562,9 +591,7 @@ background:"#303030",
 
 overflow:"hidden",
 
-minWidth:0,
-
-minHeight:0
+minWidth:0
 
 }}
 
@@ -576,10 +603,6 @@ minHeight:0
 ref={workspaceRef}
 
 onSelectDevice={setSelectedDevice}
-
-onDevicesChange={handleDevicesChange}
-
-onConnectionsChange={handleConnectionsChange}
 
 onCircuitPathsChange={setCircuitPaths}
 
@@ -596,7 +619,7 @@ onCircuitPathsChange={setCircuitPaths}
 
 
 
-{/* RIGHT SIDE PANELS */}
+{/* RIGHT PANEL */}
 
 <div
 
@@ -606,15 +629,9 @@ width:`${propertiesWidth}px`,
 
 minWidth:"260px",
 
-maxWidth:"700px",
-
 display:"flex",
 
 background:"#252526",
-
-height:"100%",
-
-minHeight:0,
 
 flexShrink:0
 
@@ -626,12 +643,6 @@ flexShrink:0
 
 
 
-
-
-
-
-{/* RESIZE BAR */}
-
 <div
 
 onMouseDown={startResize}
@@ -642,11 +653,7 @@ width:"10px",
 
 cursor:"col-resize",
 
-background:"#444",
-
-flexShrink:0,
-
-userSelect:"none"
+background:"#444"
 
 }}
 
@@ -666,43 +673,14 @@ style={{
 
 flex:1,
 
-minHeight:0,
-
 overflowY:"auto",
 
-overflowX:"hidden",
-
-padding:"10px",
-
-display:"flex",
-
-flexDirection:"column",
-
-gap:"10px"
+padding:"10px"
 
 }}
 
 >
 
-
-
-
-
-<button
-
-style={{
-
-padding:"12px",
-
-fontWeight:"bold"
-
-}}
-
->
-
-TEST CIRCUIT
-
-</button>
 
 
 
@@ -715,7 +693,7 @@ style={{
 
 padding:"12px",
 
-fontWeight:"bold"
+width:"100%"
 
 }}
 
@@ -732,27 +710,21 @@ Update Simulation
 
 
 
+
 <SimulationPanel
 
-graph={graph}
+devices={devices}
+
+connections={connections}
 
 sourceId={
 
-devices.find(
-
-device=>
-
-device.type==="Breaker Panel"
-
-)?.id
-
-??
-
-""
+panelDevice?.id ?? ""
 
 }
 
 />
+
 
 
 
@@ -771,9 +743,15 @@ circuitPaths={circuitPaths}
 
 onUpdateDevice={(updated)=>{
 
+
+updateDevice(updated);
+
+
 setSelectedDevice(updated);
 
+
 workspaceRef.current?.updateDevice(updated);
+
 
 }}
 
@@ -781,7 +759,8 @@ workspaceRef.current?.updateDevice(updated);
 
 
 
-</div>
+
+
 
 
 </div>
@@ -790,7 +769,17 @@ workspaceRef.current?.updateDevice(updated);
 </div>
 
 
+
+
+
+
+
+
 </div>
+
+
+</div>
+
 
 );
 

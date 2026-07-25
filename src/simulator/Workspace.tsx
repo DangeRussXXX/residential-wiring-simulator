@@ -1,4 +1,4 @@
-// Residential Wiring Simulator v2.3
+// Residential Wiring Simulator v2.4
 // Main simulator workspace
 //
 // Handles:
@@ -7,6 +7,7 @@
 // - visual wires
 // - electrical connections
 // - circuit topology
+// - simulator context integration
 
 
 import {
@@ -15,6 +16,11 @@ import {
   forwardRef,
   useRef
 } from "react";
+
+
+import {
+  useSimulator
+} from "./SimulatorContext";
 
 
 import {
@@ -27,22 +33,29 @@ import Device from "../components/Device";
 
 import type {
 
-ElectricalDevice,
+  ElectricalDevice,
 
-Wire,
+  Voltage,
 
-Voltage,
-
-BreakerPoles
+  BreakerPoles
 
 } from "../electrical/types";
 
 
 import type {
 
-Connection
+  Wire
+
+} from "../electrical/wireModel";
+
+
+import type {
+
+  Connection
 
 } from "../electrical/connections";
+
+
 
 
 
@@ -51,24 +64,31 @@ Connection
 export type WorkspaceHandle = {
 
 
-addDevice:
+  addDevice:
 
-(name:string)=>void;
-
-
-
-updateDevice:
-
-(device:ElectricalDevice)=>void;
+  (
+    name:string
+  )=>void;
 
 
 
-getConnections:
+  updateDevice:
 
-()=>Connection[];
+  (
+    device:ElectricalDevice
+  )=>void;
+
+
+
+  getConnections:
+
+  (
+  )=>Connection[];
 
 
 };
+
+
 
 
 
@@ -79,38 +99,23 @@ getConnections:
 type WorkspaceProps = {
 
 
-onSelectDevice?:
+  onSelectDevice?:
 
-(
-device:ElectricalDevice|null
-)=>void;
-
-
-
-onDevicesChange?:
-
-(
-devices:ElectricalDevice[]
-)=>void;
+  (
+    device:ElectricalDevice|null
+  )=>void;
 
 
 
-onConnectionsChange?:
+  onCircuitPathsChange?:
 
-(
-connections:Connection[]
-)=>void;
-
-
-
-onCircuitPathsChange?:
-
-(
-paths:string[][]
-)=>void;
+  (
+    paths:string[][]
+  )=>void;
 
 
 };
+
 
 
 
@@ -123,13 +128,9 @@ const Workspace = forwardRef<WorkspaceHandle, WorkspaceProps>(
 
 function Workspace({
 
-onSelectDevice,
+  onSelectDevice,
 
-onDevicesChange,
-
-onConnectionsChange,
-
-onCircuitPathsChange
+  onCircuitPathsChange
 
 },
 
@@ -139,26 +140,42 @@ ref
 
 
 
+// ----------------------------------
+// GLOBAL SIMULATOR STATE
+// ----------------------------------
+
+const {
+
+  devices,
+
+  setDevices,
+
+  connections,
+
+  setConnections,
+
+  selectedDevice,
+
+  setSelectedDevice
 
 
-const [devices,setDevices] =
-
-useState<ElectricalDevice[]>([]);
+}=useSimulator();
 
 
 
+
+
+
+
+
+
+// ----------------------------------
+// LOCAL WORKSPACE STATE
+// ----------------------------------
 
 const [wires,setWires] =
 
 useState<Wire[]>([]);
-
-
-
-
-const [connections,setConnections] =
-
-useState<Connection[]>([]);
-
 
 
 
@@ -168,11 +185,9 @@ useState(false);
 
 
 
-
 const [wireColor,setWireColor] =
 
 useState("black");
-
 
 
 
@@ -180,26 +195,17 @@ const [selectedTerminal,setSelectedTerminal] =
 
 useState<{
 
-deviceId:string;
+  deviceId:string;
 
-terminalId:string;
+  terminalId:string;
 
 }|null>(null);
-
-
-
-
-const [selectedDevice,setSelectedDevice] =
-
-useState<ElectricalDevice|null>(null);
-
 
 
 
 const [dragging,setDragging] =
 
 useState<string|null>(null);
-
 
 
 
@@ -219,7 +225,11 @@ useRef<SVGSVGElement|null>(null);
 // Create device from catalog
 // ----------------------------------
 
-function createDevice(name:string){
+function createDevice(
+
+  name:string
+
+){
 
 
 const definition =
@@ -254,6 +264,8 @@ id:
 
 
 }));
+
+
 
 
 
@@ -367,26 +379,13 @@ tripped:false
 
 
 
-setDevices(prev=>{
-
-
-const updated=[
+setDevices(prev=>[
 
 ...prev,
 
 device
 
-];
-
-
-onDevicesChange?.(updated);
-
-
-
-return updated;
-
-
-});
+]);
 
 
 }
@@ -410,10 +409,7 @@ updatedDevice:ElectricalDevice
 ){
 
 
-setDevices(prev=>{
-
-
-const updated =
+setDevices(prev=>
 
 prev.map(device=>
 
@@ -427,24 +423,13 @@ updatedDevice
 
 device
 
+)
+
 );
 
 
 
-onDevicesChange?.(updated);
-
-
-
-return updated;
-
-
-});
-
-
-
-
 setSelectedDevice(updatedDevice);
-
 
 
 onSelectDevice?.(updatedDevice);
@@ -477,25 +462,24 @@ getConnections:()=>connections
 
 
 }));
-
-
-
-
-
-
-
-
-
 // ----------------------------------
 // Select device
 // ----------------------------------
 
-function selectDevice(id:string){
+function selectDevice(
+
+  id:string
+
+){
 
 
 let device =
 
-devices.find(d=>d.id===id) || null;
+devices.find(
+
+d=>d.id===id
+
+) || null;
 
 
 
@@ -508,6 +492,7 @@ return;
 
 
 if(device.type==="Breaker Panel"){
+
 
 
 const paths =
@@ -526,6 +511,8 @@ onCircuitPathsChange?.(paths);
 
 
 
+
+
 const load =
 
 calculateLoad(
@@ -535,6 +522,8 @@ device,
 devices
 
 );
+
+
 
 
 
@@ -577,27 +566,34 @@ d
 
 
 
-onDevicesChange?.(
-
-devices
-
-);
-
-
 }
+
+
 
 
 
 setSelectedDevice(device);
 
 
+
 onSelectDevice?.(device);
 
 
 }
+
+
+
+
+
+
+
+
+
 // ----------------------------------
 // Terminal wiring
 // ----------------------------------
+
+
 
 function terminalClick(
 
@@ -637,55 +633,58 @@ return;
 
 
 
+
+
+
+
+
+
+// ----------------------------------
+// Prevent duplicate connections
+// ----------------------------------
+
+const duplicateExists = connections.some(connection =>
+
+(
+connection.from.deviceId === selectedTerminal.deviceId &&
+connection.from.terminalId === selectedTerminal.terminalId &&
+connection.to.deviceId === deviceId &&
+connection.to.terminalId === terminalId
+)
+
+||
+
+(
+connection.from.deviceId === deviceId &&
+connection.from.terminalId === terminalId &&
+connection.to.deviceId === selectedTerminal.deviceId &&
+connection.to.terminalId === selectedTerminal.terminalId
+)
+
+);
+
+
+
+if(duplicateExists){
+
+console.warn(
+"Connection already exists"
+);
+
+setSelectedTerminal(null);
+
+return;
+
+}
+
 const wire:Wire = {
 
-
 id:
 
 crypto.randomUUID(),
-
-
-fromDevice:
-
-selectedTerminal.deviceId,
-
-
-fromTerminal:
-
-selectedTerminal.terminalId,
-
-
-toDevice:
-
-deviceId,
-
-
-toTerminal:
-
-terminalId,
-
-
-color:wireColor
-
-
-};
-
-
-
-
-
-
-const connection:Connection = {
-
-
-id:
-
-crypto.randomUUID(),
-
 
 
 from:{
-
 
 deviceId:
 
@@ -696,40 +695,100 @@ terminalId:
 
 selectedTerminal.terminalId
 
-
 },
-
 
 
 to:{
 
-
 deviceId,
 
-
 terminalId
-
 
 },
 
 
+gauge:
 
-cable:"14/2 NM-B",
-
-
-
-status:"CONNECTED",
+"#14",
 
 
+cableType:
 
-installationMethod:"NM-B",
+"14/2 NM-B",
 
 
+installation:
 
-energized:false
+"NM-B",
 
+
+color:
+
+wireColor.toUpperCase() as Wire["color"],
+
+
+length:
+
+0,
+
+
+energized:
+
+false,
+
+
+current:
+
+0,
+
+
+voltage:
+
+120
 
 };
+
+const connection:Connection = {
+
+  id:crypto.randomUUID(),
+
+  from:{
+    deviceId:selectedTerminal.deviceId,
+    terminalId:selectedTerminal.terminalId
+  },
+
+  to:{
+    deviceId,
+    terminalId
+  },
+
+  cable:"14/2 NM-B",
+
+  wire:{
+
+    gauge:"#14",
+
+    conductors:2,
+
+    cableType:"14/2 NM-B",
+
+    length:0,
+
+    ampacity:15,
+
+    color:"BLACK"
+
+  },
+
+  installationMethod:"NM-B",
+
+  status:"CONNECTED",
+
+  energized:false
+
+};
+
+
 
 
 
@@ -751,31 +810,15 @@ wire
 
 
 
-setConnections(prev=>{
 
 
-const updated=[
+setConnections(prev=>[
 
 ...prev,
 
 connection
 
-];
-
-
-
-onConnectionsChange?.(
-
-updated
-
-);
-
-
-
-return updated;
-
-
-});
+]);
 
 
 
@@ -783,10 +826,9 @@ return updated;
 
 
 
-setDevices(prev=>{
 
 
-const updated =
+setDevices(prev=>
 
 prev.map(device=>{
 
@@ -805,9 +847,12 @@ connectedDevices:[
 
 ...new Set([
 
+
 ...(device.connectedDevices ?? []),
 
+
 deviceId
+
 
 ])
 
@@ -819,6 +864,7 @@ deviceId
 
 
 }
+
 
 
 
@@ -839,9 +885,12 @@ connectedDevices:[
 
 ...new Set([
 
+
 ...(device.connectedDevices ?? []),
 
+
 selectedTerminal.deviceId
+
 
 ])
 
@@ -861,20 +910,11 @@ selectedTerminal.deviceId
 return device;
 
 
-});
+})
+
+);
 
 
-
-
-
-onDevicesChange?.(updated);
-
-
-
-return updated;
-
-
-});
 
 
 
@@ -899,7 +939,11 @@ setSelectedTerminal(null);
 // Dragging
 // ----------------------------------
 
-function startDrag(id:string){
+function startDrag(
+
+id:string
+
+){
 
 
 if(!wireMode){
@@ -912,6 +956,7 @@ setDragging(id);
 
 
 }
+
 
 
 
@@ -946,7 +991,6 @@ e.currentTarget.getBoundingClientRect();
 setDevices(prev=>
 
 prev.map(device=>
-
 
 
 device.id===dragging
@@ -986,7 +1030,6 @@ rect.top -
 device
 
 
-
 )
 
 );
@@ -1021,39 +1064,25 @@ setSelectedDevice(null);
 
 
 
-onDevicesChange?.([]);
-
-onConnectionsChange?.([]);
-
 onCircuitPathsChange?.([]);
 
 
 }
-
-
-
-
-
-
-
-
-
 // ----------------------------------
 // Find circuit paths
 // ----------------------------------
 
 function getCircuitPaths(
 
-device:ElectricalDevice,
+  device:ElectricalDevice,
 
-deviceList:ElectricalDevice[],
+  deviceList:ElectricalDevice[],
 
-path:string[]=[device.name],
+  path:string[]=[device.name],
 
-visited=new Set<string>()
+  visited=new Set<string>()
 
 ):string[][] {
-
 
 
 if(visited.has(device.id))
@@ -1075,7 +1104,10 @@ nextVisited.add(device.id);
 
 
 
+
 let paths:string[][]=[];
+
+
 
 
 
@@ -1105,6 +1137,8 @@ return;
 if(nextVisited.has(connected.id))
 
 return;
+
+
 
 
 
@@ -1181,14 +1215,16 @@ visited=new Set<string>()
 ):number {
 
 
-
 if(visited.has(device.id))
 
 return 0;
 
 
 
+
+
 visited.add(device.id);
+
 
 
 
@@ -1256,7 +1292,7 @@ visited
 
 
 // ----------------------------------
-// Find terminal screen position
+// Find terminal position
 // ----------------------------------
 
 function getTerminalPosition(
@@ -1321,6 +1357,14 @@ device.y + terminal.y
 
 }
 
+
+
+
+
+
+
+
+
 // ----------------------------------
 // Render
 // ----------------------------------
@@ -1366,6 +1410,8 @@ wireMode
 }
 
 </button>
+
+
 
 
 
@@ -1418,6 +1464,7 @@ Ground
 
 
 
+
 <button
 
 onClick={clearWorkspace}
@@ -1444,9 +1491,32 @@ Clear
 
 className="training-board"
 
+onMouseDown={(e)=>{
+
+  const target = e.target as HTMLElement;
+
+
+  if(
+    target.closest(".device-component")
+  ){
+
+    return;
+
+  }
+
+
+  setSelectedDevice(null);
+
+  onSelectDevice?.(null);
+
+  setSelectedTerminal(null);
+
+}}
+
 onMouseMove={moveBoard}
 
 onMouseUp={()=>setDragging(null)}
+
 
 style={{
 
@@ -1469,6 +1539,8 @@ position:"relative"
 }}
 
 >
+
+
 
 
 
@@ -1533,9 +1605,9 @@ const start =
 
 getTerminalPosition(
 
-w.fromDevice,
+w.from.deviceId,
 
-w.fromTerminal
+w.from.terminalId
 
 );
 
@@ -1547,9 +1619,9 @@ const end =
 
 getTerminalPosition(
 
-w.toDevice,
+w.to.deviceId,
 
-w.toTerminal
+w.to.terminalId
 
 );
 
@@ -1614,9 +1686,9 @@ devices.map(device=>(
 
 <Device
 
-
 key={device.id}
 
+data-device-id={device.id}
 
 device={device}
 

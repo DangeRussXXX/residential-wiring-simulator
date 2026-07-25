@@ -1,6 +1,21 @@
-// Residential Wiring Simulator v2.3
+// Residential Wiring Simulator v2.5
 // Circuit graph engine
-// Central topology system for electrical simulation
+//
+// Central electrical topology system
+//
+// Architecture:
+//
+// Service
+//    |
+// Breaker Panel
+//    |
+// Breakers
+//    |
+// Circuits
+//    |
+// Wires
+//    |
+// Devices
 
 
 import type {
@@ -19,6 +34,21 @@ import type {
 
 
 import type {
+  Breaker
+} from "./breaker";
+
+
+import type {
+  Circuit
+} from "./circuit";
+
+
+import type {
+  Wire
+} from "./wireModel";
+
+
+import type {
   ResidentialService
 } from "./service";
 
@@ -26,33 +56,53 @@ import type {
 
 
 
-// Complete electrical system graph
-
 export interface CircuitGraph {
 
 
-  // Utility source
+  // Utility
 
   service?:ResidentialService;
 
 
 
-  // Distribution equipment
+  // Main panel
 
   panel?:BreakerPanel;
 
 
 
-  // All devices in workspace
+  // Individual breakers
 
-  devices:ElectricalDevice[];
-
-
+  breakers:Breaker[];
 
 
-  // Physical wire connections
+
+  // Branch circuits
+
+  circuits:Circuit[];
+
+
+
+
+  // Physical wires
+
+  wires:Wire[];
+
+
+
+
+  // Legacy connection layer
+
+  // kept during transition
 
   connections:Connection[];
+
+
+
+
+  // Devices
+
+  devices:ElectricalDevice[];
 
 
 }
@@ -61,7 +111,9 @@ export interface CircuitGraph {
 
 
 
-// Create empty graph
+
+
+
 
 export function createCircuitGraph():
 
@@ -74,7 +126,16 @@ return {
 devices:[],
 
 
-connections:[]
+connections:[],
+
+
+breakers:[],
+
+
+circuits:[],
+
+
+wires:[]
 
 
 };
@@ -88,7 +149,7 @@ connections:[]
 
 
 
-// Add a device to graph
+
 
 export function addDeviceToGraph(
 
@@ -125,60 +186,7 @@ device
 
 
 
-// Remove device from graph
 
-export function removeDeviceFromGraph(
-
-graph:CircuitGraph,
-
-deviceId:string
-
-):CircuitGraph {
-
-
-return {
-
-
-...graph,
-
-
-devices:
-
-graph.devices.filter(
-
-device =>
-
-device.id !== deviceId
-
-),
-
-
-
-connections:
-
-graph.connections.filter(
-
-connection =>
-
-connection.from.deviceId !== deviceId &&
-
-connection.to.deviceId !== deviceId
-
-)
-
-
-};
-
-
-}
-
-
-
-
-
-
-
-// Add physical connection
 
 export function addConnectionToGraph(
 
@@ -215,7 +223,7 @@ connection
 
 
 
-// Remove a single wire connection
+
 
 export function removeConnectionFromGraph(
 
@@ -254,7 +262,7 @@ connection.id !== connectionId
 
 
 
-// Find all connections for a device
+
 
 export function getDeviceConnections(
 
@@ -270,9 +278,9 @@ return graph.connections.filter(
 connection =>
 
 
-connection.from.deviceId === deviceId ||
+connection.from.deviceId===deviceId ||
 
-connection.to.deviceId === deviceId
+connection.to.deviceId===deviceId
 
 
 );
@@ -286,7 +294,7 @@ connection.to.deviceId === deviceId
 
 
 
-// Find devices connected to another device
+
 
 export function getConnectedDevices(
 
@@ -309,20 +317,17 @@ deviceId
 
 
 
-const ids =
-
-connections.map(connection => {
+const ids = connections.map(connection=>{
 
 
 if(
 
-connection.from.deviceId === deviceId
+connection.from.deviceId===deviceId
 
-){
+)
 
 return connection.to.deviceId;
 
-}
 
 
 return connection.from.deviceId;
@@ -333,7 +338,8 @@ return connection.from.deviceId;
 
 
 
-return graph.devices.filter(device =>
+
+return graph.devices.filter(device=>
 
 ids.includes(device.id)
 
@@ -348,197 +354,7 @@ ids.includes(device.id)
 
 
 
-// Trace power path through system
 
-export function traceCircuitPath(
-
-graph:CircuitGraph,
-
-startDeviceId:string,
-
-visited = new Set<string>()
-
-):string[] {
-
-
-
-if(
-
-visited.has(startDeviceId)
-
-){
-
-return [];
-
-}
-
-
-
-visited.add(startDeviceId);
-
-
-
-
-const device =
-
-graph.devices.find(
-
-d => d.id === startDeviceId
-
-);
-
-
-
-if(!device)
-
-return [];
-
-
-
-
-
-const connected =
-
-getConnectedDevices(
-
-graph,
-
-startDeviceId
-
-);
-
-
-
-
-
-return [
-
-
-device.name,
-
-
-...connected.flatMap(
-
-next =>
-
-traceCircuitPath(
-
-graph,
-
-next.id,
-
-visited
-
-)
-
-)
-
-
-];
-
-
-
-}
-
-
-
-
-
-
-
-// Check if graph contains a closed circuit
-
-export function hasCompletePath(
-
-graph:CircuitGraph,
-
-startDeviceId:string,
-
-endDeviceId:string
-
-):boolean {
-
-
-
-const visited =
-
-new Set<string>();
-
-
-
-
-
-function search(
-
-current:string
-
-):boolean {
-
-
-
-if(
-
-current === endDeviceId
-
-)
-
-return true;
-
-
-
-
-if(
-
-visited.has(current)
-
-)
-
-return false;
-
-
-
-visited.add(current);
-
-
-
-
-const connected =
-
-getConnectedDevices(
-
-graph,
-
-current
-
-);
-
-
-
-return connected.some(
-
-device =>
-
-search(device.id)
-
-);
-
-
-}
-
-
-
-return search(startDeviceId);
-
-
-}
-
-
-
-
-
-
-
-// Count energized connections
 
 export function countEnergizedConnections(
 
@@ -549,7 +365,7 @@ graph:CircuitGraph
 
 return graph.connections.filter(
 
-connection =>
+connection=>
 
 connection.energized
 

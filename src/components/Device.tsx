@@ -147,6 +147,7 @@ return (
 
 <div
 
+className="device-component"
 
 onMouseDown={(e)=>{
 

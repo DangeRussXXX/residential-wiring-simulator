@@ -1,4 +1,4 @@
-// Residential Wiring Simulator v2.3
+// Residential Wiring Simulator v2.4
 // Simulation control panel
 //
 // Controls:
@@ -24,12 +24,24 @@ import type {
 } from "../electrical/circuitGraph";
 
 
+import type {
+  ElectricalDevice
+} from "../electrical/types";
+
+
+import type {
+  Connection
+} from "../electrical/connections";
+
+
 
 
 
 interface SimulationPanelProps {
 
-  graph:CircuitGraph;
+  devices: ElectricalDevice[];
+
+  connections: Connection[];
 
   sourceId:string;
 
@@ -44,7 +56,9 @@ interface SimulationPanelProps {
 
 export default function SimulationPanel({
 
-graph,
+devices,
+
+connections,
 
 sourceId
 
@@ -61,7 +75,6 @@ useState<SimulationControllerResult|null>(null);
 const [running,setRunning] =
 
 useState(false);
-
 
 
 
@@ -86,6 +99,26 @@ return;
 
 
 }
+
+
+
+
+
+
+const graph:CircuitGraph = {
+
+  devices,
+
+  connections,
+
+  breakers:[],
+
+  circuits:[],
+
+  wires:[]
+
+};
+
 
 
 
@@ -183,7 +216,6 @@ marginTop:0
 
 
 
-
 <div
 
 style={{
@@ -192,11 +224,7 @@ background:"#2b2b2b",
 
 padding:"10px",
 
-borderRadius:"5px",
-
-marginBottom:"10px",
-
-color:"#ffffff"
+borderRadius:"5px"
 
 }}
 
@@ -207,7 +235,7 @@ color:"#ffffff"
 
 <strong>Devices:</strong>{" "}
 
-{graph.devices.length}
+{devices.length}
 
 </div>
 
@@ -217,7 +245,7 @@ color:"#ffffff"
 
 <strong>Connections:</strong>{" "}
 
-{graph.connections.length}
+{connections.length}
 
 </div>
 
@@ -235,37 +263,37 @@ color:"#ffffff"
 
 
 
+
 <hr/>
 
 
 
 
 
-<strong>Device List</strong>
+<h3>
+
+Device List
+
+</h3>
 
 
 
 {
 
-graph.devices.length===0
+devices.length===0
 
 ?
 
 <p>No devices loaded.</p>
 
+
 :
 
-graph.devices.map(device=>(
+devices.map(device=>(
 
 <div
 
 key={device.id}
-
-style={{
-
-marginTop:"4px"
-
-}}
 
 >
 
@@ -283,37 +311,38 @@ marginTop:"4px"
 
 
 
+
+
 <hr/>
 
 
 
 
 
-<strong>Connection List</strong>
+<h3>
+
+Connection List
+
+</h3>
 
 
 
 {
 
-graph.connections.length===0
+connections.length===0
 
 ?
 
 <p>No connections loaded.</p>
 
+
 :
 
-graph.connections.map(connection=>(
+connections.map(connection=>(
 
 <div
 
 key={connection.id}
-
-style={{
-
-marginTop:"4px"
-
-}}
 
 >
 
@@ -328,8 +357,6 @@ marginTop:"4px"
 ))
 
 }
-
-
 
 
 
@@ -357,7 +384,9 @@ padding:"12px",
 
 fontWeight:"bold",
 
-cursor:"pointer"
+cursor:"pointer",
+
+marginTop:"10px"
 
 }}
 
@@ -429,25 +458,7 @@ marginTop:"15px"
 
 
 
-<h3
-
-style={{
-
-color:
-
-result.state==="COMPLETE"
-
-?
-
-"#00ff88"
-
-:
-
-"#ff5555"
-
-}}
-
->
+<h3>
 
 Status:
 
@@ -475,8 +486,6 @@ result.state==="COMPLETE"
 
 
 
-
-
 <h3>
 
 Validation
@@ -497,6 +506,7 @@ result.validation.messages.length===0
 
 </p>
 
+
 :
 
 result.validation.messages.map(
@@ -508,22 +518,13 @@ result.validation.messages.map(
 
 key={index}
 
-style={{
-
-marginBottom:"5px"
-
-}}
-
 >
-
 
 {
 
 message.level==="ERROR"
 
-&&
-
-"❌ "
+&& "❌ "
 
 }
 
@@ -532,9 +533,7 @@ message.level==="ERROR"
 
 message.level==="WARNING"
 
-&&
-
-"⚠️ "
+&& "⚠️ "
 
 }
 
@@ -543,23 +542,18 @@ message.level==="WARNING"
 
 message.level==="INFO"
 
-&&
-
-"ℹ️ "
+&& "ℹ️ "
 
 }
 
 
-
 {message.message}
-
 
 
 </div>
 
 
 )
-
 
 )
 
@@ -578,8 +572,6 @@ message.level==="INFO"
 Power Flow
 
 </h3>
-
-
 
 
 
@@ -719,6 +711,7 @@ result.animations.length===0
 
 <p>No events</p>
 
+
 :
 
 result.animations.map(
@@ -750,12 +743,6 @@ animation.connectionId
 )
 
 }
-
-
-
-
-
-
 
 
 
@@ -793,7 +780,7 @@ Devices loaded:
 
 {" "}
 
-{graph.devices.length}
+{devices.length}
 
 </div>
 
@@ -805,7 +792,7 @@ Connections loaded:
 
 {" "}
 
-{graph.connections.length}
+{connections.length}
 
 </div>
 
@@ -820,6 +807,7 @@ Source:
 {sourceId || "NONE"}
 
 </div>
+
 
 
 

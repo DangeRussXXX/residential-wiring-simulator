@@ -1,13 +1,10 @@
-export type ProjectData = {
-  name: string;
-  version: string;
-  created: string;
+import type {
+  SimulatorProject
+} from "./simulatorState";
 
-  circuit: {
-    components: unknown[];
-    wires: unknown[];
-  };
-};
+
+export type ProjectData =
+  SimulatorProject;
 
 
 

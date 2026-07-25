@@ -147,12 +147,15 @@ const issues:string[]=[];
 
 const graph: CircuitGraph = {
 
+  devices:this.devices,
 
-devices:this.devices,
+  connections:this.connections,
 
+  breakers:[],
 
-connections:this.connections
+  circuits:[],
 
+  wires:[]
 
 };
 

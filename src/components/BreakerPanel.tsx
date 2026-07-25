@@ -1,176 +1,208 @@
+import type { BreakerPanel as BreakerPanelType } from "../electrical/breakerPanel";
+
+
 type BreakerPanelProps = {
-  circuitStatus?: "READY" | "WARNING" | "FAULT";
+  panel: BreakerPanelType;
+
+  circuitStatus?: 
+    | "READY"
+    | "WARNING"
+    | "FAULT";
+
+  onTrip?: () => void;
+
+  onReset?: () => void;
 };
 
 
+
 export default function BreakerPanel({
+  panel,
   circuitStatus = "READY",
+  onTrip,
+  onReset,
 }: BreakerPanelProps) {
 
-  const isFault = circuitStatus === "FAULT";
-  const isWarning = circuitStatus === "WARNING";
 
-  const indicatorColor =
-    isFault
+  const statusColor =
+    circuitStatus === "FAULT"
       ? "#ff4040"
-      : isWarning
+      : circuitStatus === "WARNING"
       ? "#ffd700"
       : "#39ff14";
 
 
+  const statusText =
+    circuitStatus === "FAULT"
+      ? "BREAKER TRIPPED"
+      : circuitStatus === "WARNING"
+      ? "CHECK CONNECTIONS"
+      : "BREAKER READY";
+
+
+
   return (
+
     <div
       style={{
-        margin: "15px 30px",
-        padding: "18px 25px",
         background:
-          "linear-gradient(145deg, #111827, #050505)",
-        border: "1px solid #176070",
-        borderRadius: "10px",
-        color: "#fff",
-        fontFamily: "monospace",
-        boxShadow:
-          "0 0 15px rgba(0,234,255,.15)",
+          "linear-gradient(135deg,#111827,#050505)",
+        border:"1px solid #176070",
+        borderRadius:"10px",
+        padding:"15px",
+        color:"white",
+        display:"flex",
+        flexDirection:"column",
+        gap:"12px",
       }}
     >
 
-      {/* Panel Header */}
+
       <h3
         style={{
-          margin: "0 0 15px 0",
-          color: "#00eaff",
-          letterSpacing: "2px",
-          fontSize: "18px",
+          margin:0,
+          color:"#00eaff",
+          letterSpacing:"1px",
         }}
       >
-        ⚡ MAIN ELECTRICAL PANEL
+        ⚡ Main Breaker Panel
       </h3>
 
 
 
-      {/* Panel Readings */}
       <div
         style={{
-          display: "grid",
-          gridTemplateColumns:
-            "200px 1fr 120px",
-          gap: "12px",
-          fontSize: "15px",
-          alignItems: "center",
+          display:"flex",
+          justifyContent:"space-between",
+          alignItems:"center",
         }}
       >
 
-        {/* Main Breaker */}
         <span>
-          MAIN BREAKER
+          {panel.name}
         </span>
+
 
         <span
           style={{
-            color: indicatorColor,
-            fontWeight: "bold",
+            color:statusColor,
+            fontWeight:800,
           }}
         >
-          ● {isFault ? "OFF" : "ON"}
-        </span>
-
-        <span>
-          {isFault ? "TRIPPED" : "240V"}
-        </span>
-
-
-
-        {/* Circuit 1 */}
-        <span>
-          CIRCUIT 1
-        </span>
-
-        <span
-          style={{
-            color: "#39ff14",
-          }}
-        >
-          ● LIGHTING
-        </span>
-
-        <span>
-          120V | 3.2A
-        </span>
-
-
-
-        {/* Circuit 2 */}
-        <span>
-          CIRCUIT 2
-        </span>
-
-        <span
-          style={{
-            color: isWarning
-              ? "#ffd700"
-              : "#39ff14",
-          }}
-        >
-          ● OUTLETS
-        </span>
-
-        <span>
-          120V | 5.8A
-        </span>
-
-
-
-        {/* Circuit 3 */}
-        <span>
-          CIRCUIT 3
-        </span>
-
-        <span
-          style={{
-            color: isFault
-              ? "#ff4040"
-              : "#39ff14",
-          }}
-        >
-          ● GFCI
-        </span>
-
-        <span>
-          {isFault
-            ? "DISABLED"
-            : "120V | 0.0A"}
+          ● {statusText}
         </span>
 
       </div>
 
 
-      {/* Warning Message */}
-      {isWarning && (
-        <div
-          style={{
-            marginTop: "15px",
-            color: "#ffd700",
-            fontWeight: "bold",
-          }}
-        >
-          ⚠ CHECK CONNECTIONS BEFORE ENERGIZING
-        </div>
-      )}
 
 
-      {/* Fault Message */}
-      {isFault && (
+      <div
+        style={{
+          display:"grid",
+          gridTemplateColumns:"1fr 1fr",
+          gap:"10px",
+        }}
+      >
+
+
         <div
           style={{
-            marginTop: "15px",
-            color: "#ff4040",
-            fontWeight: "bold",
+            background:"#080b10",
+            padding:"10px",
+            borderRadius:"6px",
+            border:"1px solid #176070",
           }}
         >
-          ⚠ SAFETY LOCKOUT ACTIVE — RESET BREAKER REQUIRED
+
+          Main Breaker
+
+          <br/>
+
+          <strong>
+            {panel.mainBreaker}A
+          </strong>
+
         </div>
-      )}
+
+
+
+        <div
+          style={{
+            background:"#080b10",
+            padding:"10px",
+            borderRadius:"6px",
+            border:"1px solid #176070",
+          }}
+        >
+
+          Circuits
+
+          <br/>
+
+          <strong>
+            12
+          </strong>
+
+        </div>
+
+
+      </div>
+
+
+
+
+      <div
+        style={{
+          display:"flex",
+          gap:"10px",
+        }}
+      >
+
+
+        <button
+          onClick={onTrip}
+          style={{
+            flex:1,
+            padding:"10px",
+            borderRadius:"6px",
+            border:"1px solid #ff4040",
+            background:
+              "linear-gradient(#3b1010,#140000)",
+            color:"#ff8080",
+            fontWeight:800,
+            cursor:"pointer",
+          }}
+        >
+          ⚠ TRIP BREAKER
+        </button>
+
+
+
+
+        <button
+          onClick={onReset}
+          style={{
+            flex:1,
+            padding:"10px",
+            borderRadius:"6px",
+            border:"1px solid #39ff14",
+            background:
+              "linear-gradient(#123b12,#001400)",
+            color:"#39ff14",
+            fontWeight:800,
+            cursor:"pointer",
+          }}
+        >
+          🔄 RESET
+        </button>
+
+
+      </div>
+
 
     </div>
+
   );
+
 }

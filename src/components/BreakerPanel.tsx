@@ -1,6 +1,3 @@
-// Residential Wiring Simulator v2.5
-// Breaker Panel UI
-
 import { useState } from "react";
 
 import type {
@@ -8,7 +5,8 @@ import type {
 } from "../electrical/breakerPanel";
 
 import type {
-  BreakerType
+  BreakerType,
+  Breaker
 } from "../electrical/breaker";
 
 import type {
@@ -25,6 +23,7 @@ export type BreakerConfiguration = {
 
 
 type BreakerPanelProps = {
+
   panel: BreakerPanelType;
 
   circuitStatus?:
@@ -39,10 +38,14 @@ type BreakerPanelProps = {
   onInstallBreaker?: (
     config: BreakerConfiguration
   ) => void;
+
+  onRemoveBreaker?: (
+    slotNumber: number
+  ) => void;
+
 };
 
 
-// Available breaker sizes
 const breakerSizes = [
   15,
   20,
@@ -54,53 +57,86 @@ const breakerSizes = [
 ];
 
 
-// Available breaker types
 const breakerTypes: {
   value: BreakerType;
   label: string;
 }[] = [
+
   {
     value: "STANDARD",
     label: "Standard"
   },
+
   {
     value: "GFCI",
     label: "GFCI"
   },
+
   {
     value: "AFCI",
     label: "AFCI"
   },
+
   {
     value: "DUAL_FUNCTION",
     label: "AFCI/GFCI Combo"
   }
+
 ];
 
 
-// Available pole configurations
 const poleOptions: {
   value: BreakerPoles;
   label: string;
 }[] = [
+
   {
-    value: 1 as BreakerPoles,
-    label: "1 Pole"
+    value: 1,
+    label: "1 Pole — 120V"
   },
+
   {
-    value: 2 as BreakerPoles,
-    label: "2 Pole"
+    value: 2,
+    label: "2 Pole — 240V"
   }
+
 ];
 
 
+function getBreakerDisplayName(
+  breaker: Breaker
+) {
+
+  if (
+    breaker.breakerType ===
+    "DUAL_FUNCTION"
+  ) {
+
+    return "AFCI/GFCI";
+
+  }
+
+  return breaker.breakerType;
+
+}
+
+
 export default function BreakerPanel({
+
   panel,
+
   circuitStatus = "READY",
+
   onTrip,
+
   onReset,
-  onInstallBreaker
+
+  onInstallBreaker,
+
+  onRemoveBreaker
+
 }: BreakerPanelProps) {
+
 
   const [
     selectedSlot,
@@ -117,15 +153,15 @@ export default function BreakerPanel({
   const [
     selectedType,
     setSelectedType
-  ] = useState<BreakerType>("STANDARD");
+  ] = useState<BreakerType>(
+    "STANDARD"
+  );
 
 
   const [
     selectedPoles,
     setSelectedPoles
-  ] = useState<BreakerPoles>(
-    1 as BreakerPoles
-  );
+  ] = useState<BreakerPoles>(1);
 
 
   const statusColor =
@@ -144,13 +180,24 @@ export default function BreakerPanel({
       : "BREAKER READY";
 
 
+  const selectedBreaker =
+    selectedSlot !== null
+      ? panel.breakers.find(
+          slot =>
+            slot.slot === selectedSlot
+        )?.breaker ?? null
+      : null;
+
+
   return (
+
     <div
       style={{
         background:
           "linear-gradient(135deg,#111827,#050505)",
 
-        border: "1px solid #176070",
+        border:
+          "1px solid #176070",
 
         borderRadius: "10px",
 
@@ -166,8 +213,6 @@ export default function BreakerPanel({
       }}
     >
 
-      {/* HEADER */}
-
       <h3
         style={{
           margin: 0,
@@ -175,7 +220,7 @@ export default function BreakerPanel({
           letterSpacing: "1px"
         }}
       >
-        ⚡ Main Breaker Panel
+        ⚡ {panel.name}
       </h3>
 
 
@@ -188,7 +233,8 @@ export default function BreakerPanel({
       >
 
         <span>
-          {panel.name}
+          {panel.manufacturer ?? "Generic"}{" "}
+          {panel.model ?? "Residential Load Center"}
         </span>
 
         <span
@@ -208,7 +254,8 @@ export default function BreakerPanel({
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "1fr 1fr",
+          gridTemplateColumns:
+            "1fr 1fr",
           gap: "10px"
         }}
       >
@@ -218,14 +265,19 @@ export default function BreakerPanel({
             background: "#080b10",
             padding: "10px",
             borderRadius: "6px",
-            border: "1px solid #176070"
+            border:
+              "1px solid #176070"
           }}
         >
+
           Main Breaker
+
           <br />
+
           <strong>
             {panel.mainBreaker}A
           </strong>
+
         </div>
 
 
@@ -234,14 +286,19 @@ export default function BreakerPanel({
             background: "#080b10",
             padding: "10px",
             borderRadius: "6px",
-            border: "1px solid #176070"
+            border:
+              "1px solid #176070"
           }}
         >
+
           Breaker Slots
+
           <br />
+
           <strong>
             {panel.breakers.length}
           </strong>
+
         </div>
 
       </div>
@@ -252,7 +309,8 @@ export default function BreakerPanel({
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(4,1fr)",
+          gridTemplateColumns:
+            "repeat(4,1fr)",
           gap: "8px"
         }}
       >
@@ -262,20 +320,25 @@ export default function BreakerPanel({
           <div
             key={slot.id}
 
-            onClick={() => {
-              setSelectedSlot(slot.slot);
-            }}
+            onClick={() =>
+              setSelectedSlot(
+                slot.slot
+              )
+            }
 
             style={{
+
               background:
                 slot.installed
                   ? "#123b12"
-                  : selectedSlot === slot.slot
+                  : selectedSlot ===
+                    slot.slot
                   ? "#17202b"
                   : "#080b10",
 
               border:
-                selectedSlot === slot.slot
+                selectedSlot ===
+                slot.slot
                   ? "2px solid #00eaff"
                   : slot.installed
                   ? "1px solid #39ff14"
@@ -313,13 +376,24 @@ export default function BreakerPanel({
               }}
             >
 
-              {slot.installed && slot.breaker
-                ? `${slot.breaker.amperage}A ${
-                    slot.breaker.breakerType ===
-                    "DUAL_FUNCTION"
-                      ? "AFCI/GFCI"
-                      : slot.breaker.breakerType
-                  }`
+              {slot.installed &&
+              slot.breaker
+
+                ? (
+                  <>
+                    {slot.breaker.amperage}A{" "}
+                    {getBreakerDisplayName(
+                      slot.breaker
+                    )}
+
+                    <br />
+
+                    {slot.breaker.poles === 2
+                      ? "240V"
+                      : "120V"}
+                  </>
+                )
+
                 : "EMPTY"}
 
             </div>
@@ -331,14 +405,15 @@ export default function BreakerPanel({
       </div>
 
 
-      {/* BREAKER CONFIGURATION */}
+      {/* SELECTED SLOT */}
 
       {selectedSlot !== null && (
 
         <div
           style={{
             background: "#080b10",
-            border: "1px solid #176070",
+            border:
+              "1px solid #176070",
             borderRadius: "8px",
             padding: "12px"
           }}
@@ -353,7 +428,71 @@ export default function BreakerPanel({
           </h4>
 
 
-          {/* SIZE */}
+          {/* EXISTING BREAKER */}
+
+          {selectedBreaker && (
+
+            <div
+              style={{
+                background: "#123b12",
+                border:
+                  "1px solid #39ff14",
+                padding: "10px",
+                borderRadius: "6px",
+                marginBottom: "12px"
+              }}
+            >
+
+              <strong>
+                Installed Breaker
+              </strong>
+
+              <br />
+
+              {selectedBreaker.amperage}A{" "}
+
+              {getBreakerDisplayName(
+                selectedBreaker
+              )}
+
+              <br />
+
+              {selectedBreaker.poles === 2
+                ? "240V"
+                : "120V"}
+
+              <button
+                onClick={() => {
+
+                  onRemoveBreaker?.(
+                    selectedSlot
+                  );
+
+                }}
+
+                style={{
+                  width: "100%",
+                  marginTop: "8px",
+                  padding: "8px",
+                  background:
+                    "#3b1010",
+                  color: "#ff8080",
+                  border:
+                    "1px solid #ff4040",
+                  borderRadius: "5px",
+                  cursor: "pointer",
+                  fontWeight: 800
+                }}
+              >
+                REMOVE BREAKER
+              </button>
+
+            </div>
+
+          )}
+
+
+          {/* BREAKER SIZE */}
 
           <label>
             Breaker Size
@@ -362,11 +501,13 @@ export default function BreakerPanel({
           <select
             value={selectedAmperage}
 
-            onChange={event => {
+            onChange={e =>
               setSelectedAmperage(
-                Number(event.target.value)
-              );
-            }}
+                Number(
+                  e.target.value
+                )
+              )
+            }
 
             style={{
               width: "100%",
@@ -375,7 +516,8 @@ export default function BreakerPanel({
               marginBottom: "10px",
               background: "#111827",
               color: "white",
-              border: "1px solid #176070",
+              border:
+                "1px solid #176070",
               borderRadius: "5px"
             }}
           >
@@ -394,7 +536,7 @@ export default function BreakerPanel({
           </select>
 
 
-          {/* TYPE */}
+          {/* BREAKER TYPE */}
 
           <label>
             Breaker Type
@@ -403,11 +545,11 @@ export default function BreakerPanel({
           <select
             value={selectedType}
 
-            onChange={event => {
+            onChange={e =>
               setSelectedType(
-                event.target.value as BreakerType
-              );
-            }}
+                e.target.value as BreakerType
+              )
+            }
 
             style={{
               width: "100%",
@@ -416,7 +558,8 @@ export default function BreakerPanel({
               marginBottom: "10px",
               background: "#111827",
               color: "white",
-              border: "1px solid #176070",
+              border:
+                "1px solid #176070",
               borderRadius: "5px"
             }}
           >
@@ -444,12 +587,15 @@ export default function BreakerPanel({
           <select
             value={selectedPoles}
 
-            onChange={event => {
+            onChange={e => {
+
+              const value =
+                Number(
+                  e.target.value
+                );
 
               setSelectedPoles(
-                Number(
-                  event.target.value
-                ) as BreakerPoles
+                value === 2 ? 2 : 1
               );
 
             }}
@@ -461,7 +607,8 @@ export default function BreakerPanel({
               marginBottom: "10px",
               background: "#111827",
               color: "white",
-              border: "1px solid #176070",
+              border:
+                "1px solid #176070",
               borderRadius: "5px"
             }}
           >
@@ -488,19 +635,17 @@ export default function BreakerPanel({
               padding: "9px",
               borderRadius: "5px",
               marginBottom: "10px",
-              border: "1px solid #176070"
+              border:
+                "1px solid #176070"
             }}
           >
 
-            Voltage:
+            Voltage:{" "}
 
             <strong>
-              {" "}
-
-              {Number(selectedPoles) === 2
+              {selectedPoles === 2
                 ? "240V"
                 : "120V"}
-
             </strong>
 
           </div>
@@ -509,7 +654,6 @@ export default function BreakerPanel({
           {/* INSTALL */}
 
           <button
-
             onClick={() => {
 
               if (
@@ -519,7 +663,9 @@ export default function BreakerPanel({
               }
 
               onInstallBreaker?.({
-                slot: selectedSlot,
+
+                slot:
+                  selectedSlot,
 
                 amperage:
                   selectedAmperage,
@@ -529,6 +675,7 @@ export default function BreakerPanel({
 
                 poles:
                   selectedPoles
+
               });
 
             }}
@@ -538,13 +685,18 @@ export default function BreakerPanel({
               width: "100%",
               background: "#123b12",
               color: "#39ff14",
-              border: "1px solid #39ff14",
+              border:
+                "1px solid #39ff14",
               borderRadius: "6px",
               fontWeight: 800,
               cursor: "pointer"
             }}
           >
-            INSTALL BREAKER
+
+            {selectedBreaker
+              ? "REPLACE BREAKER"
+              : "INSTALL BREAKER"}
+
           </button>
 
         </div>
@@ -568,7 +720,8 @@ export default function BreakerPanel({
             flex: 1,
             padding: "10px",
             borderRadius: "6px",
-            border: "1px solid #ff4040",
+            border:
+              "1px solid #ff4040",
             background:
               "linear-gradient(#3b1010,#140000)",
             color: "#ff8080",
@@ -587,7 +740,8 @@ export default function BreakerPanel({
             flex: 1,
             padding: "10px",
             borderRadius: "6px",
-            border: "1px solid #39ff14",
+            border:
+              "1px solid #39ff14",
             background:
               "linear-gradient(#123b12,#001400)",
             color: "#39ff14",
@@ -601,5 +755,7 @@ export default function BreakerPanel({
       </div>
 
     </div>
+
   );
+
 }

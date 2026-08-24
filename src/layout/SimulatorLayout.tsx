@@ -81,7 +81,7 @@ propertiesWidth,
 
 setPropertiesWidth
 
-]=useState(350);
+]=useState(400);
 
 
 
@@ -116,45 +116,28 @@ const [
 
 
 
-
-
 // ---------------------------------
 // ACTIVE BREAKER PANEL
 // ---------------------------------
 
 const panelDevice =
-
-selectedDevice?.type === "Breaker Panel"
-
-?
-
-selectedDevice
-
-:
-
-null;
-
-
+  selectedDevice?.type === "Breaker Panel"
+    ? selectedDevice
+    : devices.find(device => device.type === "Breaker Panel") ?? null;
 
 const panel = panelDevice
-
-?
-
-createBreakerPanel(
-
-panelDevice.id,
-
-panelDevice.name,
-
-panelDevice.mainBreaker ?? 200,
-
-12
-
-)
-
-:
-
-null;
+  ? createBreakerPanel(
+      panelDevice.id,
+      panelDevice.name,
+      panelDevice.mainBreaker ?? 200,
+      12
+    )
+  : createBreakerPanel(
+      "default-main-panel",
+      "Main Electrical Panel",
+      200,
+      12
+    );
 
 
 
@@ -447,52 +430,6 @@ overflow:"hidden"
 
 
 
-
-{
-
-panel &&
-
-(
-
-<div
-
-style={{
-
-flexShrink:0,
-
-background:"#181818",
-
-padding:"10px"
-
-}}
-
->
-
-<BreakerPanel
-
-panel={panel}
-
-circuitStatus={circuitStatus}
-
-onTrip={() => setCircuitStatus("FAULT")}
-
-onReset={resetBreaker}
-
-/>
-
-</div>
-
-)
-
-}
-
-
-
-
-
-
-
-
 <div
 
 style={{
@@ -627,7 +564,7 @@ style={{
 
 width:`${propertiesWidth}px`,
 
-minWidth:"260px",
+minWidth:"360px",
 
 display:"flex",
 
@@ -701,14 +638,25 @@ width:"100%"
 
 Update Simulation
 
+
 </button>
 
 
+{/* BREAKER PANEL */}
 
-
-
-
-
+<div
+  style={{
+    marginTop: "10px",
+    marginBottom: "10px"
+  }}
+>
+  <BreakerPanel
+    panel={panel}
+    circuitStatus={circuitStatus}
+    onTrip={() => setCircuitStatus("FAULT")}
+    onReset={resetBreaker}
+  />
+</div>
 
 
 <SimulationPanel

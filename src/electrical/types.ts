@@ -1,278 +1,178 @@
-// Residential Wiring Simulator v2.3
+// Residential Wiring Simulator v2.5
 // Core electrical data types
 //
 // Master definitions used throughout:
 // - devices
 // - circuits
 // - breakers
+// - panels
 // - wires
 // - simulation modes
 
+import type {
+  BreakerPanel
+} from "./breakerPanel";
+
+import type {
+  Breaker
+} from "./breaker";
 
 
 // --------------------------------
 // Voltage definitions
 // --------------------------------
 
-
 export type Voltage =
-
   | 120
-
   | 240;
-// --------------------------------
-// Breaker Panel definitions
-// --------------------------------
-
-import type {
-  BreakerPanel
-} from "./breakerPanel";
-
 
 
 // --------------------------------
-// Breaker definitions
+// Breaker poles
 // --------------------------------
-
-import type {
-  Breaker
-} from "./breaker";
-
-
-export type {
-  Breaker
-} from "./breaker";
-
-
-
-// --------------------------------
-// Breaker definitions
-// --------------------------------
-
 
 export type BreakerPoles =
-
   | 1
-
   | 2;
 
 
-
-
-
-
+// --------------------------------
+// Breaker type
+// --------------------------------
 
 export type BreakerType =
-
   | "STANDARD"
-
   | "AFCI"
-
   | "GFCI"
-
   | "DUAL_FUNCTION";
-
-
-
-
-
-
-
-
-
-
-
 
 
 // --------------------------------
 // Wire definitions
 // --------------------------------
 
-
 export type WireGauge =
-
   | "#14"
-
   | "#12"
-
   | "#10"
-
   | "#8";
-
-
-
-
-
-
 
 
 export interface Wire {
 
+  id?: string;
 
-  id?:string;
+  gauge?: WireGauge;
 
+  length?: number;
 
-  gauge?:WireGauge;
+  fromDevice: string;
 
+  fromTerminal: string;
 
-  length?:number;
+  toDevice: string;
 
+  toTerminal: string;
 
-
-  fromDevice:string;
-
-
-  fromTerminal:string;
-
-
-
-  toDevice:string;
-
-
-  toTerminal:string;
-
-
-
-  color?:string;
-
+  color?: string;
 
 }
-
-
-
-
-
-
-
 
 
 // --------------------------------
 // Electrical load
 // --------------------------------
 
-
 export interface ElectricalLoad {
 
+  watts: number;
 
-  watts:number;
-
-
-  continuous?:boolean;
-
+  continuous?: boolean;
 
 }
-
-
-
-
-
-
-
 
 
 // --------------------------------
 // Circuit definition
 // --------------------------------
 
-
 export interface Circuit {
 
+  id: string;
 
-  id:string;
+  name: string;
+
+  voltage: Voltage;
+
+  breaker: Breaker;
+
+  wire: Wire;
+
+  devices: ElectricalDevice[];
+
+  // --------------------------------
+  // PANEL OWNERSHIP
+  // --------------------------------
+  //
+  // Identifies which electrical panel
+  // owns this circuit.
+  //
+  // Example:
+  //
+  // panel-100
+  // panel-200
+  //
+
+  panelId?: string;
 
 
-  name:string;
+  // --------------------------------
+  // BREAKER OWNERSHIP
+  // --------------------------------
+  //
+  // Identifies the breaker slot/device
+  // that feeds this circuit.
+  //
 
-
-
-  voltage:Voltage;
-
-
-
-  breaker:Breaker;
-
-
-
-  wire:Wire;
-
-
-
-  devices:ElectricalDevice[];
-
+  breakerId?: string;
 
 }
-
-
-
-
-
-
-
 
 
 // --------------------------------
 // Device terminal
 // --------------------------------
 
-
 export interface DeviceTerminal {
 
+  id: string;
 
-  id:string;
-
-
-  name:string;
-
-
+  name: string;
 
   type:
-
     | "hot"
-
     | "neutral"
-
     | "ground"
-
     | "load"
-
     | "traveler"
-
     | "control";
 
+  x: number;
 
-
-  x:number;
-
-
-  y:number;
-
-
+  y: number;
 
   side?:
-
     | "left"
-
     | "right"
-
     | "top"
-
     | "bottom";
 
-
 }
-
-
-
-
-
-
-
 
 
 // --------------------------------
 // Device types
 // --------------------------------
-
 
 export type DeviceType =
 
@@ -311,112 +211,128 @@ export type DeviceType =
   | string;
 
 
-
-
-
-
-
-
-
 // --------------------------------
 // Electrical device
 // --------------------------------
 
-
 export interface ElectricalDevice {
 
-id:string;
+  id: string;
 
-name:string;
+  name: string;
 
-symbol:string;
+  symbol: string;
 
-type:DeviceType;
-
-
-
-  description?:string;
+  type: DeviceType;
 
 
-// Electrical properties
+  // --------------------------------
+  // General information
+  // --------------------------------
 
-load?:ElectricalLoad;
-
-
-voltage?:Voltage;
-
-
-amperage?:number;
+  description?: string;
 
 
-poles?:BreakerPoles;
+  // --------------------------------
+  // Electrical properties
+  // --------------------------------
+
+  load?: ElectricalLoad;
+
+  voltage?: Voltage;
+
+  amperage?: number;
+
+  poles?: BreakerPoles;
 
 
+  // --------------------------------
+  // Breaker properties
+  // --------------------------------
 
-// Breaker panel properties
+  breakerSize?: number;
 
-breakerSize?:number;
-
-
-mainBreaker?:number;
-
-
-// Full breaker panel model
-
-panel?:BreakerPanel;
+  mainBreaker?: number;
 
 
+  // --------------------------------
+  // PANEL OWNERSHIP
+  // --------------------------------
+  //
+  // If this device belongs to a circuit
+  // fed from a particular panel, this
+  // identifies that panel.
+  //
+  // Example:
+  //
+  // panelId: "panel-100"
+  //
+  // or
+  //
+  // panelId: "panel-200"
+  //
 
-// Simulation values
-
-tripped?:boolean;
-
-
-  calculatedLoad?:number;
-
-
-  calculatedAmps?:number;
-
-
-
-  connectedDevices?:string[];
-
-
-
-  // Position on workspace
-
-  x:number;
+  panelId?: string;
 
 
-  y:number;
+  // --------------------------------
+  // BREAKER OWNERSHIP
+  // --------------------------------
+  //
+  // Identifies the breaker feeding this
+  // device/circuit.
+  //
+
+  breakerId?: string;
 
 
+  // --------------------------------
+  // Full breaker panel model
+  // --------------------------------
+  //
+  // Only normally populated for:
+  //
+  // Breaker Panel
+  // Sub Panel
+  //
 
-  terminals:DeviceTerminal[];
+  panel?: BreakerPanel;
 
+
+  // --------------------------------
+  // Simulation values
+  // --------------------------------
+
+  tripped?: boolean;
+
+  calculatedLoad?: number;
+
+  calculatedAmps?: number;
+
+  connectedDevices?: string[];
+
+
+  // --------------------------------
+  // Workspace position
+  // --------------------------------
+
+  x: number;
+
+  y: number;
+
+  terminals: DeviceTerminal[];
 
 }
-
-
-
-
-
-
-
 
 
 // --------------------------------
 // Simulation modes
 // --------------------------------
 
-
 export type SimulationMode =
-
 
   | "APPRENTICE"
 
-
   | "ENGINEERING"
-
 
   | "HYBRID";

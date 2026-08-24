@@ -104,7 +104,7 @@ export default function SimulatorLayout() {
 
 
   // ---------------------------------
-  // ACTIVE PANEL
+  // SELECTED PANEL
   // ---------------------------------
 
   const selectedPanelDevice =
@@ -117,49 +117,74 @@ export default function SimulatorLayout() {
       : null;
 
 
+  /*
+   * IMPORTANT:
+   *
+   * There is intentionally NO fallback here.
+   *
+   * If the user has not selected a panel,
+   * activePanelDevice is null.
+   *
+   * This prevents the old fake/default
+   * 200A panel from appearing.
+   */
+
   const activePanelDevice =
-    selectedPanelDevice ??
-    panelDevices[0] ??
-    null;
+    selectedPanelDevice;
 
 
   // ---------------------------------
-  // CREATE / GET PANEL MODEL
+  // GET PANEL MODEL
   // ---------------------------------
 
   function getPanelModel(
     device: ElectricalDevice | null
-  ): BreakerPanelType {
+  ): BreakerPanelType | null {
 
-    if (device?.panel) {
+    if (!device) {
+      return null;
+    }
+
+
+    /*
+     * If the device already owns a panel
+     * model, use that exact model.
+     *
+     * This is what keeps the 100A and 200A
+     * panels independent.
+     */
+
+    if (device.panel) {
       return device.panel;
     }
 
 
-    if (device) {
-
-      return createBreakerPanel(
-        device.id,
-        device.name,
-        device.mainBreaker ?? 200,
-        12
-      );
-
-    }
-
+    /*
+     * Older panel devices may not have a
+     * panel model yet.
+     *
+     * Create one specifically for this
+     * device.
+     */
 
     return createBreakerPanel(
-      "default-main-panel",
-      "Main Electrical Panel",
-      200,
+      device.id,
+      device.name,
+      device.mainBreaker ?? 200,
       12
     );
 
   }
 
 
+  // ---------------------------------
+  // ACTIVE PANEL
+  // ---------------------------------
+
   const activePanel =
-    getPanelModel(activePanelDevice);
+    getPanelModel(
+      activePanelDevice
+    );
 
 
   // ---------------------------------
@@ -195,18 +220,26 @@ export default function SimulatorLayout() {
 
 
     const updatedDevice: ElectricalDevice = {
+
       ...activePanelDevice,
 
       panel: updatedPanel,
 
       mainBreaker:
         updatedPanel.mainBreaker
+
     };
 
 
-    updateDevice(updatedDevice);
+    updateDevice(
+      updatedDevice
+    );
 
-    setSelectedDevice(updatedDevice);
+
+    setSelectedDevice(
+      updatedDevice
+    );
+
 
     workspaceRef.current?.updateDevice(
       updatedDevice
@@ -223,25 +256,56 @@ export default function SimulatorLayout() {
     config: BreakerConfiguration
   ) {
 
-    if (!activePanelDevice) {
+    /*
+     * Never install a breaker if there
+     * is no active panel.
+     */
+
+    if (
+      !activePanelDevice ||
+      !activePanel
+    ) {
       return;
     }
 
 
+    /*
+     * Include the panel ID in the breaker ID.
+     *
+     * This prevents:
+     *
+     * panel-100 / slot-1
+     *
+     * and
+     *
+     * panel-200 / slot-1
+     *
+     * from becoming the same breaker.
+     */
+
     const breaker =
       createBreaker(
+
         `breaker-${activePanelDevice.id}-${config.slot}`,
+
         config.slot,
+
         config.amperage,
+
         config.poles,
+
         config.breakerType
+
       );
 
 
     const updatedPanel =
       installBreaker(
+
         activePanel,
+
         breaker
+
       );
 
 
@@ -262,7 +326,8 @@ export default function SimulatorLayout() {
 
     const device =
       devices.find(
-        item => item.id === deviceId
+        item =>
+          item.id === deviceId
       );
 
 
@@ -271,7 +336,27 @@ export default function SimulatorLayout() {
     }
 
 
-    setSelectedDevice(device);
+    if (
+      device.type !== "Breaker Panel" &&
+      device.type !== "Sub Panel"
+    ) {
+      return;
+    }
+
+
+    setSelectedDevice(
+      device
+    );
+
+
+    /*
+     * Reset the visual breaker status
+     * when changing panels.
+     */
+
+    setCircuitStatus(
+      "READY"
+    );
 
   }
 
@@ -317,10 +402,13 @@ export default function SimulatorLayout() {
 
     e.preventDefault();
 
-    resizing.current = true;
+    resizing.current =
+      true;
+
 
     const startX =
       e.clientX;
+
 
     const startWidth =
       propertiesWidth;
@@ -329,7 +417,9 @@ export default function SimulatorLayout() {
     const handleMouseMove =
       (event: MouseEvent) => {
 
-        if (!resizing.current) {
+        if (
+          !resizing.current
+        ) {
           return;
         }
 
@@ -355,7 +445,8 @@ export default function SimulatorLayout() {
 
     const stopResize = () => {
 
-      resizing.current = false;
+      resizing.current =
+        false;
 
 
       window.removeEventListener(
@@ -403,6 +494,7 @@ export default function SimulatorLayout() {
     const startX =
       e.clientX;
 
+
     const startWidth =
       componentWidth;
 
@@ -419,7 +511,10 @@ export default function SimulatorLayout() {
 
         const width =
           startWidth +
-          (event.clientX - startX);
+          (
+            event.clientX -
+            startX
+          );
 
 
         if (
@@ -488,8 +583,12 @@ export default function SimulatorLayout() {
     >
 
       <Toolbar
-        circuitStatus={circuitStatus}
-        onResetBreaker={resetBreaker}
+        circuitStatus={
+          circuitStatus
+        }
+        onResetBreaker={
+          resetBreaker
+        }
       />
 
 
@@ -502,41 +601,65 @@ export default function SimulatorLayout() {
         }}
       >
 
+        {/* =============================== */}
         {/* COMPONENT LIBRARY */}
+        {/* =============================== */}
 
         <div
           style={{
-            width: `${componentWidth}px`,
-            background: "#252526",
-            height: "100%",
-            overflowY: "auto",
-            flexShrink: 0
+            width:
+              `${componentWidth}px`,
+
+            background:
+              "#252526",
+
+            height:
+              "100%",
+
+            overflowY:
+              "auto",
+
+            flexShrink:
+              0
           }}
         >
 
           <ComponentLibrary
-            workspaceRef={workspaceRef}
+            workspaceRef={
+              workspaceRef
+            }
           />
 
         </div>
 
 
+        {/* =============================== */}
         {/* COMPONENT RESIZE */}
+        {/* =============================== */}
 
         <div
           onMouseDown={
             startComponentResize
           }
           style={{
-            width: "10px",
-            cursor: "col-resize",
-            background: "#444",
-            flexShrink: 0
+            width:
+              "10px",
+
+            cursor:
+              "col-resize",
+
+            background:
+              "#444",
+
+            flexShrink:
+              0
           }}
         />
 
 
+        {/* =============================== */}
         {/* WORKSPACE */}
+        {/* =============================== */}
 
         <div
           style={{
@@ -549,10 +672,14 @@ export default function SimulatorLayout() {
         >
 
           <Workspace
-            ref={workspaceRef}
+            ref={
+              workspaceRef
+            }
+
             onSelectDevice={
               setSelectedDevice
             }
+
             onCircuitPathsChange={
               setCircuitPaths
             }
@@ -561,24 +688,44 @@ export default function SimulatorLayout() {
         </div>
 
 
+        {/* =============================== */}
         {/* RIGHT PANEL */}
+        {/* =============================== */}
 
         <div
           style={{
-            width: `${propertiesWidth}px`,
-            minWidth: "360px",
-            display: "flex",
-            background: "#252526",
-            flexShrink: 0
+            width:
+              `${propertiesWidth}px`,
+
+            minWidth:
+              "360px",
+
+            display:
+              "flex",
+
+            background:
+              "#252526",
+
+            flexShrink:
+              0
           }}
         >
 
+          {/* RIGHT PANEL RESIZE */}
+
           <div
-            onMouseDown={startResize}
+            onMouseDown={
+              startResize
+            }
             style={{
-              width: "10px",
-              cursor: "col-resize",
-              background: "#444"
+              width:
+                "10px",
+
+              cursor:
+                "col-resize",
+
+              background:
+                "#444"
             }}
           />
 
@@ -591,40 +738,67 @@ export default function SimulatorLayout() {
             }}
           >
 
+            {/* =============================== */}
+            {/* UPDATE SIMULATION */}
+            {/* =============================== */}
+
             <button
               onClick={
                 refreshSimulation
               }
               style={{
-                padding: "12px",
-                width: "100%"
+                padding:
+                  "12px",
+
+                width:
+                  "100%"
               }}
             >
               Update Simulation
             </button>
 
 
+            {/* =============================== */}
             {/* PANEL SELECTOR */}
+            {/* =============================== */}
 
             {panelDevices.length > 0 && (
 
               <div
                 style={{
-                  marginTop: "10px",
-                  marginBottom: "10px",
-                  background: "#080b10",
-                  border: "1px solid #176070",
-                  borderRadius: "8px",
-                  padding: "12px"
+                  marginTop:
+                    "10px",
+
+                  marginBottom:
+                    "10px",
+
+                  background:
+                    "#080b10",
+
+                  border:
+                    "1px solid #176070",
+
+                  borderRadius:
+                    "8px",
+
+                  padding:
+                    "12px"
                 }}
               >
 
                 <label
                   style={{
-                    display: "block",
-                    marginBottom: "6px",
-                    color: "#9eefff",
-                    fontWeight: 700
+                    display:
+                      "block",
+
+                    marginBottom:
+                      "6px",
+
+                    color:
+                      "#9eefff",
+
+                    fontWeight:
+                      700
                   }}
                 >
                   Active Electrical Panel
@@ -635,27 +809,54 @@ export default function SimulatorLayout() {
                   value={
                     activePanelDevice?.id ?? ""
                   }
-                  onChange={event =>
-                    selectPanel(
-                      event.target.value
-                    )
+
+                  onChange={
+                    event =>
+                      selectPanel(
+                        event.target.value
+                      )
                   }
+
                   style={{
-                    width: "100%",
-                    padding: "10px",
-                    background: "#111827",
-                    color: "white",
-                    border: "1px solid #176070",
-                    borderRadius: "5px"
+                    width:
+                      "100%",
+
+                    padding:
+                      "10px",
+
+                    background:
+                      "#111827",
+
+                    color:
+                      "white",
+
+                    border:
+                      "1px solid #176070",
+
+                    borderRadius:
+                      "5px"
                   }}
                 >
+
+                  <option
+                    value=""
+                    disabled
+                  >
+                    Select a panel...
+                  </option>
+
 
                   {panelDevices.map(
                     device => (
 
                       <option
-                        key={device.id}
-                        value={device.id}
+                        key={
+                          device.id
+                        }
+
+                        value={
+                          device.id
+                        }
                       >
                         {device.name}
                         {" — "}
@@ -672,41 +873,134 @@ export default function SimulatorLayout() {
             )}
 
 
+            {/* =============================== */}
             {/* BREAKER PANEL */}
+            {/* =============================== */}
 
             <div
               style={{
-                marginTop: "10px",
-                marginBottom: "10px"
+                marginTop:
+                  "10px",
+
+                marginBottom:
+                  "10px"
               }}
             >
 
-              <BreakerPanel
-                panel={activePanel}
-                circuitStatus={
-                  circuitStatus
-                }
-                onTrip={() =>
-                  setCircuitStatus(
-                    "FAULT"
-                  )
-                }
-                onReset={
-                  resetBreaker
-                }
-                onInstallBreaker={
-                  handleInstallBreaker
-                }
-              />
+              {activePanel ? (
+
+                <BreakerPanel
+                  panel={
+                    activePanel
+                  }
+
+                  circuitStatus={
+                    circuitStatus
+                  }
+
+                  onTrip={() =>
+                    setCircuitStatus(
+                      "FAULT"
+                    )
+                  }
+
+                  onReset={
+                    resetBreaker
+                  }
+
+                  onInstallBreaker={
+                    handleInstallBreaker
+                  }
+                />
+
+              ) : (
+
+                <div
+                  style={{
+                    background:
+                      "linear-gradient(135deg,#111827,#050505)",
+
+                    border:
+                      "1px solid #176070",
+
+                    borderRadius:
+                      "10px",
+
+                    padding:
+                      "25px",
+
+                    color:
+                      "#777",
+
+                    textAlign:
+                      "center"
+                  }}
+                >
+
+                  <div
+                    style={{
+                      fontSize:
+                        "32px",
+
+                      marginBottom:
+                        "10px"
+                    }}
+                  >
+                    ⚡
+                  </div>
+
+
+                  <strong
+                    style={{
+                      color:
+                        "#9eefff",
+
+                      fontSize:
+                        "16px"
+                    }}
+                  >
+                    No Panel Selected
+                  </strong>
+
+
+                  <div
+                    style={{
+                      marginTop:
+                        "8px",
+
+                      fontSize:
+                        "12px"
+                    }}
+                  >
+                    Select a breaker panel or
+                    sub panel to view its
+                    breakers.
+                  </div>
+
+                </div>
+
+              )}
 
             </div>
 
 
+            {/* =============================== */}
             {/* SIMULATION */}
+            {/* =============================== */}
 
             <SimulationPanel
-              devices={devices}
-              connections={connections}
+              devices={
+                activePanelDevice
+                  ? devices
+                  : []
+              }
+
+              connections={
+                activePanelDevice
+                  ? connections
+                  : []
+              }
+
               sourceId={
                 activePanelDevice?.id ??
                 ""
@@ -714,16 +1008,23 @@ export default function SimulatorLayout() {
             />
 
 
+            {/* =============================== */}
             {/* PROPERTIES */}
+            {/* =============================== */}
 
             <PropertiesPanel
               device={
                 selectedDevice
               }
-              devices={devices}
+
+              devices={
+                devices
+              }
+
               circuitPaths={
                 circuitPaths
               }
+
               onUpdateDevice={
                 updated => {
 
@@ -731,9 +1032,11 @@ export default function SimulatorLayout() {
                     updated
                   );
 
+
                   setSelectedDevice(
                     updated
                   );
+
 
                   workspaceRef.current?.updateDevice(
                     updated
@@ -741,6 +1044,7 @@ export default function SimulatorLayout() {
 
                 }
               }
+
             />
 
           </div>

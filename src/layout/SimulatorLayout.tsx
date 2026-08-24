@@ -35,642 +35,205 @@ import {
   installBreaker
 } from "../electrical/breakerPanel";
 
+
 import {
   createBreaker
 } from "../electrical/breaker";
+
 
 import type {
   BreakerPanel as BreakerPanelType
 } from "../electrical/breakerPanel";
 
 
+import type {
+  BreakerConfiguration
+} from "../components/BreakerPanel";
 
 
-export default function SimulatorLayout(){
 
+export default function SimulatorLayout() {
 
-const workspaceRef =
-useRef<WorkspaceHandle>(null);
 
+  const workspaceRef =
+    useRef<WorkspaceHandle>(null);
 
-const resizing =
-useRef(false);
 
+  const resizing =
+    useRef(false);
 
-const componentResizing =
-useRef(false);
 
+  const componentResizing =
+    useRef(false);
 
 
 
+  const {
+    devices,
+    setDevices,
+    connections,
+    setConnections,
+    selectedDevice,
+    setSelectedDevice
+  } = useSimulator();
 
-const {
 
-devices,
 
-setDevices,
+  const [
+    propertiesWidth,
+    setPropertiesWidth
+  ] = useState(400);
 
-connections,
 
-setConnections,
 
-selectedDevice,
+  const [
+    componentWidth,
+    setComponentWidth
+  ] = useState(220);
 
-setSelectedDevice
 
-}=useSimulator();
 
+  const [
+    circuitPaths,
+    setCircuitPaths
+  ] = useState<string[][]>([]);
 
 
 
+  const [
+    circuitStatus,
+    setCircuitStatus
+  ] = useState<
+    "READY" | "WARNING" | "FAULT"
+  >("READY");
 
-const [
 
-propertiesWidth,
 
-setPropertiesWidth
+  // ---------------------------------
+  // BREAKER PANEL
+  // ---------------------------------
 
-]=useState(400);
+  const [
+    breakerPanel,
+    setBreakerPanel
+  ] = useState<BreakerPanelType>(() =>
+    createBreakerPanel(
+      "default-main-panel",
+      "Main Electrical Panel",
+      200,
+      12
+    )
+  );
 
 
 
-const [
+  // ---------------------------------
+  // ACTIVE PANEL DEVICE
+  // ---------------------------------
 
-componentWidth,
+  const panelDevice =
+    selectedDevice?.type === "Breaker Panel"
+      ? selectedDevice
+      : devices.find(
+          device =>
+            device.type === "Breaker Panel"
+        ) ?? null;
 
-setComponentWidth
 
-]=useState(220);
 
+  // ---------------------------------
+  // UPDATE DEVICE
+  // ---------------------------------
 
-
-const [
-
-circuitPaths,
-
-setCircuitPaths
-
-]=useState<string[][]>([]);
-
-
-
-const [
-  circuitStatus,
-  setCircuitStatus
-]=useState<
-"READY" | "WARNING" | "FAULT"
->("READY");
-
-const [
-  breakerPanel,
-  setBreakerPanel
-] = useState<BreakerPanelType>(() =>
-  createBreakerPanel(
-    "default-main-panel",
-    "Main Electrical Panel",
-    200,
-    12
-  )
-);
-
-
-
-// ---------------------------------
-// ACTIVE BREAKER PANEL
-// ---------------------------------
-
-const panelDevice =
-  selectedDevice?.type === "Breaker Panel"
-    ? selectedDevice
-    : devices.find(
-        device => device.type === "Breaker Panel"
-      ) ?? null;
-
-
-
-
-
-
-
-// ---------------------------------
-// UPDATE DEVICE
-// ---------------------------------
-
-function updateDevice(
-updatedDevice:any
-){
-
-setDevices(prev=>
-
-prev.map(device=>
-
-device.id===updatedDevice.id
-
-?
-
-updatedDevice
-
-:
-
-device
-
-)
-
-);
-
-}
-
-
-
-
-
-
-
-
-
-// ---------------------------------
-// REFRESH SIMULATION
-// ---------------------------------
-
-function refreshSimulation(){
-
-const currentConnections =
-
-workspaceRef.current?.getConnections()
-
-??
-
-[];
-
-
-setConnections(
-currentConnections
-);
-
-}
-
-
-// ---------------------------------
-// RESET BREAKER
-// ---------------------------------
-
-function resetBreaker(){
-
-  setCircuitStatus("READY");
-
-}
-
-
-
-
-
-
-// ---------------------------------
-// RESIZE RIGHT PANEL
-// ---------------------------------
-
-function startResize(
-e:React.MouseEvent
-){
-
-e.preventDefault();
-
-
-resizing.current=true;
-
-
-const startX=e.clientX;
-
-
-const startWidth=propertiesWidth;
-
-
-
-const handleMouseMove=(event:MouseEvent)=>{
-
-
-if(!resizing.current)
-
-return;
-
-
-const width =
-
-startWidth +
-
-(startX-event.clientX);
-
-
-
-if(width>=260 && width<=700){
-
-setPropertiesWidth(width);
-
-}
-
-};
-
-
-
-
-const stopResize=()=>{
-
-
-resizing.current=false;
-
-
-window.removeEventListener(
-"mousemove",
-handleMouseMove
-);
-
-
-window.removeEventListener(
-"mouseup",
-stopResize
-);
-
-};
-
-
-
-
-window.addEventListener(
-"mousemove",
-handleMouseMove
-);
-
-
-window.addEventListener(
-"mouseup",
-stopResize
-);
-
-}
-
-
-
-
-
-
-
-
-
-// ---------------------------------
-// RESIZE COMPONENT LIBRARY
-// ---------------------------------
-
-function startComponentResize(
-e:React.MouseEvent
-){
-
-e.preventDefault();
-
-
-componentResizing.current=true;
-
-
-const startX=e.clientX;
-
-
-const startWidth=componentWidth;
-
-
-
-const handleMouseMove=(event:MouseEvent)=>{
-
-
-if(!componentResizing.current)
-
-return;
-
-
-const width =
-
-startWidth +
-
-(event.clientX-startX);
-
-
-
-if(width>=160 && width<=500){
-
-setComponentWidth(width);
-
-}
-
-};
-
-
-
-
-const stopResize=()=>{
-
-
-componentResizing.current=false;
-
-
-window.removeEventListener(
-"mousemove",
-handleMouseMove
-);
-
-
-window.removeEventListener(
-"mouseup",
-stopResize
-);
-
-};
-
-
-
-
-window.addEventListener(
-"mousemove",
-handleMouseMove
-);
-
-
-window.addEventListener(
-"mouseup",
-stopResize
-);
-
-}
-
-
-
-
-
-
-
-
-
-return (
-
-<div
-
-style={{
-
-height:"100vh",
-
-display:"flex",
-
-flexDirection:"column",
-
-background:"#202124",
-
-color:"white",
-
-overflow:"hidden"
-
-}}
-
->
-
-<Toolbar
-  circuitStatus={circuitStatus}
-  onResetBreaker={resetBreaker}
-/>
-
-
-
-
-<div
-
-style={{
-
-flex:1,
-
-display:"flex",
-
-minHeight:0,
-
-overflow:"hidden"
-
-}}
-
->
-
-
-
-
-
-
-{/* COMPONENT LIBRARY */}
-
-<div
-
-style={{
-
-width:`${componentWidth}px`,
-
-background:"#252526",
-
-height:"100%",
-
-overflowY:"auto",
-
-flexShrink:0
-
-}}
-
->
-
-
-<ComponentLibrary
-
-workspaceRef={workspaceRef}
-
-/>
-
-
-</div>
-
-
-
-
-
-
-
-{/* COMPONENT RESIZE */}
-
-<div
-
-onMouseDown={startComponentResize}
-
-style={{
-
-width:"10px",
-
-cursor:"col-resize",
-
-background:"#444",
-
-flexShrink:0
-
-}}
-
-/>
-
-
-
-
-
-
-
-
-{/* WORKSPACE */}
-
-<div
-
-style={{
-
-flex:1,
-
-padding:"15px",
-
-background:"#303030",
-
-overflow:"hidden",
-
-minWidth:0
-
-}}
-
->
-
-
-<Workspace
-
-ref={workspaceRef}
-
-onSelectDevice={setSelectedDevice}
-
-onCircuitPathsChange={setCircuitPaths}
-
-/>
-
-
-</div>
-
-
-
-
-
-
-
-
-
-{/* RIGHT PANEL */}
-
-<div
-
-style={{
-
-width:`${propertiesWidth}px`,
-
-minWidth:"360px",
-
-display:"flex",
-
-background:"#252526",
-
-flexShrink:0
-
-}}
-
->
-
-
-
-
-
-<div
-
-onMouseDown={startResize}
-
-style={{
-
-width:"10px",
-
-cursor:"col-resize",
-
-background:"#444"
-
-}}
-
-/>
-
-
-
-
-
-
-
-
-
-<div
-
-style={{
-
-flex:1,
-
-overflowY:"auto",
-
-padding:"10px"
-
-}}
-
->
-
-
-
-
-
-<button
-
-onClick={refreshSimulation}
-
-style={{
-
-padding:"12px",
-
-width:"100%"
-
-}}
-
->
-
-Update Simulation
-
-
-</button>
-
-
-{/* BREAKER PANEL */}
-
-<div
-  style={{
-    marginTop: "10px",
-    marginBottom: "10px"
-  }}
->
-<BreakerPanel
-  panel={breakerPanel}
-  circuitStatus={circuitStatus}
-  onTrip={() => setCircuitStatus("FAULT")}
-  onReset={resetBreaker}
-  onInstallBreaker={(config) => {
-
-    const breaker = createBreaker(
-      `breaker-${config.slot}`,
-      config.slot,
-      config.amperage,
-      config.poles,
-      config.breakerType
+  function updateDevice(
+    updatedDevice: any
+  ) {
+
+    setDevices(prev =>
+      prev.map(device =>
+        device.id === updatedDevice.id
+          ? updatedDevice
+          : device
+      )
     );
+
+  }
+
+
+
+  // ---------------------------------
+  // REFRESH SIMULATION
+  // ---------------------------------
+
+  function refreshSimulation() {
+
+    const currentConnections =
+      workspaceRef.current?.getConnections()
+      ?? [];
+
+
+    setConnections(
+      currentConnections
+    );
+
+  }
+
+
+
+  // ---------------------------------
+  // RESET BREAKER
+  // ---------------------------------
+
+  function resetBreaker() {
+
+    setCircuitStatus(
+      "READY"
+    );
+
+  }
+
+
+
+  // ---------------------------------
+  // INSTALL BREAKER
+  // ---------------------------------
+
+  function handleInstallBreaker(
+    config: BreakerConfiguration
+  ) {
+
+    const existingSlot =
+      breakerPanel.breakers.find(
+        slot =>
+          slot.slot === config.slot
+      );
+
+
+    // Don't replace an existing breaker
+    if (
+      existingSlot?.installed
+    ) {
+
+      console.warn(
+        `Slot ${config.slot} already contains a breaker.`
+      );
+
+      return;
+
+    }
+
+
+
+    const breaker =
+      createBreaker(
+        `breaker-${config.slot}`,
+        config.slot,
+        config.amperage,
+        config.poles,
+        config.breakerType
+      );
+
+
 
     setBreakerPanel(prev =>
       installBreaker(
@@ -679,81 +242,558 @@ Update Simulation
       )
     );
 
-  }}
-/>
-</div>
-
-
-<SimulationPanel
-
-devices={devices}
-
-connections={connections}
-
-sourceId={
-
-panelDevice?.id ?? ""
-
-}
-
-/>
+  }
 
 
 
+  // ---------------------------------
+  // RESIZE RIGHT PANEL
+  // ---------------------------------
+
+  function startResize(
+    e: React.MouseEvent
+  ) {
+
+    e.preventDefault();
+
+
+    resizing.current = true;
+
+
+    const startX =
+      e.clientX;
+
+
+    const startWidth =
+      propertiesWidth;
 
 
 
+    const handleMouseMove =
+      (event: MouseEvent) => {
+
+        if (
+          !resizing.current
+        ) {
+          return;
+        }
+
+
+        const width =
+          startWidth +
+          (
+            startX -
+            event.clientX
+          );
+
+
+        if (
+          width >= 260 &&
+          width <= 700
+        ) {
+
+          setPropertiesWidth(
+            width
+          );
+
+        }
+
+      };
 
 
 
-<PropertiesPanel
+    const stopResize =
+      () => {
 
-device={selectedDevice}
-
-devices={devices}
-
-circuitPaths={circuitPaths}
-
-onUpdateDevice={(updated)=>{
+        resizing.current =
+          false;
 
 
-updateDevice(updated);
+        window.removeEventListener(
+          "mousemove",
+          handleMouseMove
+        );
 
 
-setSelectedDevice(updated);
+        window.removeEventListener(
+          "mouseup",
+          stopResize
+        );
 
-
-workspaceRef.current?.updateDevice(updated);
-
-
-}}
-
-/>
+      };
 
 
 
+    window.addEventListener(
+      "mousemove",
+      handleMouseMove
+    );
+
+
+    window.addEventListener(
+      "mouseup",
+      stopResize
+    );
+
+  }
 
 
 
+  // ---------------------------------
+  // RESIZE COMPONENT LIBRARY
+  // ---------------------------------
 
-</div>
+  function startComponentResize(
+    e: React.MouseEvent
+  ) {
 
-
-</div>
-
-
-
-
-
-
+    e.preventDefault();
 
 
-</div>
+    componentResizing.current =
+      true;
 
 
-</div>
+    const startX =
+      e.clientX;
 
 
-);
+    const startWidth =
+      componentWidth;
+
+
+
+    const handleMouseMove =
+      (event: MouseEvent) => {
+
+        if (
+          !componentResizing.current
+        ) {
+          return;
+        }
+
+
+        const width =
+          startWidth +
+          (
+            event.clientX -
+            startX
+          );
+
+
+        if (
+          width >= 160 &&
+          width <= 500
+        ) {
+
+          setComponentWidth(
+            width
+          );
+
+        }
+
+      };
+
+
+
+    const stopResize =
+      () => {
+
+        componentResizing.current =
+          false;
+
+
+        window.removeEventListener(
+          "mousemove",
+          handleMouseMove
+        );
+
+
+        window.removeEventListener(
+          "mouseup",
+          stopResize
+        );
+
+      };
+
+
+
+    window.addEventListener(
+      "mousemove",
+      handleMouseMove
+    );
+
+
+    window.addEventListener(
+      "mouseup",
+      stopResize
+    );
+
+  }
+
+
+
+  // ---------------------------------
+  // RENDER
+  // ---------------------------------
+
+  return (
+
+    <div
+
+      style={{
+
+        height: "100vh",
+
+        display: "flex",
+
+        flexDirection: "column",
+
+        background: "#202124",
+
+        color: "white",
+
+        overflow: "hidden"
+
+      }}
+
+    >
+
+
+      {/* TOOLBAR */}
+
+      <Toolbar
+
+        circuitStatus={
+          circuitStatus
+        }
+
+        onResetBreaker={
+          resetBreaker
+        }
+
+      />
+
+
+
+      <div
+
+        style={{
+
+          flex: 1,
+
+          display: "flex",
+
+          minHeight: 0,
+
+          overflow: "hidden"
+
+        }}
+
+      >
+
+
+        {/* COMPONENT LIBRARY */}
+
+        <div
+
+          style={{
+
+            width:
+              `${componentWidth}px`,
+
+            background:
+              "#252526",
+
+            height: "100%",
+
+            overflowY:
+              "auto",
+
+            flexShrink: 0
+
+          }}
+
+        >
+
+          <ComponentLibrary
+
+            workspaceRef={
+              workspaceRef
+            }
+
+          />
+
+        </div>
+
+
+
+        {/* COMPONENT RESIZE */}
+
+        <div
+
+          onMouseDown={
+            startComponentResize
+          }
+
+          style={{
+
+            width: "10px",
+
+            cursor:
+              "col-resize",
+
+            background:
+              "#444",
+
+            flexShrink: 0
+
+          }}
+
+        />
+
+
+
+        {/* WORKSPACE */}
+
+        <div
+
+          style={{
+
+            flex: 1,
+
+            padding: "15px",
+
+            background:
+              "#303030",
+
+            overflow: "hidden",
+
+            minWidth: 0
+
+          }}
+
+        >
+
+          <Workspace
+
+            ref={
+              workspaceRef
+            }
+
+            onSelectDevice={
+              setSelectedDevice
+            }
+
+            onCircuitPathsChange={
+              setCircuitPaths
+            }
+
+          />
+
+        </div>
+
+
+
+        {/* RIGHT PANEL */}
+
+        <div
+
+          style={{
+
+            width:
+              `${propertiesWidth}px`,
+
+            minWidth:
+              "360px",
+
+            display: "flex",
+
+            background:
+              "#252526",
+
+            flexShrink: 0
+
+          }}
+
+        >
+
+
+          {/* RIGHT PANEL RESIZE */}
+
+          <div
+
+            onMouseDown={
+              startResize
+            }
+
+            style={{
+
+              width: "10px",
+
+              cursor:
+                "col-resize",
+
+              background:
+                "#444"
+
+            }}
+
+          />
+
+
+
+          <div
+
+            style={{
+
+              flex: 1,
+
+              overflowY:
+                "auto",
+
+              padding: "10px"
+
+            }}
+
+          >
+
+
+            {/* SIMULATION UPDATE */}
+
+            <button
+
+              onClick={
+                refreshSimulation
+              }
+
+              style={{
+
+                padding: "12px",
+
+                width: "100%"
+
+              }}
+
+            >
+
+              Update Simulation
+
+            </button>
+
+
+
+            {/* BREAKER PANEL */}
+
+            <div
+
+              style={{
+
+                marginTop: "10px",
+
+                marginBottom: "10px"
+
+              }}
+
+            >
+
+              <BreakerPanel
+
+                panel={
+                  breakerPanel
+                }
+
+                circuitStatus={
+                  circuitStatus
+                }
+
+                onTrip={() =>
+                  setCircuitStatus(
+                    "FAULT"
+                  )
+                }
+
+                onReset={
+                  resetBreaker
+                }
+
+                onInstallBreaker={
+                  handleInstallBreaker
+                }
+
+              />
+
+            </div>
+
+
+
+            {/* SIMULATION PANEL */}
+
+            <SimulationPanel
+
+              devices={
+                devices
+              }
+
+              connections={
+                connections
+              }
+
+              sourceId={
+                panelDevice?.id ?? ""
+              }
+
+            />
+
+
+
+            {/* PROPERTIES */}
+
+            <PropertiesPanel
+
+              device={
+                selectedDevice
+              }
+
+              devices={
+                devices
+              }
+
+              circuitPaths={
+                circuitPaths
+              }
+
+              onUpdateDevice={
+                updated => {
+
+                  updateDevice(
+                    updated
+                  );
+
+
+                  setSelectedDevice(
+                    updated
+                  );
+
+
+                  workspaceRef.current
+                    ?.updateDevice(
+                      updated
+                    );
+
+                }
+              }
+
+            />
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  );
 
 }

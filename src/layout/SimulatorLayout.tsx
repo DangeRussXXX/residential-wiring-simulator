@@ -31,7 +31,16 @@ import {
 
 
 import {
-  createBreakerPanel
+  createBreakerPanel,
+  installBreaker
+} from "../electrical/breakerPanel";
+
+import {
+  createBreaker
+} from "../electrical/breaker";
+
+import type {
+  BreakerPanel as BreakerPanelType
 } from "../electrical/breakerPanel";
 
 
@@ -112,7 +121,17 @@ const [
 "READY" | "WARNING" | "FAULT"
 >("READY");
 
-
+const [
+  breakerPanel,
+  setBreakerPanel
+] = useState<BreakerPanelType>(() =>
+  createBreakerPanel(
+    "default-main-panel",
+    "Main Electrical Panel",
+    200,
+    12
+  )
+);
 
 
 
@@ -123,21 +142,9 @@ const [
 const panelDevice =
   selectedDevice?.type === "Breaker Panel"
     ? selectedDevice
-    : devices.find(device => device.type === "Breaker Panel") ?? null;
-
-const panel = panelDevice
-  ? createBreakerPanel(
-      panelDevice.id,
-      panelDevice.name,
-      panelDevice.mainBreaker ?? 200,
-      12
-    )
-  : createBreakerPanel(
-      "default-main-panel",
-      "Main Electrical Panel",
-      200,
-      12
-    );
+    : devices.find(
+        device => device.type === "Breaker Panel"
+      ) ?? null;
 
 
 
@@ -650,12 +657,30 @@ Update Simulation
     marginBottom: "10px"
   }}
 >
-  <BreakerPanel
-    panel={panel}
-    circuitStatus={circuitStatus}
-    onTrip={() => setCircuitStatus("FAULT")}
-    onReset={resetBreaker}
-  />
+<BreakerPanel
+  panel={breakerPanel}
+  circuitStatus={circuitStatus}
+  onTrip={() => setCircuitStatus("FAULT")}
+  onReset={resetBreaker}
+  onInstallBreaker={(config) => {
+
+    const breaker = createBreaker(
+      `breaker-${config.slot}`,
+      config.slot,
+      config.amperage,
+      config.poles,
+      config.breakerType
+    );
+
+    setBreakerPanel(prev =>
+      installBreaker(
+        prev,
+        breaker
+      )
+    );
+
+  }}
+/>
 </div>
 
 

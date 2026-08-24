@@ -8,6 +8,31 @@ import type {
 } from "../electrical/breakerPanel";
 
 
+import type {
+  BreakerType
+} from "../electrical/breaker";
+
+
+import type {
+  BreakerPoles
+} from "../electrical/types";
+
+
+
+type BreakerConfiguration = {
+
+  slot: number;
+
+  amperage: number;
+
+  breakerType: BreakerType;
+
+  poles: BreakerPoles;
+
+};
+
+
+
 type BreakerPanelProps = {
 
   panel: BreakerPanelType;
@@ -21,7 +46,73 @@ type BreakerPanelProps = {
 
   onReset?: () => void;
 
+  onInstallBreaker?: (
+    config: BreakerConfiguration
+  ) => void;
+
 };
+
+
+
+
+
+const breakerSizes = [
+  15,
+  20,
+  25,
+  30,
+  40,
+  50,
+  60
+];
+
+
+
+const breakerTypes: {
+  value: BreakerType;
+  label: string;
+}[] = [
+
+  {
+    value: "STANDARD",
+    label: "Standard"
+  },
+
+  {
+    value: "GFCI",
+    label: "GFCI"
+  },
+
+  {
+    value: "AFCI",
+    label: "AFCI"
+  },
+
+  {
+    value: "DUAL_FUNCTION",
+    label: "AFCI/GFCI Combo"
+  }
+
+];
+
+
+
+const poleOptions: {
+  value: BreakerPoles;
+  label: string;
+}[] = [
+
+  {
+    value: 1 as BreakerPoles,
+    label: "1 Pole"
+  },
+
+  {
+    value: 2 as BreakerPoles,
+    label: "2 Pole"
+  }
+
+];
 
 
 
@@ -37,6 +128,8 @@ export default function BreakerPanel({
 
   onReset,
 
+  onInstallBreaker
+
 }: BreakerPanelProps) {
 
 
@@ -47,8 +140,49 @@ selectedSlot,
 
 setSelectedSlot
 
-]=useState<number | null>(null);
+] = useState<number | null>(null);
 
+
+
+const [
+
+selectedAmperage,
+
+setSelectedAmperage
+
+] = useState(20);
+
+
+
+const [
+
+selectedType,
+
+setSelectedType
+
+] =
+
+useState<BreakerType>(
+
+"STANDARD"
+
+);
+
+
+
+const [
+
+selectedPoles,
+
+setSelectedPoles
+
+] =
+
+useState<BreakerPoles>(
+
+1 as BreakerPoles
+
+);
 
 
 
@@ -70,7 +204,6 @@ const statusColor =
 
 
 
-
 const statusText =
 
   circuitStatus === "FAULT"
@@ -82,7 +215,6 @@ const statusText =
     ? "CHECK CONNECTIONS"
 
     : "BREAKER READY";
-
 
 
 
@@ -109,12 +241,11 @@ display:"flex",
 
 flexDirection:"column",
 
-gap:"12px",
+gap:"12px"
 
 }}
 
 >
-
 
 
 
@@ -126,7 +257,7 @@ margin:0,
 
 color:"#00eaff",
 
-letterSpacing:"1px",
+letterSpacing:"1px"
 
 }}
 
@@ -140,8 +271,6 @@ letterSpacing:"1px",
 
 
 
-
-
 <div
 
 style={{
@@ -150,11 +279,12 @@ display:"flex",
 
 justifyContent:"space-between",
 
-alignItems:"center",
+alignItems:"center"
 
 }}
 
 >
+
 
 
 <span>
@@ -171,7 +301,7 @@ style={{
 
 color:statusColor,
 
-fontWeight:800,
+fontWeight:800
 
 }}
 
@@ -182,10 +312,8 @@ fontWeight:800,
 </span>
 
 
+
 </div>
-
-
-
 
 
 
@@ -201,7 +329,7 @@ display:"grid",
 
 gridTemplateColumns:"1fr 1fr",
 
-gap:"10px",
+gap:"10px"
 
 }}
 
@@ -219,7 +347,7 @@ padding:"10px",
 
 borderRadius:"6px",
 
-border:"1px solid #176070",
+border:"1px solid #176070"
 
 }}
 
@@ -251,7 +379,7 @@ padding:"10px",
 
 borderRadius:"6px",
 
-border:"1px solid #176070",
+border:"1px solid #176070"
 
 }}
 
@@ -277,9 +405,6 @@ Breaker Slots
 
 
 
-
-
-
 {/* BREAKER SLOTS */}
 
 <div
@@ -290,23 +415,23 @@ display:"grid",
 
 gridTemplateColumns:"repeat(4,1fr)",
 
-gap:"8px",
+gap:"8px"
 
 }}
 
 >
 
 
+
 {
 
-panel.breakers.map((slot)=>(
-
+panel.breakers.map(slot => (
 
 <div
 
 key={slot.id}
 
-onClick={()=>{
+onClick={() => {
 
 setSelectedSlot(slot.slot);
 
@@ -334,7 +459,6 @@ selectedSlot === slot.slot
 
 "#080b10",
 
-
 border:
 
 selectedSlot === slot.slot
@@ -355,7 +479,6 @@ slot.installed
 
 "1px solid #176070",
 
-
 borderRadius:"6px",
 
 padding:"8px",
@@ -366,11 +489,12 @@ fontSize:"12px",
 
 cursor:"pointer",
 
-transition:".2s",
+transition:".2s"
 
 }}
 
 >
+
 
 
 <div>
@@ -378,6 +502,7 @@ transition:".2s",
 SLOT {slot.slot}
 
 </div>
+
 
 
 
@@ -400,11 +525,12 @@ slot.installed
 
 "#777",
 
-fontWeight:800,
+fontWeight:800
 
 }}
 
 >
+
 
 
 {
@@ -413,7 +539,11 @@ slot.installed && slot.breaker
 
 ?
 
-`${slot.breaker.amperage}A ${slot.breaker.breakerType}`
+`${slot.breaker.amperage}A ${
+  slot.breaker.breakerType === "DUAL_FUNCTION"
+    ? "AFCI/GFCI"
+    : slot.breaker.breakerType
+}`
 
 :
 
@@ -422,22 +552,20 @@ slot.installed && slot.breaker
 }
 
 
-</div>
-
 
 </div>
 
+
+
+</div>
 
 ))
 
 }
 
 
+
 </div>
-
-
-
-
 
 
 
@@ -447,9 +575,7 @@ slot.installed && slot.breaker
 
 {
 
-selectedSlot &&
-
-(
+selectedSlot !== null && (
 
 <div
 
@@ -461,48 +587,324 @@ border:"1px solid #176070",
 
 borderRadius:"8px",
 
-padding:"12px",
+padding:"12px"
 
 }}
 
 >
 
 
+
 <h4>
 
-Slot {selectedSlot} Selected
+Slot {selectedSlot}
 
 </h4>
 
 
 
-<p
+
+
+{/* BREAKER SIZE */}
+
+<label>
+
+Breaker Size
+
+</label>
+
+
+
+<select
+
+value={selectedAmperage}
+
+onChange={e => {
+
+setSelectedAmperage(
+
+Number(e.target.value)
+
+);
+
+}}
 
 style={{
 
-color:"#9eefff"
+width:"100%",
+
+padding:"9px",
+
+marginTop:"5px",
+
+marginBottom:"10px",
+
+background:"#111827",
+
+color:"white",
+
+border:"1px solid #176070",
+
+borderRadius:"5px"
 
 }}
 
 >
 
-Breaker installation interface ready.
-
-</p>
 
 
+{
+
+breakerSizes.map(size => (
+
+<option
+
+key={size}
+
+value={size}
+
+>
+
+{size}A
+
+</option>
+
+))
+
+}
+
+
+
+</select>
+
+
+
+
+
+{/* BREAKER TYPE */}
+
+<label>
+
+Breaker Type
+
+</label>
+
+
+
+<select
+
+value={selectedType}
+
+onChange={e => {
+
+setSelectedType(
+
+e.target.value as BreakerType
+
+);
+
+}}
+
+style={{
+
+width:"100%",
+
+padding:"9px",
+
+marginTop:"5px",
+
+marginBottom:"10px",
+
+background:"#111827",
+
+color:"white",
+
+border:"1px solid #176070",
+
+borderRadius:"5px"
+
+}}
+
+>
+
+
+
+{
+
+breakerTypes.map(type => (
+
+<option
+
+key={type.value}
+
+value={type.value}
+
+>
+
+{type.label}
+
+</option>
+
+))
+
+}
+
+
+
+</select>
+
+
+
+
+
+{/* POLES */}
+
+<label>
+
+Breaker Poles
+
+</label>
+
+
+
+<select
+
+value={selectedPoles}
+
+onChange={e => {
+
+setSelectedPoles(
+
+Number(e.target.value)
+
+as BreakerPoles
+
+);
+
+}}
+
+style={{
+
+width:"100%",
+
+padding:"9px",
+
+marginTop:"5px",
+
+marginBottom:"10px",
+
+background:"#111827",
+
+color:"white",
+
+border:"1px solid #176070",
+
+borderRadius:"5px"
+
+}}
+
+>
+
+
+
+{
+
+poleOptions.map(option => (
+
+<option
+
+key={option.value}
+
+value={option.value}
+
+>
+
+{option.label}
+
+</option>
+
+))
+
+}
+
+
+
+</select>
+
+
+
+
+
+{/* VOLTAGE */}
+
+<div
+
+style={{
+
+background:"#111827",
+
+padding:"9px",
+
+borderRadius:"5px",
+
+marginBottom:"10px",
+
+border:"1px solid #176070"
+
+}}
+
+>
+
+Voltage:
+
+<strong>
+
+{" "}
+
+{
+
+selectedPoles === (2 as BreakerPoles)
+
+?
+
+"240V"
+
+:
+
+"120V"
+
+}
+
+</strong>
+
+</div>
+
+
+
+
+
+{/* INSTALL */}
 
 <button
 
-onClick={()=>{
+onClick={() => {
 
-console.log(
+if(selectedSlot === null)
 
-"Install breaker requested",
+return;
 
-selectedSlot
 
-);
+onInstallBreaker?.({
+
+slot:selectedSlot,
+
+amperage:selectedAmperage,
+
+breakerType:selectedType,
+
+poles:selectedPoles
+
+});
 
 }}
 
@@ -522,13 +924,13 @@ borderRadius:"6px",
 
 fontWeight:800,
 
-cursor:"pointer",
+cursor:"pointer"
 
 }}
 
 >
 
-Install 20A Standard Breaker
+INSTALL BREAKER
 
 </button>
 
@@ -536,14 +938,7 @@ Install 20A Standard Breaker
 
 </div>
 
-)
-
-}
-
-
-
-
-
+)}
 
 
 
@@ -557,7 +952,7 @@ style={{
 
 display:"flex",
 
-gap:"10px",
+gap:"10px"
 
 }}
 
@@ -587,7 +982,7 @@ color:"#ff8080",
 
 fontWeight:800,
 
-cursor:"pointer",
+cursor:"pointer"
 
 }}
 
@@ -596,8 +991,6 @@ cursor:"pointer",
 ⚠ TRIP BREAKER
 
 </button>
-
-
 
 
 
@@ -625,7 +1018,7 @@ color:"#39ff14",
 
 fontWeight:800,
 
-cursor:"pointer",
+cursor:"pointer"
 
 }}
 
@@ -646,6 +1039,5 @@ cursor:"pointer",
 </div>
 
 );
-
 
 }

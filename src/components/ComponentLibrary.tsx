@@ -1,4 +1,4 @@
-// Residential Wiring Simulator v2.6
+// Residential Wiring Simulator v2.7
 // Component Library
 //
 // Handles:
@@ -8,8 +8,15 @@
 // - click placement
 // - drag placement preparation
 //
-// This component uses the electrical component catalog
-// as the single source of component definitions.
+// Breaker drag workflow:
+// 1. Create a complete Breaker object.
+// 2. Keep the normal dataTransfer payload.
+// 3. Publish the breaker through a browser CustomEvent.
+// 4. BreakerPanelLayout listens for that event.
+// 5. The panel can therefore highlight valid slots during drag.
+//
+// This preserves normal workspace drag behavior while fixing
+// breaker-panel drag highlighting.
 
 import {
   useState
@@ -74,11 +81,6 @@ type ComponentItem = {
 // ============================================================
 // COMPONENT DESCRIPTIONS
 // ============================================================
-//
-// The catalog intentionally does not require descriptions.
-// We provide them here so the UI can display useful text
-// without changing the electrical catalog data model.
-//
 
 function getComponentDescription(
   name: string
@@ -204,6 +206,25 @@ const categories: string[] = [
     )
   )
 ];
+
+
+// ============================================================
+// BREAKER DRAG EVENT
+// ============================================================
+//
+// BreakerPanelLayout listens for this event.
+//
+// The event contains the complete Breaker object.
+//
+// We intentionally use a string event name so both components
+// remain independent and do not need to import each other.
+// ============================================================
+
+const BREAKER_DRAG_EVENT =
+  "residential-wiring-breaker-drag";
+
+const BREAKER_DRAG_END_EVENT =
+  "residential-wiring-breaker-drag-end";
 
 
 // ============================================================
@@ -336,8 +357,7 @@ export default function ComponentLibrary({
 
 
     /*
-     * Fallback for any future breaker
-     * that gets added to the catalog.
+     * Fallback for future breaker catalog entries.
      */
 
     return createLibraryBreaker(
@@ -376,6 +396,12 @@ export default function ComponentLibrary({
         );
 
 
+      /*
+       * Keep the original dataTransfer payload.
+       *
+       * This is still used by the drop handler.
+       */
+
       event.dataTransfer.setData(
         "breaker",
         JSON.stringify(
@@ -386,6 +412,26 @@ export default function ComponentLibrary({
 
       event.dataTransfer.effectAllowed =
         "copy";
+
+
+      /*
+       * IMPORTANT:
+       *
+       * Browsers do not reliably expose custom dataTransfer
+       * values during dragover.
+       *
+       * Publish the breaker separately so the panel can learn
+       * about the breaker immediately when dragging begins.
+       */
+
+      window.dispatchEvent(
+        new CustomEvent(
+          BREAKER_DRAG_EVENT,
+          {
+            detail: breaker
+          }
+        )
+      );
 
 
       return;
@@ -405,6 +451,34 @@ export default function ComponentLibrary({
 
     event.dataTransfer.effectAllowed =
       "copy";
+
+  }
+
+
+  // ==========================================================
+  // DRAG END
+  // ==========================================================
+
+  function dragEnd(
+    item: ComponentItem
+  ): void {
+
+    /*
+     * Only breaker drags need to clear the panel's
+     * special breaker-drag state.
+     */
+
+    if (
+      item.isBreaker
+    ) {
+
+      window.dispatchEvent(
+        new CustomEvent(
+          BREAKER_DRAG_END_EVENT
+        )
+      );
+
+    }
 
   }
 
@@ -499,15 +573,15 @@ export default function ComponentLibrary({
 
         value={search}
 
-        onChange={(
-          event
-        ) => {
+        onChange={
+          event => {
 
-          setSearch(
-            event.target.value
-          );
+            setSearch(
+              event.target.value
+            );
 
-        }}
+          }
+        }
 
         style={{
 
@@ -551,8 +625,7 @@ export default function ComponentLibrary({
                     component.name
                       .toLowerCase()
                       .includes(
-                        search
-                          .toLowerCase()
+                        search.toLowerCase()
                       );
 
                   return (
@@ -583,7 +656,6 @@ export default function ComponentLibrary({
 
               <div
                 key={category}
-
                 style={{
                   marginBottom: "12px"
                 }}
@@ -641,9 +713,16 @@ export default function ComponentLibrary({
 
                         draggable={true}
 
-                        onDragStart={event =>
-                          dragStart(
-                            event,
+                        onDragStart={
+                          event =>
+                            dragStart(
+                              event,
+                              item
+                            )
+                        }
+
+                        onDragEnd={() =>
+                          dragEnd(
                             item
                           )
                         }
@@ -693,8 +772,6 @@ export default function ComponentLibrary({
                           }}
                         >
 
-                          {/* ICON */}
-
                           <div
                             style={{
 
@@ -736,8 +813,6 @@ export default function ComponentLibrary({
 
                           </div>
 
-
-                          {/* NAME / DESCRIPTION */}
 
                           <div>
 
@@ -838,11 +913,8 @@ export default function ComponentLibrary({
                         >
 
                           {item.isBreaker
-
                             ? "Drag into breaker panel slot"
-
                             : "Click to place • Drag to workspace"
-
                           }
 
                         </div>

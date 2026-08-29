@@ -15,8 +15,14 @@
 // IMPORTANT:
 // DROP does NOT install the breaker.
 // INSTALL BREAKER performs the actual installation.
+//
+// IMPORTANT DRAG FIX:
+// ComponentLibrary publishes the dragged breaker through
+// a browser CustomEvent because custom dataTransfer values
+// are not reliably available during dragover.
 
 import {
+  useEffect,
   useMemo,
   useState,
   type DragEvent
@@ -35,6 +41,21 @@ import type {
   BreakerPoles
 } from "../electrical/types";
 
+
+// ============================================================
+// DRAG EVENTS
+// ============================================================
+
+const BREAKER_DRAG_EVENT =
+  "residential-wiring-breaker-drag";
+
+const BREAKER_DRAG_END_EVENT =
+  "residential-wiring-breaker-drag-end";
+
+
+// ============================================================
+// PROPS
+// ============================================================
 
 type BreakerPanelLayoutProps = {
 
@@ -57,6 +78,10 @@ type BreakerPanelLayoutProps = {
 };
 
 
+// ============================================================
+// PANEL SLOT
+// ============================================================
+
 type PanelSlot = {
 
   id: number;
@@ -66,9 +91,9 @@ type PanelSlot = {
 };
 
 
-/*
- * Breaker sizes available in the panel.
- */
+// ============================================================
+// BREAKER SIZES
+// ============================================================
 
 const BREAKER_SIZES = [
   15,
@@ -81,9 +106,9 @@ const BREAKER_SIZES = [
 ];
 
 
-/*
- * Breaker type options.
- */
+// ============================================================
+// BREAKER TYPES
+// ============================================================
 
 const BREAKER_TYPES: {
   value: BreakerType;
@@ -113,9 +138,9 @@ const BREAKER_TYPES: {
 ];
 
 
-/*
- * Pole options.
- */
+// ============================================================
+// POLE OPTIONS
+// ============================================================
 
 const POLE_OPTIONS: {
   value: BreakerPoles;
@@ -135,9 +160,9 @@ const POLE_OPTIONS: {
 ];
 
 
-/*
- * Create the physical panel slots.
- */
+// ============================================================
+// CREATE PANEL SLOTS
+// ============================================================
 
 function makeSlots(
   count: number
@@ -145,10 +170,11 @@ function makeSlots(
 
   return Array.from(
     {
-      length: Math.max(
-        1,
-        count
-      )
+      length:
+        Math.max(
+          1,
+          count
+        )
     },
     (_, index) => ({
 
@@ -164,9 +190,9 @@ function makeSlots(
 }
 
 
-/*
- * Display name for a breaker.
- */
+// ============================================================
+// BREAKER LABEL
+// ============================================================
 
 function getBreakerLabel(
   breaker: Breaker
@@ -180,9 +206,9 @@ function getBreakerLabel(
 }
 
 
-/*
- * Friendly breaker type label.
- */
+// ============================================================
+// TYPE LABEL
+// ============================================================
 
 function getTypeLabel(
   type: BreakerType
@@ -207,19 +233,9 @@ function getTypeLabel(
 }
 
 
-/*
- * Read the breaker payload supplied by
- * ComponentLibrary.
- *
- * ComponentLibrary writes:
- *
- * dataTransfer.setData(
- *   "breaker",
- *   JSON.stringify(breaker)
- * )
- *
- * This function reads that exact payload.
- */
+// ============================================================
+// READ DRAGGED BREAKER
+// ============================================================
 
 function readDraggedBreaker(
   event: DragEvent<HTMLDivElement>
@@ -231,7 +247,9 @@ function readDraggedBreaker(
     );
 
 
-  if (!data) {
+  if (
+    !data
+  ) {
 
     return null;
 
@@ -246,17 +264,14 @@ function readDraggedBreaker(
       ) as Partial<Breaker>;
 
 
-    /*
-     * Validate the minimum information
-     * required for a breaker.
-     */
-
     if (
       !parsed ||
       typeof parsed.id !== "string" ||
       typeof parsed.amperage !== "number" ||
-      (parsed.poles !== 1 &&
-       parsed.poles !== 2) ||
+      (
+        parsed.poles !== 1 &&
+        parsed.poles !== 2
+      ) ||
       (
         parsed.breakerType !== "STANDARD" &&
         parsed.breakerType !== "GFCI" &&
@@ -288,14 +303,9 @@ function readDraggedBreaker(
 }
 
 
-/*
- * Determine whether a slot belongs to a particular
- * breaker.
- *
- * This is important for editing an already-installed
- * breaker because the breaker's own occupied slots
- * should not prevent editing it.
- */
+// ============================================================
+// SLOT BELONGS TO BREAKER
+// ============================================================
 
 function slotBelongsToBreaker(
   slot: PanelSlot,
@@ -320,6 +330,10 @@ function slotBelongsToBreaker(
 }
 
 
+// ============================================================
+// PANEL
+// ============================================================
+
 export default function BreakerPanelLayout({
 
   panelName,
@@ -338,7 +352,7 @@ export default function BreakerPanelLayout({
 
 
   // ==========================================================
-  // PANEL
+  // PANEL SLOTS
   // ==========================================================
 
   const [
@@ -365,12 +379,7 @@ export default function BreakerPanelLayout({
 
 
   // ==========================================================
-  // DRAG STATE
-  //
-  // The ComponentLibrary owns dragStart.
-  //
-  // Therefore the panel discovers the breaker
-  // from dataTransfer during dragOver.
+  // DRAGGED BREAKER
   // ==========================================================
 
   const [
@@ -380,6 +389,10 @@ export default function BreakerPanelLayout({
     null
   );
 
+
+  // ==========================================================
+  // DRAG OVER SLOT
+  // ==========================================================
 
   const [
     dragOverSlot,
@@ -391,10 +404,6 @@ export default function BreakerPanelLayout({
 
   // ==========================================================
   // PENDING BREAKER
-  //
-  // A dropped breaker is stored here first.
-  // It is NOT installed until INSTALL BREAKER
-  // is pressed.
   // ==========================================================
 
   const [
@@ -442,14 +451,103 @@ export default function BreakerPanelLayout({
 
 
   // ==========================================================
+  // LISTEN FOR COMPONENT LIBRARY BREAKER DRAG
+  // ==========================================================
+  //
+  // This is the central fix.
+  //
+  // ComponentLibrary sends:
+  //
+  // window.dispatchEvent(
+  //   new CustomEvent(
+  //     "residential-wiring-breaker-drag",
+  //     { detail: breaker }
+  //   )
+  // );
+  //
+  // The panel receives the complete breaker immediately.
+  // ==========================================================
+
+  useEffect(() => {
+
+    function handleBreakerDrag(
+      event: Event
+    ): void {
+
+      const customEvent =
+        event as CustomEvent<Breaker>;
+
+
+      const breaker =
+        customEvent.detail;
+
+
+      if (
+        !breaker
+      ) {
+
+        return;
+
+      }
+
+
+      setDraggingBreaker(
+        breaker
+      );
+
+
+      setDragOverSlot(
+        null
+      );
+
+    }
+
+
+    function handleBreakerDragEnd(): void {
+
+      setDraggingBreaker(
+        null
+      );
+
+      setDragOverSlot(
+        null
+      );
+
+    }
+
+
+    window.addEventListener(
+      BREAKER_DRAG_EVENT,
+      handleBreakerDrag
+    );
+
+
+    window.addEventListener(
+      BREAKER_DRAG_END_EVENT,
+      handleBreakerDragEnd
+    );
+
+
+    return () => {
+
+      window.removeEventListener(
+        BREAKER_DRAG_EVENT,
+        handleBreakerDrag
+      );
+
+
+      window.removeEventListener(
+        BREAKER_DRAG_END_EVENT,
+        handleBreakerDragEnd
+      );
+
+    };
+
+  }, []);
+
+
+  // ==========================================================
   // VALID DROP SLOTS
-  //
-  // These are calculated from the breaker currently being
-  // dragged.
-  //
-  // A 1-pole breaker needs one empty slot.
-  //
-  // A 2-pole breaker needs two consecutive empty slots.
   // ==========================================================
 
   const validDropSlots =
@@ -478,9 +576,9 @@ export default function BreakerPanelLayout({
           index + 1;
 
 
-        /*
-         * 1-pole breaker.
-         */
+        // ----------------------------------------------------
+        // 1-POLE
+        // ----------------------------------------------------
 
         if (
           draggingBreaker.poles === 1
@@ -496,17 +594,15 @@ export default function BreakerPanelLayout({
 
           }
 
+
           continue;
 
         }
 
 
-        /*
-         * 2-pole breaker.
-         *
-         * It must start on a slot where
-         * the following physical slot also exists.
-         */
+        // ----------------------------------------------------
+        // 2-POLE
+        // ----------------------------------------------------
 
         if (
           index + 1 <
@@ -562,12 +658,7 @@ export default function BreakerPanelLayout({
 
 
   // ==========================================================
-  // DRAG OVER SLOT
-  //
-  // The ComponentLibrary starts the drag, so this component
-  // discovers the breaker payload here.
-  //
-  // This is what makes valid panel slots highlight.
+  // DRAG OVER
   // ==========================================================
 
   function handleDragOver(
@@ -583,9 +674,9 @@ export default function BreakerPanelLayout({
 
 
     /*
-     * If we do not already know which breaker
-     * is being dragged, read it directly from
-     * the browser's dataTransfer payload.
+     * Normally the CustomEvent has already supplied the
+     * breaker. This fallback is retained for compatibility
+     * with other breaker drag sources.
      */
 
     let breaker =
@@ -628,10 +719,9 @@ export default function BreakerPanelLayout({
     }
 
 
-    /*
-     * Determine whether this physical slot
-     * is a valid starting position.
-     */
+    // --------------------------------------------------------
+    // 1-POLE
+    // --------------------------------------------------------
 
     if (
       breaker.poles === 1
@@ -664,14 +754,15 @@ export default function BreakerPanelLayout({
 
       }
 
+
       return;
 
     }
 
 
-    /*
-     * 2-pole validation.
-     */
+    // --------------------------------------------------------
+    // 2-POLE
+    // --------------------------------------------------------
 
     const first =
       panelSlots.find(
@@ -737,10 +828,6 @@ export default function BreakerPanelLayout({
 
   // ==========================================================
   // DROP
-  //
-  // DROP ONLY opens configuration.
-  //
-  // It does NOT install the breaker.
   // ==========================================================
 
   function handleDrop(
@@ -753,15 +840,31 @@ export default function BreakerPanelLayout({
     event.stopPropagation();
 
 
-    const breaker =
+    /*
+     * Try the actual drop payload first.
+     */
+
+    let breaker =
       readDraggedBreaker(
         event
       );
 
 
     /*
-     * Clear visual drag state immediately.
+     * If the browser does not provide the custom dataTransfer
+     * value, use the breaker already received through the
+     * CustomEvent.
      */
+
+    if (
+      !breaker
+    ) {
+
+      breaker =
+        draggingBreaker;
+
+    }
+
 
     clearDragState();
 
@@ -771,7 +874,7 @@ export default function BreakerPanelLayout({
     ) {
 
       console.warn(
-        "Panel received a drop, but no breaker payload was found."
+        "Panel received a breaker drop, but no breaker was available."
       );
 
       return;
@@ -779,12 +882,9 @@ export default function BreakerPanelLayout({
     }
 
 
-    /*
-     * Re-check the actual panel state.
-     *
-     * This prevents a stale highlight from
-     * allowing an invalid drop.
-     */
+    // --------------------------------------------------------
+    // VALIDATE 1-POLE
+    // --------------------------------------------------------
 
     if (
       breaker.poles === 1
@@ -810,9 +910,9 @@ export default function BreakerPanelLayout({
     }
 
 
-    /*
-     * 2-pole breaker validation.
-     */
+    // --------------------------------------------------------
+    // VALIDATE 2-POLE
+    // --------------------------------------------------------
 
     if (
       breaker.poles === 2
@@ -865,10 +965,7 @@ export default function BreakerPanelLayout({
 
 
     /*
-     * If the library breaker has a generic label such as
-     * "20A STANDARD", don't use that as the circuit name.
-     *
-     * Otherwise preserve the friendly label.
+     * Generic library labels become blank circuit names.
      */
 
     setBreakerName(
@@ -899,7 +996,7 @@ export default function BreakerPanelLayout({
 
 
   // ==========================================================
-  // INSTALL BREAKER
+  // INSTALL
   // ==========================================================
 
   function installBreaker(): void {
@@ -915,8 +1012,8 @@ export default function BreakerPanelLayout({
 
 
     /*
-     * Determine whether this is an existing breaker
-     * being edited or a brand-new breaker from the library.
+     * Determine whether the pending breaker is already
+     * installed and is being edited.
      */
 
     const existingBreaker =
@@ -926,14 +1023,6 @@ export default function BreakerPanelLayout({
           pendingBreaker.id
       );
 
-
-    /*
-     * When editing an existing breaker, its own occupied
-     * slots are temporarily considered available.
-     *
-     * When installing a new breaker, every occupied slot
-     * remains unavailable.
-     */
 
     const selectedTarget =
       panelSlots.find(
@@ -952,9 +1041,9 @@ export default function BreakerPanelLayout({
     }
 
 
-    /*
-     * Check the first physical slot.
-     */
+    // --------------------------------------------------------
+    // FIRST SLOT
+    // --------------------------------------------------------
 
     const firstOccupiedByOther =
       selectedTarget.breaker &&
@@ -977,9 +1066,9 @@ export default function BreakerPanelLayout({
     }
 
 
-    /*
-     * Check the second physical slot for a 2-pole breaker.
-     */
+    // --------------------------------------------------------
+    // SECOND SLOT
+    // --------------------------------------------------------
 
     if (
       poles === 2
@@ -1029,10 +1118,9 @@ export default function BreakerPanelLayout({
     }
 
 
-    /*
-     * Start with the complete Breaker object supplied
-     * by ComponentLibrary.
-     */
+    // --------------------------------------------------------
+    // BUILD BREAKER
+    // --------------------------------------------------------
 
     let installed =
       assignBreakerSlot(
@@ -1040,10 +1128,6 @@ export default function BreakerPanelLayout({
         selectedSlot
       );
 
-
-    /*
-     * Apply the user's configuration.
-     */
 
     installed = {
 
@@ -1070,9 +1154,8 @@ export default function BreakerPanelLayout({
 
 
     /*
-     * Reassign the slot after changing the electrical
-     * properties so bus/load-terminal information is
-     * recalculated from the final pole configuration.
+     * Recalculate electrical slot/bus information after
+     * applying the final pole configuration.
      */
 
     installed =
@@ -1082,15 +1165,17 @@ export default function BreakerPanelLayout({
       );
 
 
-    /*
-     * Update the panel.
-     *
-     * First remove every physical slot occupied by
-     * this breaker when editing/replacing.
-     */
+    // --------------------------------------------------------
+    // UPDATE PANEL
+    // --------------------------------------------------------
 
     setPanelSlots(
       previous => {
+
+        /*
+         * Remove all physical positions belonging to the
+         * breaker being edited.
+         */
 
         const cleared =
           previous.map(
@@ -1120,7 +1205,7 @@ export default function BreakerPanelLayout({
 
 
         /*
-         * Install the breaker into its first physical slot.
+         * Install the first physical slot.
          */
 
         const installedSlots =
@@ -1145,11 +1230,8 @@ export default function BreakerPanelLayout({
 
 
               /*
-               * A 2-pole breaker occupies the next
-               * physical slot as well.
-               *
-               * The same breaker object is intentionally
-               * referenced by both physical positions.
+               * A 2-pole breaker occupies the next physical
+               * slot as well.
                */
 
               if (
@@ -1182,49 +1264,35 @@ export default function BreakerPanelLayout({
     );
 
 
-    /*
-     * Notify the parent application.
-     */
+    // --------------------------------------------------------
+    // NOTIFY PARENT
+    // --------------------------------------------------------
 
     onBreakerInstalled?.(
       installed
     );
 
 
-    /*
-     * Installation is complete.
-     *
-     * Close the configuration state.
-     */
+    // --------------------------------------------------------
+    // CLOSE CONFIGURATION
+    // --------------------------------------------------------
 
     setPendingBreaker(
       null
     );
 
 
-    /*
-     * Keep the installed slot selected so
-     * the user can immediately see what was installed.
-     */
-
     setSelectedSlot(
       selectedSlot
     );
 
 
-    /*
-     * Clear drag state just in case the install
-     * occurred immediately after a drag operation.
-     */
-
     clearDragState();
 
 
     /*
-     * existingBreaker is intentionally calculated above
-     * because it documents the editing/replacement path.
-     * Keep the variable referenced to avoid accidental removal
-     * during future modifications.
+     * Keep this variable referenced because it explicitly
+     * documents the edit/replacement path.
      */
 
     void existingBreaker;
@@ -1244,11 +1312,6 @@ export default function BreakerPanelLayout({
       previous =>
         previous.map(
           item => {
-
-            /*
-             * Remove every physical slot belonging
-             * to the same breaker.
-             */
 
             if (
               item.breaker?.id ===
@@ -1274,18 +1337,10 @@ export default function BreakerPanelLayout({
     );
 
 
-    /*
-     * Notify parent.
-     */
-
     onBreakerRemoved?.(
       breaker
     );
 
-
-    /*
-     * Clear configuration state.
-     */
 
     setPendingBreaker(
       null
@@ -1301,9 +1356,6 @@ export default function BreakerPanelLayout({
 
   // ==========================================================
   // SELECT SLOT
-  //
-  // Clicking an installed breaker opens its settings.
-  // Clicking an empty slot simply selects it.
   // ==========================================================
 
   function selectSlot(
@@ -1323,20 +1375,9 @@ export default function BreakerPanelLayout({
       );
 
 
-    /*
-     * Empty slot.
-     */
-
     if (
       !slot?.breaker
     ) {
-
-      /*
-       * Do not create a fake pending breaker.
-       *
-       * Configuration only appears for an actual
-       * dropped or installed breaker.
-       */
 
       setPendingBreaker(
         null
@@ -1346,10 +1387,6 @@ export default function BreakerPanelLayout({
 
     }
 
-
-    /*
-     * Installed breaker.
-     */
 
     const breaker =
       slot.breaker;
@@ -1361,7 +1398,8 @@ export default function BreakerPanelLayout({
 
 
     setBreakerName(
-      breaker.label || ""
+      breaker.label ||
+      ""
     );
 
 
@@ -1436,6 +1474,7 @@ export default function BreakerPanelLayout({
             onClick={
               onClose
             }
+
             style={{
               background: "#3b1010",
               color: "#ff8080",
@@ -1549,7 +1588,10 @@ export default function BreakerPanelLayout({
 
           <br />
 
-          Choose a highlighted slot
+          {draggingBreaker.poles === 2
+            ? "2-pole breaker: choose two consecutive highlighted slots"
+            : "Choose a highlighted slot"
+          }
 
         </div>
 
@@ -1726,6 +1768,7 @@ export default function BreakerPanelLayout({
                       )}
                     </span>
 
+
                     {breaker.poles === 2 && (
 
                       <>
@@ -1837,9 +1880,12 @@ export default function BreakerPanelLayout({
             {poles === 2 && (
               <>
                 {" "}—{" "}
+
                 {selectedSlot !== null
                   ? selectedSlot + 1
-                  : ""}
+                  : ""
+                }
+
               </>
             )}
 
@@ -2071,7 +2117,8 @@ export default function BreakerPanelLayout({
             <strong>
               {poles === 2
                 ? "240V"
-                : "120V"}
+                : "120V"
+              }
             </strong>
 
           </div>

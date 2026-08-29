@@ -55,20 +55,20 @@ import type {
 export type WorkspaceHandle = {
 
   addDevice:
-  (
-    name: string,
-    x?: number,
-    y?: number
-  ) => void;
+    (
+      name: string,
+      x?: number,
+      y?: number
+    ) => void;
 
   updateDevice:
-  (
-    device: ElectricalDevice
-  ) => void;
+    (
+      device: ElectricalDevice
+    ) => void;
 
   getConnections:
-  (
-  ) => Connection[];
+    (
+    ) => Connection[];
 
 };
 
@@ -76,14 +76,14 @@ export type WorkspaceHandle = {
 type WorkspaceProps = {
 
   onSelectDevice?:
-  (
-    device: ElectricalDevice | null
-  ) => void;
+    (
+      device: ElectricalDevice | null
+    ) => void;
 
   onCircuitPathsChange?:
-  (
-    paths: string[][]
-  ) => void;
+    (
+      paths: string[][]
+    ) => void;
 
 };
 
@@ -330,14 +330,6 @@ function Workspace(
       device
     ]);
 
-
-    // If this was created while a panel was selected,
-    // keep that panel selected.
-    //
-    // We deliberately do NOT automatically select the new
-    // device because doing so would make the panel disappear
-    // from the active-panel selector logic.
-
   }
 
 
@@ -478,64 +470,28 @@ function Workspace(
 
 
   // ==========================================================
-  // ASSIGN PANEL OWNERSHIP
-  // ==========================================================
-  //
-  // This is the important part for preventing:
-  //
-  // 100A circuit appearing in 200A panel
-  //
-  // and
-  //
-  // 200A circuit appearing in 100A panel.
-  //
-  // ==========================================================
-
-  function assignPanelOwnership(
-    deviceId: string,
-    panelId: string
-  ) {
-
-    setDevices(prev =>
-      prev.map(device => {
-
-        if (
-          device.id !== deviceId
-        ) {
-          return device;
-        }
-
-
-        // Never assign a panel to another panel.
-        if (
-          isPanel(device)
-        ) {
-          return device;
-        }
-
-
-        return {
-
-          ...device,
-
-          panelId
-
-        };
-
-      })
-    );
-
-  }
-
-
-  // ==========================================================
   // ASSIGN PANEL OWNERSHIP TO CONNECTED CIRCUIT
+  // ==========================================================
+  //
+  // Traverses the connected-device graph.
+  //
+  // Rules:
+  //
+  // 1. Start at the supplied device.
+  //
+  // 2. Every reachable non-panel device belongs to panelId.
+  //
+  // 3. Another panel is never absorbed.
+  //
+  // 4. Traversal stops at another panel.
+  //
   // ==========================================================
 
   function assignCircuitOwnership(
+    deviceList: ElectricalDevice[],
     startDeviceId: string,
     panelId: string
-  ) {
+  ): Set<string> {
 
     const visited =
       new Set<string>();
@@ -559,9 +515,13 @@ function Workspace(
 
 
       if (
-        visited.has(currentId)
+        visited.has(
+          currentId
+        )
       ) {
+
         continue;
+
       }
 
 
@@ -571,19 +531,21 @@ function Workspace(
 
 
       const currentDevice =
-        devices.find(
+        deviceList.find(
           device =>
             device.id === currentId
         );
 
 
       if (!currentDevice) {
+
         continue;
+
       }
 
 
       // ------------------------------------------------------
-      // Do not absorb another panel.
+      // Never absorb another panel.
       // ------------------------------------------------------
 
       if (
@@ -596,6 +558,10 @@ function Workspace(
       }
 
 
+      // ------------------------------------------------------
+      // Panels themselves do not receive panelId.
+      // ------------------------------------------------------
+
       if (
         !isPanel(currentDevice)
       ) {
@@ -606,6 +572,10 @@ function Workspace(
 
       }
 
+
+      // ------------------------------------------------------
+      // Continue through connected devices.
+      // ------------------------------------------------------
 
       (
         currentDevice.connectedDevices ?? []
@@ -630,37 +600,7 @@ function Workspace(
     }
 
 
-    if (
-      ownedDeviceIds.size === 0
-    ) {
-      return;
-    }
-
-
-    setDevices(prev =>
-      prev.map(device => {
-
-        if (
-          !ownedDeviceIds.has(
-            device.id
-          )
-        ) {
-
-          return device;
-
-        }
-
-
-        return {
-
-          ...device,
-
-          panelId
-
-        };
-
-      })
-    );
+    return ownedDeviceIds;
 
   }
 
@@ -876,16 +816,6 @@ function Workspace(
     // Case 4:
     //
     // A panel is currently selected.
-    //
-    // This lets the user select:
-    //
-    // 100A Panel
-    //     ↓
-    // Wire
-    //     ↓
-    // Existing circuit
-    //
-    // and explicitly move that circuit to the 100A panel.
     // --------------------------------------------------------
 
     else {
@@ -1041,114 +971,199 @@ function Workspace(
 
 
     // ========================================================
-    // UPDATE CONNECTED DEVICES
+    // UPDATE CONNECTED DEVICES + PANEL OWNERSHIP
+    //
+    // IMPORTANT:
+    //
+    // We perform both operations in the same setDevices()
+    // transaction so ownership sees the NEW connection graph.
     // ========================================================
 
-    setDevices(prev =>
-      prev.map(device => {
+    setDevices(prev => {
 
-        // -----------------------------------------------
-        // First endpoint
-        // -----------------------------------------------
+      // ------------------------------------------------------
+      // First create the new connected-device graph.
+      // ------------------------------------------------------
 
-        if (
-          device.id ===
-          selectedTerminal.deviceId
-        ) {
+      const updatedDevices =
+        prev.map(device => {
 
-          return {
+          // -----------------------------------------------
+          // First endpoint
+          // -----------------------------------------------
 
-            ...device,
+          if (
+            device.id ===
+            selectedTerminal.deviceId
+          ) {
 
-            connectedDevices: [
+            return {
 
-              ...new Set([
+              ...device,
 
-                ...(device.connectedDevices ?? []),
+              connectedDevices: [
 
-                deviceId
+                ...new Set([
 
-              ])
+                  ...(device.connectedDevices ?? []),
 
-            ]
+                  deviceId
 
-          };
+                ])
 
-        }
+              ]
 
+            };
 
-        // -----------------------------------------------
-        // Second endpoint
-        // -----------------------------------------------
-
-        if (
-          device.id ===
-          deviceId
-        ) {
-
-          return {
-
-            ...device,
-
-            connectedDevices: [
-
-              ...new Set([
-
-                ...(device.connectedDevices ?? []),
-
-                selectedTerminal.deviceId
-
-              ])
-
-            ]
-
-          };
-
-        }
+          }
 
 
-        return device;
+          // -----------------------------------------------
+          // Second endpoint
+          // -----------------------------------------------
 
-      })
-    );
+          if (
+            device.id ===
+            deviceId
+          ) {
+
+            return {
+
+              ...device,
+
+              connectedDevices: [
+
+                ...new Set([
+
+                  ...(device.connectedDevices ?? []),
+
+                  selectedTerminal.deviceId
+
+                ])
+
+              ]
+
+            };
+
+          }
 
 
-    // ========================================================
-    // PANEL OWNERSHIP
-    // ========================================================
+          return device;
 
-    if (
-      connectionPanelId
-    ) {
+        });
 
-      // ----------------------------------------------------
-      // Assign the directly connected device.
-      // ----------------------------------------------------
+
+      // ------------------------------------------------------
+      // If there is no panel, preserve the devices exactly
+      // as updated above.
+      // ------------------------------------------------------
 
       if (
-        !isPanel(toDevice)
+        !connectionPanelId
       ) {
 
-        assignPanelOwnership(
-          toDevice.id,
-          connectionPanelId
-        );
+        return updatedDevices;
 
       }
+
+
+      // ------------------------------------------------------
+      // Determine which side should be used as the traversal
+      // starting point.
+      //
+      // If one side is the panel, traverse from the other side.
+      // Otherwise traverse from both sides.
+      // ------------------------------------------------------
+
+      const ownershipStarts: string[] = [];
 
 
       if (
         !isPanel(fromDevice)
       ) {
 
-        assignPanelOwnership(
-          fromDevice.id,
-          connectionPanelId
+        ownershipStarts.push(
+          fromDevice.id
         );
 
       }
 
-    }
+
+      if (
+        !isPanel(toDevice)
+      ) {
+
+        ownershipStarts.push(
+          toDevice.id
+        );
+
+      }
+
+
+      // ------------------------------------------------------
+      // Find all devices reachable from the new connection.
+      // ------------------------------------------------------
+
+      const ownedDeviceIds =
+        new Set<string>();
+
+
+      ownershipStarts.forEach(
+        startId => {
+
+          const ids =
+            assignCircuitOwnership(
+              updatedDevices,
+              startId,
+              connectionPanelId!
+            );
+
+
+          ids.forEach(
+            id => {
+
+              ownedDeviceIds.add(
+                id
+              );
+
+            }
+          );
+
+        }
+      );
+
+
+      // ------------------------------------------------------
+      // Apply panel ownership.
+      // ------------------------------------------------------
+
+      return updatedDevices.map(
+        device => {
+
+          if (
+            !ownedDeviceIds.has(
+              device.id
+            )
+          ) {
+
+            return device;
+
+          }
+
+
+          return {
+
+            ...device,
+
+            panelId:
+              connectionPanelId
+
+          };
+
+        }
+      );
+
+    });
 
 
     // --------------------------------------------------------
@@ -1311,13 +1326,12 @@ function Workspace(
 
 
         // ----------------------------------------------------
-        // If this device belongs to a different panel,
-        // do NOT display it in this panel's circuit tree.
+        // Never traverse into another panel.
         // ----------------------------------------------------
 
         if (
-          connected.panelId &&
-          connected.panelId !== device.id
+          isPanel(connected) &&
+          connected.id !== device.id
         ) {
 
           return;
@@ -1326,12 +1340,19 @@ function Workspace(
 
 
         // ----------------------------------------------------
-        // Never traverse into another panel.
+        // Only display devices belonging to THIS panel.
+        //
+        // IMPORTANT:
+        //
+        // connected.panelId must be compared against the
+        // actual panel ID, not against device.id.
         // ----------------------------------------------------
 
         if (
-          isPanel(connected) &&
-          connected.id !== device.id
+          !isPanel(device) &&
+          connected.panelId &&
+          device.panelId &&
+          connected.panelId !== device.panelId
         ) {
 
           return;

@@ -99,6 +99,9 @@ export interface Breaker {
    *
    * For a two-pole breaker this represents the
    * starting slot/position.
+   *
+   * A value of -1 means the breaker has not yet
+   * been installed into a panel.
    */
   slot: number;
 
@@ -203,15 +206,21 @@ export interface Breaker {
 
 
 // ============================================================
-// Breaker Configuration Validation
+// BREAKER CONFIGURATION VALIDATION
 // ============================================================
 
 function validateBreakerConfiguration(
+
   amperage: number,
+
   poles: BreakerPoles
+
 ): void {
 
-  if (!Number.isFinite(amperage) || amperage <= 0) {
+  if (
+    !Number.isFinite(amperage) ||
+    amperage <= 0
+  ) {
 
     throw new Error(
       "Breaker amperage must be greater than zero."
@@ -220,7 +229,10 @@ function validateBreakerConfiguration(
   }
 
 
-  if (poles !== 1 && poles !== 2) {
+  if (
+    poles !== 1 &&
+    poles !== 2
+  ) {
 
     throw new Error(
       "Breaker poles must be 1 or 2."
@@ -232,7 +244,48 @@ function validateBreakerConfiguration(
 
 
 // ============================================================
-// Determine Bus Legs
+// VALIDATE BREAKER SLOT
+// ============================================================
+//
+// Installed breakers must use a positive physical slot.
+//
+// The library uses -1 to indicate that a breaker has not
+// yet been installed into a panel.
+//
+
+function validateBreakerSlot(
+
+  slot: number
+
+): void {
+
+  if (
+    !Number.isInteger(slot)
+  ) {
+
+    throw new Error(
+      "Breaker slot must be an integer."
+    );
+
+  }
+
+
+  if (
+    slot === 0 ||
+    slot < -1
+  ) {
+
+    throw new Error(
+      "Breaker slot must be -1 for an uninstalled breaker or a positive panel slot."
+    );
+
+  }
+
+}
+
+
+// ============================================================
+// DETERMINE BUS LEGS
 // ============================================================
 //
 // The panel ultimately decides which physical bus position
@@ -244,19 +297,51 @@ function validateBreakerConfiguration(
 // This keeps the breaker model independent from the panel
 // while giving us deterministic L1/L2 behavior.
 //
-// Later the panel can explicitly assign the bus legs.
+// IMPORTANT:
+// An uninstalled library breaker uses -1 and therefore gets
+// a temporary default L1 assignment. The panel should establish
+// the final physical bus relationship when the breaker is
+// installed.
 //
 
 function determineBusLegs(
+
   slot: number,
+
   poles: BreakerPoles
+
 ): BreakerBusLeg[] {
 
-  if (poles === 2) {
+  if (
+    poles === 2
+  ) {
 
     return [
+
       "L1",
+
       "L2"
+
+    ];
+
+  }
+
+
+  /*
+   * Uninstalled/library breaker.
+   *
+   * There is no physical panel slot yet, so
+   * assign a temporary deterministic value.
+   */
+
+  if (
+    slot === -1
+  ) {
+
+    return [
+
+      "L1"
+
     ];
 
   }
@@ -267,16 +352,18 @@ function determineBusLegs(
 
 
   return [
+
     isEvenSlot
       ? "L2"
       : "L1"
+
   ];
 
 }
 
 
 // ============================================================
-// Create Breaker
+// CREATE BREAKER
 // ============================================================
 
 export function createBreaker(
@@ -294,20 +381,34 @@ export function createBreaker(
 ): Breaker {
 
   validateBreakerConfiguration(
+
     amperage,
+
     poles
+
+  );
+
+
+  validateBreakerSlot(
+
+    slot
+
   );
 
 
   const busLegs =
     determineBusLegs(
+
       slot,
+
       poles
+
     );
 
 
   const loadTerminals =
     busLegs.map(
+
       (busLeg, index) => ({
 
         id:
@@ -319,6 +420,7 @@ export function createBreaker(
         busLeg
 
       })
+
     );
 
 
@@ -360,8 +462,16 @@ export function createBreaker(
 
 
 // ============================================================
-// Library Breaker Preset
+// LIBRARY BREAKER PRESET
 // ============================================================
+//
+// A library breaker is not installed into a panel yet.
+//
+// Therefore:
+//   slot = -1
+//
+// The panel assigns the real physical slot during installation.
+//
 
 export function createLibraryBreaker(
 
@@ -377,7 +487,7 @@ export function createLibraryBreaker(
 
     crypto.randomUUID(),
 
-    0,
+    -1,
 
     amperage,
 
@@ -391,7 +501,75 @@ export function createLibraryBreaker(
 
 
 // ============================================================
-// Trip Breaker
+// ASSIGN PHYSICAL SLOT
+// ============================================================
+//
+// Used when a breaker is being installed into a panel.
+//
+// This updates the breaker slot and recalculates its default
+// bus-leg/load-terminal mapping.
+//
+
+export function assignBreakerSlot(
+
+  breaker: Breaker,
+
+  slot: number
+
+): Breaker {
+
+  validateBreakerSlot(
+
+    slot
+
+  );
+
+
+  const busLegs =
+    determineBusLegs(
+
+      slot,
+
+      breaker.poles
+
+    );
+
+
+  const loadTerminals =
+    busLegs.map(
+
+      (busLeg, index) => ({
+
+        id:
+          `${breaker.id}-load-hot-${index + 1}`,
+
+        type:
+          "LOAD_HOT" as const,
+
+        busLeg
+
+      })
+
+    );
+
+
+  return {
+
+    ...breaker,
+
+    slot,
+
+    busLegs,
+
+    loadTerminals
+
+  };
+
+}
+
+
+// ============================================================
+// TRIP BREAKER
 // ============================================================
 
 export function tripBreaker(
@@ -420,7 +598,7 @@ export function tripBreaker(
 
 
 // ============================================================
-// Reset Breaker
+// RESET BREAKER
 // ============================================================
 
 export function resetBreaker(
@@ -447,7 +625,7 @@ export function resetBreaker(
 
 
 // ============================================================
-// Energize Breaker
+// ENERGIZE BREAKER
 // ============================================================
 
 export function energizeBreaker(
@@ -462,7 +640,9 @@ export function energizeBreaker(
    * It must first be reset.
    */
 
-  if (breaker.tripped) {
+  if (
+    breaker.tripped
+  ) {
 
     return breaker;
 
@@ -483,7 +663,7 @@ export function energizeBreaker(
 
 
 // ============================================================
-// De-energize Breaker
+// DE-ENERGIZE BREAKER
 // ============================================================
 
 export function deenergizeBreaker(
@@ -506,7 +686,7 @@ export function deenergizeBreaker(
 
 
 // ============================================================
-// Connect Device To Breaker
+// CONNECT DEVICE TO BREAKER
 // ============================================================
 //
 // Compatibility helper for the existing application.
@@ -526,9 +706,13 @@ export function connectDeviceToBreaker(
 ): Breaker {
 
   if (
+
     breaker.connectedDevices.includes(
+
       deviceId
+
     )
+
   ) {
 
     return breaker;
@@ -554,7 +738,7 @@ export function connectDeviceToBreaker(
 
 
 // ============================================================
-// Disconnect Device From Breaker
+// DISCONNECT DEVICE FROM BREAKER
 // ============================================================
 
 export function disconnectDeviceFromBreaker(
@@ -570,6 +754,7 @@ export function disconnectDeviceFromBreaker(
     ...breaker,
 
     connectedDevices:
+
       breaker.connectedDevices.filter(
 
         id =>
@@ -583,7 +768,7 @@ export function disconnectDeviceFromBreaker(
 
 
 // ============================================================
-// Assign Circuit To Breaker
+// ASSIGN CIRCUIT TO BREAKER
 // ============================================================
 
 export function assignCircuitToBreaker(
@@ -606,7 +791,7 @@ export function assignCircuitToBreaker(
 
 
 // ============================================================
-// Remove Circuit From Breaker
+// REMOVE CIRCUIT FROM BREAKER
 // ============================================================
 
 export function clearBreakerCircuit(
@@ -627,11 +812,13 @@ export function clearBreakerCircuit(
 
 
 // ============================================================
-// Breaker Helper Functions
+// BREAKER HELPER FUNCTIONS
 // ============================================================
 
 export function isSinglePoleBreaker(
+
   breaker: Breaker
+
 ): boolean {
 
   return breaker.poles === 1;
@@ -640,7 +827,9 @@ export function isSinglePoleBreaker(
 
 
 export function isDoublePoleBreaker(
+
   breaker: Breaker
+
 ): boolean {
 
   return breaker.poles === 2;
@@ -649,55 +838,74 @@ export function isDoublePoleBreaker(
 
 
 export function supplies240Volts(
+
   breaker: Breaker
+
 ): boolean {
 
   return (
+
     breaker.poles === 2 &&
+
     breaker.voltage === 240
+
   );
 
 }
 
 
 export function isOperational(
+
   breaker: Breaker
+
 ): boolean {
 
   return (
+
     breaker.status === "ON" &&
+
     breaker.energized &&
+
     !breaker.tripped
+
   );
 
 }
 
 
 // ============================================================
-// Get Breaker Bus Legs
+// GET BREAKER BUS LEGS
 // ============================================================
 
 export function getBreakerBusLegs(
+
   breaker: Breaker
+
 ): BreakerBusLeg[] {
 
   return [
+
     ...breaker.busLegs
+
   ];
 
 }
 
 
 // ============================================================
-// Get Breaker Load Terminals
+// GET BREAKER LOAD TERMINALS
 // ============================================================
 
 export function getBreakerLoadTerminals(
+
   breaker: Breaker
+
 ): BreakerLoadTerminal[] {
 
   return [
+
     ...breaker.loadTerminals
+
   ];
 
 }

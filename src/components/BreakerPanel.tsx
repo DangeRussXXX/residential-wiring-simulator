@@ -180,13 +180,100 @@ export default function BreakerPanel({
       : "BREAKER READY";
 
 
+  /*
+   * Find the breaker represented by
+   * the currently selected slot.
+   *
+   * For a 2-pole breaker, the second
+   * occupied slot may reference the
+   * same breaker. Therefore first look
+   * for a breaker directly on the slot,
+   * then fall back to a breaker whose
+   * occupied slots include this slot.
+   */
+
   const selectedBreaker =
     selectedSlot !== null
-      ? panel.breakers.find(
-          slot =>
-            slot.slot === selectedSlot
-        )?.breaker ?? null
+      ? (
+          panel.breakers.find(
+            slot =>
+              slot.slot === selectedSlot &&
+              slot.installed &&
+              slot.breaker
+          )?.breaker
+          ??
+          panel.breakers.find(
+            slot =>
+              slot.installed &&
+              slot.breaker &&
+              slot.breaker.poles === 2 &&
+              (
+                slot.slot === selectedSlot ||
+                slot.slot + 1 === selectedSlot
+              )
+          )?.breaker
+          ??
+          null
+        )
       : null;
+
+
+  /*
+   * Determine the actual starting slot
+   * of the selected breaker.
+   *
+   * This is important for 2-pole breakers.
+   */
+
+  const selectedBreakerStartSlot =
+    selectedBreaker && selectedSlot !== null
+      ? (
+          panel.breakers.find(
+            slot =>
+              slot.breaker?.id ===
+              selectedBreaker.id
+          )?.slot
+          ?? selectedSlot
+        )
+      : selectedSlot;
+
+
+  /*
+   * Removing a breaker always uses its
+   * actual starting slot.
+   *
+   * This prevents removing slot 2 of a
+   * 2-pole breaker as if it were a
+   * separate breaker.
+   */
+
+  function handleRemoveBreaker() {
+
+    if (
+      selectedBreakerStartSlot === null ||
+      !selectedBreaker
+    ) {
+      return;
+    }
+
+
+    onRemoveBreaker?.(
+      selectedBreakerStartSlot
+    );
+
+
+    /*
+     * Clear the selection immediately.
+     * The parent will update the panel,
+     * and this prevents stale breaker
+     * controls from remaining visible.
+     */
+
+    setSelectedSlot(
+      null
+    );
+
+  }
 
 
   return (
@@ -296,7 +383,7 @@ export default function BreakerPanel({
           <br />
 
           <strong>
-            {panel.breakers.length}
+            {panel.slots ?? panel.breakers.length}
           </strong>
 
         </div>
@@ -462,13 +549,9 @@ export default function BreakerPanel({
                 : "120V"}
 
               <button
-                onClick={() => {
-
-                  onRemoveBreaker?.(
-                    selectedSlot
-                  );
-
-                }}
+                onClick={
+                  handleRemoveBreaker
+                }
 
                 style={{
                   width: "100%",

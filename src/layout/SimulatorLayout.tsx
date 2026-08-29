@@ -23,7 +23,8 @@ import {
 
 import {
   createBreakerPanel,
-  installBreaker
+  installBreaker,
+  removeBreaker
 } from "../electrical/breakerPanel";
 
 import {
@@ -150,8 +151,8 @@ export default function SimulatorLayout() {
      * If the device already owns a panel
      * model, use that exact model.
      *
-     * This is what keeps the 100A and 200A
-     * panels independent.
+     * This keeps each panel's breakers
+     * independent.
      */
 
     if (device.panel) {
@@ -272,15 +273,8 @@ export default function SimulatorLayout() {
     /*
      * Include the panel ID in the breaker ID.
      *
-     * This prevents:
-     *
-     * panel-100 / slot-1
-     *
-     * and
-     *
-     * panel-200 / slot-1
-     *
-     * from becoming the same breaker.
+     * This prevents breakers from different
+     * panels from having the same ID.
      */
 
     const breaker =
@@ -311,6 +305,66 @@ export default function SimulatorLayout() {
 
     updatePanel(
       updatedPanel
+    );
+
+  }
+
+
+  // ---------------------------------
+  // REMOVE BREAKER
+  // ---------------------------------
+
+  function handleRemoveBreaker(
+    slotNumber: number
+  ) {
+
+    /*
+     * Never remove a breaker if there
+     * is no active panel.
+     */
+
+    if (
+      !activePanelDevice ||
+      !activePanel
+    ) {
+      return;
+    }
+
+
+    /*
+     * removeBreaker() is responsible for
+     * removing the breaker occupying the
+     * selected slot.
+     *
+     * This is especially important for
+     * two-pole breakers, which occupy two
+     * slots.
+     */
+
+    const updatedPanel =
+      removeBreaker(
+        activePanel,
+        slotNumber
+      );
+
+
+    /*
+     * Save the updated panel back onto
+     * the currently selected device.
+     */
+
+    updatePanel(
+      updatedPanel
+    );
+
+
+    /*
+     * Removing a breaker clears any
+     * displayed fault state.
+     */
+
+    setCircuitStatus(
+      "READY"
     );
 
   }
@@ -910,6 +964,10 @@ export default function SimulatorLayout() {
 
                   onInstallBreaker={
                     handleInstallBreaker
+                  }
+
+                  onRemoveBreaker={
+                    handleRemoveBreaker
                   }
                 />
 

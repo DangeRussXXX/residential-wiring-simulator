@@ -7,6 +7,7 @@
 // - Breaker installation/removal
 // - Single-pole and double-pole placement
 // - Panel slot occupancy
+// - Safe breaker replacement
 //
 // The panel owns PHYSICAL breaker placement.
 // The breaker owns its electrical characteristics.
@@ -133,7 +134,10 @@ export function createBreakerPanel(
             false,
 
           breaker:
-            null
+            null,
+
+          occupiedBy:
+            undefined
 
         })
 
@@ -196,7 +200,7 @@ export function getBreakerOccupiedSlots(
 //
 // Returns the breaker occupying a particular physical slot.
 //
-// This works for both:
+// Works for:
 //
 // - primary slot
 // - secondary slot of a two-pole breaker
@@ -217,7 +221,48 @@ function getBreakerAtSlot(
     );
 
 
-  return slot?.breaker ?? null;
+  if (!slot) {
+
+    return null;
+
+  }
+
+
+  if (
+    slot.breaker
+  ) {
+
+    return slot.breaker;
+
+  }
+
+
+  /*
+   * Compatibility fallback:
+   *
+   * Older panel data may have occupiedBy
+   * without a breaker reference on the
+   * secondary physical slot.
+   */
+
+  if (
+    slot.occupiedBy
+  ) {
+
+    const owner =
+      panel.breakers.find(
+        item =>
+          item.breaker?.id ===
+          slot.occupiedBy
+      );
+
+
+    return owner?.breaker ?? null;
+
+  }
+
+
+  return null;
 
 }
 
@@ -276,7 +321,8 @@ function areSlotsAvailable(
 
         return !!slot &&
           !slot.installed &&
-          !slot.breaker;
+          !slot.breaker &&
+          !slot.occupiedBy;
 
       }
     );
@@ -462,6 +508,64 @@ export function removeBreaker(
 
 
 // ============================================================
+// REPLACE BREAKER
+// ============================================================
+//
+// Replaces whatever breaker occupies the requested starting
+// slot.
+//
+// This is especially important for the UI because
+// BreakerPanel.tsx displays:
+//
+//   "REPLACE BREAKER"
+//
+// when a breaker already exists.
+//
+// For a two-pole breaker, the entire physical footprint
+// is removed before the new breaker is installed.
+//
+
+export function replaceBreaker(
+
+  panel: BreakerPanel,
+
+  breaker: Breaker
+
+): BreakerPanel {
+
+  const existingBreaker =
+    getBreakerAtSlot(
+      panel,
+      breaker.slot
+    );
+
+
+  if (existingBreaker) {
+
+    const clearedPanel =
+      removeBreaker(
+        panel,
+        breaker.slot
+      );
+
+
+    return installBreaker(
+      clearedPanel,
+      breaker
+    );
+
+  }
+
+
+  return installBreaker(
+    panel,
+    breaker
+  );
+
+}
+
+
+// ============================================================
 // FIND SLOT
 // ============================================================
 
@@ -478,6 +582,26 @@ export function getBreakerSlot(
     slot =>
       slot.slot === slotNumber
 
+  );
+
+}
+
+
+// ============================================================
+// CHECK WHETHER SLOT IS OCCUPIED
+// ============================================================
+
+export function isBreakerSlotOccupied(
+
+  panel: BreakerPanel,
+
+  slotNumber: number
+
+): boolean {
+
+  return !!getBreakerAtSlot(
+    panel,
+    slotNumber
   );
 
 }

@@ -1,712 +1,1117 @@
-// Residential Wiring Simulator v2.3
-// Master Electrical Component Catalog
+// Residential Wiring Simulator v2.6
+// Electrical Simulation Engine
+//
+// Responsibilities:
+// - Determine energized circuits
+// - Calculate device loads
+// - Calculate circuit current
+// - Calculate voltage drop
+// - Detect overloaded breakers
+// - Detect undersized conductors
+// - Detect open circuits
+// - Propagate breaker state through the circuit
+//
+// This file contains electrical simulation logic only.
+// It does NOT contain React/UI code.
 
-import type { DeviceType, DeviceTerminal } from "./types";
+import type {
+  ElectricalDevice,
+  Circuit,
+  WireGauge
+} from "./types";
+
+import type {
+  Breaker
+} from "./breaker";
+
+import {
+  isOperational,
+  tripBreaker
+} from "./breaker";
+
+import type {
+  BreakerPanel
+} from "./breakerPanel";
+
+import type {
+  Connection
+} from "./connections";
 
 
-export interface ComponentDefinition {
+// ============================================================
+// SIMULATION RESULT
+// ============================================================
 
-  name:string;
+export interface DeviceSimulationResult {
 
-  type:DeviceType;
+  deviceId: string;
 
-  category:string;
+  energized: boolean;
 
-  description:string;
+  voltage: number;
+
+  watts: number;
+
+  amps: number;
+
+  fault: boolean;
+
+  faultReason?: string;
+
+}
 
 
-  electrical?:{
+export interface CircuitSimulationResult {
 
-    voltage?:number;
+  circuitId?: string;
 
-    watts?:number;
+  energized: boolean;
 
-    amps?:number;
+  voltage: number;
 
-    poles?:number;
+  watts: number;
+
+  amps: number;
+
+  voltageDrop: number;
+
+  overloaded: boolean;
+
+  fault: boolean;
+
+  faultReason?: string;
+
+  deviceResults: DeviceSimulationResult[];
+
+}
+
+
+export interface PanelSimulationResult {
+
+  panelId: string;
+
+  energized: boolean;
+
+  totalWatts: number;
+
+  totalAmps: number;
+
+  circuits: CircuitSimulationResult[];
+
+  overloaded: boolean;
+
+  faults: string[];
+
+}
+
+
+// ============================================================
+// WIRE AMPACITY
+// ============================================================
+//
+// Simplified simulator values.
+//
+// These are modeling values for the simulator, not a substitute
+// for applicable electrical code or installation requirements.
+//
+
+function getWireAmpacity(
+  gauge: WireGauge
+): number {
+
+  switch (gauge) {
+
+    case "#14":
+      return 15;
+
+    case "#12":
+      return 20;
+
+    case "#10":
+      return 30;
+
+    case "#8":
+      return 40;
+
+    default:
+      return 0;
+
+  }
+
+}
+
+
+// ============================================================
+// DEVICE LOAD
+// ============================================================
+
+export function getDeviceWatts(
+  device: ElectricalDevice
+): number {
+
+  return device.load?.watts ?? 0;
+
+}
+
+
+// ============================================================
+// DEVICE CURRENT
+// ============================================================
+
+export function calculateDeviceCurrent(
+  device: ElectricalDevice
+): number {
+
+  const watts =
+    getDeviceWatts(device);
+
+
+  const voltage =
+    device.voltage ?? 120;
+
+
+  if (
+    voltage <= 0
+  ) {
+
+    return 0;
+
+  }
+
+
+  // P = V × I
+  // I = P / V
+
+  return watts / voltage;
+
+}
+
+
+// ============================================================
+// CONNECTION BETWEEN DEVICES
+// ============================================================
+
+function connectionTouchesDevice(
+  connection: Connection,
+  deviceId: string
+): boolean {
+
+  return (
+    connection.from.deviceId === deviceId ||
+    connection.to.deviceId === deviceId
+  );
+
+}
+
+
+// ============================================================
+// GET CONNECTED DEVICE IDS
+// ============================================================
+
+function getConnectedDeviceIds(
+  deviceId: string,
+  connections: Connection[]
+): string[] {
+
+  const ids =
+    new Set<string>();
+
+
+  connections.forEach(
+    connection => {
+
+      if (
+        connection.status !==
+        "CONNECTED"
+      ) {
+
+        return;
+
+      }
+
+
+      if (
+        connection.from.deviceId ===
+        deviceId
+      ) {
+
+        ids.add(
+          connection.to.deviceId
+        );
+
+      }
+
+
+      if (
+        connection.to.deviceId ===
+        deviceId
+      ) {
+
+        ids.add(
+          connection.from.deviceId
+        );
+
+      }
+
+    }
+  );
+
+
+  return [
+    ...ids
+  ];
+
+}
+
+
+// ============================================================
+// FIND PANEL
+// ============================================================
+
+function findPanelForDevice(
+  device: ElectricalDevice,
+  panels: BreakerPanel[]
+): BreakerPanel | undefined {
+
+  if (
+    !device.panelId
+  ) {
+
+    return undefined;
+
+  }
+
+
+  return panels.find(
+    panel =>
+      panel.id === device.panelId
+  );
+
+}
+
+
+// ============================================================
+// FIND BREAKER
+// ============================================================
+
+function findBreakerForDevice(
+  device: ElectricalDevice,
+  panel: BreakerPanel | undefined
+): Breaker | undefined {
+
+  if (
+    !panel ||
+    !device.breakerId
+  ) {
+
+    return undefined;
+
+  }
+
+
+  return panel.breakers.find(
+    slot =>
+      slot.breaker?.id ===
+      device.breakerId
+  )?.breaker ?? undefined;
+
+}
+
+
+// ============================================================
+// BREAKER ENERGIZATION
+// ============================================================
+
+export function isDeviceEnergized(
+  device: ElectricalDevice,
+  panel: BreakerPanel | undefined,
+  breaker: Breaker | undefined
+): boolean {
+
+  // ----------------------------------------------------------
+  // Device must belong to a powered panel.
+  // ----------------------------------------------------------
+
+  if (
+    !panel ||
+    !panel.serviceConnected
+  ) {
+
+    return false;
+
+  }
+
+
+  // ----------------------------------------------------------
+  // Panel must be grounded.
+  //
+  // This is intentionally conservative for the simulator.
+  // ----------------------------------------------------------
+
+  if (
+    !panel.grounded
+  ) {
+
+    return false;
+
+  }
+
+
+  // ----------------------------------------------------------
+  // Device must have an operational breaker.
+  // ----------------------------------------------------------
+
+  if (
+    !breaker ||
+    !isOperational(breaker)
+  ) {
+
+    return false;
+
+  }
+
+
+  // ----------------------------------------------------------
+  // Device itself may be tripped.
+  // ----------------------------------------------------------
+
+  if (
+    device.tripped
+  ) {
+
+    return false;
+
+  }
+
+
+  return true;
+
+}
+
+
+// ============================================================
+// VOLTAGE DROP
+// ============================================================
+//
+// Simplified voltage-drop calculation.
+//
+// Vdrop = I × R
+//
+// Resistance is approximated from conductor gauge and length.
+//
+
+function getOhmsPer1000Ft(
+  gauge: WireGauge
+): number {
+
+  switch (gauge) {
+
+    case "#14":
+      return 2.525;
+
+    case "#12":
+      return 1.588;
+
+    case "#10":
+      return 0.999;
+
+    case "#8":
+      return 0.628;
+
+    default:
+      return 0;
+
+  }
+
+}
+
+
+export function calculateVoltageDrop(
+  current: number,
+  gauge: WireGauge,
+  length: number
+): number {
+
+  if (
+    current <= 0 ||
+    length <= 0
+  ) {
+
+    return 0;
+
+  }
+
+
+  const resistance =
+    getOhmsPer1000Ft(gauge) *
+    (length / 1000);
+
+
+  return current * resistance;
+
+}
+
+
+// ============================================================
+// CIRCUIT LOAD
+// ============================================================
+
+export function calculateCircuitLoad(
+  devices: ElectricalDevice[]
+): number {
+
+  return devices.reduce(
+    (
+      total,
+      device
+    ) => {
+
+      return (
+        total +
+        getDeviceWatts(device)
+      );
+
+    },
+    0
+  );
+
+}
+
+
+// ============================================================
+// CIRCUIT CURRENT
+// ============================================================
+
+export function calculateCircuitCurrent(
+  devices: ElectricalDevice[],
+  voltage: number
+): number {
+
+  const watts =
+    calculateCircuitLoad(
+      devices
+    );
+
+
+  if (
+    voltage <= 0
+  ) {
+
+    return 0;
+
+  }
+
+
+  return watts / voltage;
+
+}
+
+
+// ============================================================
+// BREAKER OVERLOAD
+// ============================================================
+
+export function isBreakerOverloaded(
+  breaker: Breaker,
+  current: number
+): boolean {
+
+  return (
+    current >
+    breaker.amperage
+  );
+
+}
+
+
+// ============================================================
+// WIRE OVERLOAD
+// ============================================================
+
+export function isWireOverloaded(
+  gauge: WireGauge,
+  current: number
+): boolean {
+
+  return (
+    current >
+    getWireAmpacity(gauge)
+  );
+
+}
+
+
+// ============================================================
+// FIND DEVICE GROUP
+// ============================================================
+//
+// Returns all devices connected to the starting device.
+//
+// Traversal stops at another panel.
+//
+
+export function findConnectedDevices(
+  startDeviceId: string,
+  devices: ElectricalDevice[],
+  connections: Connection[]
+): ElectricalDevice[] {
+
+  const visited =
+    new Set<string>();
+
+
+  const queue: string[] = [
+    startDeviceId
+  ];
+
+
+  const result: ElectricalDevice[] = [];
+
+
+  while (
+    queue.length > 0
+  ) {
+
+    const currentId =
+      queue.shift()!;
+
+
+    if (
+      visited.has(
+        currentId
+      )
+    ) {
+
+      continue;
+
+    }
+
+
+    visited.add(
+      currentId
+    );
+
+
+    const device =
+      devices.find(
+        item =>
+          item.id === currentId
+      );
+
+
+    if (!device) {
+
+      continue;
+
+    }
+
+
+    // --------------------------------------------------------
+    // Panels terminate the device-side traversal.
+    // --------------------------------------------------------
+
+    if (
+      device.id !== startDeviceId &&
+      (
+        device.type ===
+          "Breaker Panel" ||
+        device.type ===
+          "Sub Panel"
+      )
+    ) {
+
+      continue;
+
+    }
+
+
+    result.push(
+      device
+    );
+
+
+    const connectedIds =
+      getConnectedDeviceIds(
+        currentId,
+        connections
+      );
+
+
+    connectedIds.forEach(
+      id => {
+
+        if (
+          !visited.has(id)
+        ) {
+
+          queue.push(id);
+
+        }
+
+      }
+    );
+
+  }
+
+
+  return result;
+
+}
+
+
+// ============================================================
+// SIMULATE CIRCUIT
+// ============================================================
+
+export function simulateCircuit(
+  devices: ElectricalDevice[],
+  connections: Connection[],
+  panel: BreakerPanel,
+  breaker: Breaker
+): CircuitSimulationResult {
+
+  const circuitDevices =
+    devices.filter(
+      device =>
+        device.panelId ===
+        panel.id &&
+        device.breakerId ===
+        breaker.id
+    );
+
+
+  const energized =
+    panel.serviceConnected &&
+    panel.grounded &&
+    isOperational(breaker);
+
+
+  const voltage =
+    breaker.voltage;
+
+
+  const watts =
+    calculateCircuitLoad(
+      circuitDevices
+    );
+
+
+  const amps =
+    voltage > 0
+      ? watts / voltage
+      : 0;
+
+
+  const overloaded =
+    isBreakerOverloaded(
+      breaker,
+      amps
+    );
+
+
+  const deviceResults:
+    DeviceSimulationResult[] =
+    circuitDevices.map(
+      device => {
+
+        const deviceEnergized =
+          energized &&
+          !device.tripped;
+
+
+        const deviceWatts =
+          getDeviceWatts(
+            device
+          );
+
+
+        const deviceAmps =
+          calculateDeviceCurrent(
+            device
+          );
+
+
+        return {
+
+          deviceId:
+            device.id,
+
+          energized:
+            deviceEnergized,
+
+          voltage:
+            deviceEnergized
+              ? (
+                  device.voltage ??
+                  voltage
+                )
+              : 0,
+
+          watts:
+            deviceWatts,
+
+          amps:
+            deviceAmps,
+
+          fault:
+            false
+
+        };
+
+      }
+    );
+
+
+  let fault = false;
+  let faultReason:
+    string | undefined;
+
+
+  if (
+    overloaded
+  ) {
+
+    fault = true;
+
+    faultReason =
+      `Circuit current ${amps.toFixed(2)}A exceeds ${breaker.amperage}A breaker rating.`;
+
+  }
+
+
+  return {
+
+    circuitId:
+      breaker.circuitId,
+
+    energized,
+
+    voltage:
+      energized
+        ? voltage
+        : 0,
+
+    watts,
+
+    amps,
+
+    voltageDrop:
+      0,
+
+    overloaded,
+
+    fault,
+
+    faultReason,
+
+    deviceResults
 
   };
 
+}
 
-  terminals:DeviceTerminal[];
+
+// ============================================================
+// SIMULATE PANEL
+// ============================================================
+
+export function simulatePanel(
+  devices: ElectricalDevice[],
+  connections: Connection[],
+  panel: BreakerPanel
+): PanelSimulationResult {
+
+  const breakerMap =
+    new Map<string, Breaker>();
 
 
-  symbol:string;
+  panel.breakers.forEach(
+    slot => {
+
+      if (
+        slot.breaker
+      ) {
+
+        breakerMap.set(
+          slot.breaker.id,
+          slot.breaker
+        );
+
+      }
+
+    }
+  );
+
+
+  const circuits:
+    CircuitSimulationResult[] = [];
+
+
+  const faults:
+    string[] = [];
+
+
+  breakerMap.forEach(
+    breaker => {
+
+      const result =
+        simulateCircuit(
+          devices,
+          connections,
+          panel,
+          breaker
+        );
+
+
+      circuits.push(
+        result
+      );
+
+
+      if (
+        result.faultReason
+      ) {
+
+        faults.push(
+          result.faultReason
+        );
+
+      }
+
+    }
+  );
+
+
+  const totalWatts =
+    circuits.reduce(
+      (
+        total,
+        circuit
+      ) =>
+        total +
+        circuit.watts,
+      0
+    );
+
+
+  const totalAmps =
+    circuits.reduce(
+      (
+        total,
+        circuit
+      ) =>
+        total +
+        circuit.amps,
+      0
+    );
+
+
+  return {
+
+    panelId:
+      panel.id,
+
+    energized:
+      panel.serviceConnected,
+
+    totalWatts,
+
+    totalAmps,
+
+    circuits,
+
+    overloaded:
+      circuits.some(
+        circuit =>
+          circuit.overloaded
+      ),
+
+    faults
+
+  };
 
 }
 
 
-
-
-
-export const componentCatalog:ComponentDefinition[] = [
-
-
-
+// ============================================================
+// APPLY BREAKER PROTECTION
+// ============================================================
 //
-// SERVICE EQUIPMENT
+// Returns a new breaker object.
 //
-
-{
-name:"100A Breaker Panel",
-type:"Breaker Panel",
-category:"Panels",
-description:"Residential 100 amp main service panel",
-
-electrical:{
-voltage:240,
-amps:100,
-poles:2
-},
-
-terminals:[
-{
-  id:"hotA",
-  name:"Hot A",
-  type:"hot",
-  x:10,
-  y:35
-},
-{
-  id:"hotB",
-  name:"Hot B",
-  type:"hot",
-  x:10,
-  y:65
-},
-{
-  id:"neutral",
-  name:"Neutral",
-  type:"neutral",
-  x:130,
-  y:35
-},
-{
-  id:"ground",
-  name:"Ground",
-  type:"ground",
-  x:65,
-  y:85
-}
-],
-
-symbol:"breaker-panel"
-
-},
-
-
-
-{
-name:"200A Breaker Panel",
-type:"Breaker Panel",
-category:"Panels",
-description:"Residential 200 amp main service panel",
-
-electrical:{
-voltage:240,
-amps:200,
-poles:2
-},
-
-terminals:[
-{
- id:"hotA",
- name:"Hot A",
- type:"hot",
- x:10,
- y:35
-},
-
-{
- id:"hotB",
- name:"Hot B",
- type:"hot",
- x:10,
- y:65
-},
-
-{
- id:"neutral",
- name:"Neutral",
- type:"neutral",
- x:130,
- y:35
-},
-
-{
- id:"ground",
- name:"Ground",
- type:"ground",
- x:65,
- y:85
-}
-],
-
-symbol:"breaker-panel"
-
-},
-
-
-
-{
-name:"Sub Panel",
-type:"Sub Panel",
-category:"Panels",
-description:"Secondary distribution panel",
-
-electrical:{
-voltage:240,
-amps:100,
-poles:2
-},
-
-terminals:[
-{
-  id:"hotA",
-  name:"Hot A",
-  type:"hot",
-  x:10,
-  y:35
-},
-{
-  id:"hotB",
-  name:"Hot B",
-  type:"hot",
-  x:10,
-  y:65
-},
-{
-  id:"neutral",
-  name:"Neutral",
-  type:"neutral",
-  x:130,
-  y:35
-},
-{
-  id:"ground",
-  name:"Ground",
-  type:"ground",
-  x:65,
-  y:85
-}
-],
-
-symbol:"sub-panel"
-
-},
-
-
-
-//
-// SWITCHES
+// The existing breaker is never mutated.
 //
 
-{
-name:"Single Pole Switch",
-type:"Switch",
-category:"Switches",
-description:"Standard 120V lighting switch",
-
-electrical:{
-voltage:120
-},
-
-terminals:[
-{
-  id:"line",
-  name:"Line Hot",
-  type:"hot",
-  x:0,
-  y:40
-},
-{
-  id:"load",
-  name:"Switch Leg",
-  type:"load",
-  x:130,
-  y:40
-},
-{
-  id:"ground",
-  name:"Ground",
-  type:"ground",
-  x:65,
-  y:80
-}
-],
-
-symbol:"switch-single"
-
-},
-
-
-
-{
-name:"3-Way Switch",
-type:"3-Way Switch",
-category:"Switches",
-description:"Three way traveler switch",
-
-electrical:{
-voltage:120
-},
-
-terminals:[
-{
-  id:"common",
-  name:"Common",
-  type:"hot",
-  x:0,
-  y:40
-},
-{
-  id:"traveler1",
-  name:"Traveler 1",
-  type:"traveler",
-  x:130,
-  y:25
-},
-{
-  id:"traveler2",
-  name:"Traveler 2",
-  type:"traveler",
-  x:130,
-  y:55
-},
-{
-  id:"ground",
-  name:"Ground",
-  type:"ground",
-  x:65,
-  y:85
-}
-],
-
-symbol:"switch-three-way"
-
-},
-
-
-
-{
-name:"Dimmer Switch",
-type:"Dimmer",
-category:"Switches",
-description:"Variable lighting control",
-
-electrical:{
-voltage:120
-},
-
-terminals:[
-{
-  id:"line",
-  name:"Line Hot",
-  type:"hot",
-  x:0,
-  y:40
-},
-{
-  id:"load",
-  name:"Dimmed Load",
-  type:"load",
-  x:130,
-  y:40
-},
-{
-  id:"ground",
-  name:"Ground",
-  type:"ground",
-  x:65,
-  y:80
-}
-],
-
-symbol:"dimmer"
-
-},
-
-
-
-//
-// LIGHTING
-//
-
-{
-name:"Ceiling Light",
-type:"Light",
-category:"Lighting",
-description:"Standard ceiling fixture",
-
-electrical:{
-voltage:120,
-watts:100
-},
-
-terminals:[
-{
-  id:"hot",
-  name:"Light Hot",
- type:"hot",
-  x:0,
-  y:40
-},
-{
-  id:"neutral",
-  name:"Neutral",
-  type:"neutral",
-  x:130,
-  y:40
-},
-{
-  id:"ground",
-  name:"Ground",
-  type:"ground",
-  x:65,
-  y:80
-}
-],
-
-symbol:"light-ceiling"
-
-},
-
-
-
-{
-name:"Recessed Light",
-type:"Light",
-category:"Lighting",
-description:"Recessed can light",
-
-electrical:{
-voltage:120,
-watts:15
-},
-
-terminals:[
-{
-  id:"hot",
-  name:"Light Hot",
-  type:"load",
-  x:0,
-  y:40
-},
-{
-  id:"neutral",
-  name:"Neutral",
-  type:"neutral",
-  x:130,
-  y:40
-},
-{
-  id:"ground",
-  name:"Ground",
-  type:"ground",
-  x:65,
-  y:80
-}
-],
-
-symbol:"light-recessed"
-
-},
-
-
-
-//
-// RECEPTACLES
-//
-
-{
-name:"Duplex Receptacle",
-type:"Receptacle",
-category:"Receptacles",
-description:"Standard 120V duplex outlet",
-
-electrical:{
-voltage:120
-},
-
-terminals:[
-{
-  id:"hot",
-  name:"Hot",
-  type:"hot",
-  x:0,
-  y:35
-},
-{
-  id:"neutral",
-  name:"Neutral",
-  type:"neutral",
-  x:130,
-  y:35
-},
-{
-  id:"ground",
-  name:"Ground",
-  type:"ground",
-  x:65,
-  y:80
-}
-],
-
-symbol:"outlet"
-
-},
-
-
-
-{
-name:"GFCI Receptacle",
-type:"GFCI",
-category:"Safety",
-description:"Ground fault protected receptacle",
-
-electrical:{
-voltage:120
-},
-
-terminals:[
-{
-  id:"lineHot",
-  name:"Line Hot",
-  type:"hot",
-  x:0,
-  y:25
-},
-{
-  id:"lineNeutral",
-  name:"Line Neutral",
-  type:"neutral",
-  x:130,
-  y:25
-},
-{
-  id:"loadHot",
-  name:"Load Hot",
-  type:"load",
-  x:0,
-  y:55
-},
-{
-  id:"loadNeutral",
-  name:"Load Neutral",
-  type:"neutral",
-  x:130,
-  y:55
-},
-{
-  id:"ground",
-  name:"Ground",
-  type:"ground",
-  x:65,
-  y:85
-}
-],
-
-symbol:"gfci"
-
-},
-
-
-
-//
-// APPLIANCES
-//
-
-{
-name:"Electric Range",
-type:"Appliance",
-category:"Appliances",
-
-description:"240V electric cooking appliance",
-
-electrical:{
-voltage:240,
-watts:12000
-},
-
-terminals:[
-{
-  id:"hotA",
-  name:"Hot A",
-  type:"hot",
-  x:10,
-  y:35
-},
-{
-  id:"hotB",
-  name:"Hot B",
-  type:"hot",
-  x:10,
-  y:65
-},
-{
-  id:"neutral",
-  name:"Neutral",
-  type:"neutral",
-  x:130,
-  y:35
-},
-{
-  id:"ground",
-  name:"Ground",
-  type:"ground",
-  x:65,
-  y:85
-}
-],
-
-symbol:"range"
-
-},
-
-
-
-{
-name:"Water Heater",
-type:"Appliance",
-category:"Appliances",
-
-description:"240V electric water heater",
-
-electrical:{
-voltage:240,
-watts:4500
-},
-
-terminals:[
-{
- id:"hotA",
- name:"Hot A",
- type:"hot",
- x:10,
- y:25
-},
-{
- id:"hotB",
- name:"Hot B",
- type:"hot",
- x:10,
- y:55
-},
-{
- id:"neutral",
- name:"Neutral",
- type:"neutral",
- x:130,
- y:40
-},
-{
- id:"ground",
- name:"Ground",
- type:"ground",
- x:65,
- y:85
-}
-],
-
-symbol:"water-heater"
-
-},
-
-
-
-//
-// MOTORS
-//
-
-{
-name:"Exhaust Fan",
-type:"Motor",
-category:"Motors",
-
-description:"Bathroom ventilation fan",
-
-electrical:{
-voltage:120,
-watts:50
-},
-
-terminals:[
-{
- id:"hot",
- name:"Hot",
- type:"hot",
- x:0,
- y:40
-},
-{
- id:"neutral",
- name:"Neutral",
- type:"neutral",
- x:130,
- y:40
-},
-{
- id:"ground",
- name:"Ground",
- type:"ground",
- x:65,
- y:80
-}
-],
-
-symbol:"fan"
-
-},
-
-
-
-{
-name:"HVAC Condenser",
-type:"Motor",
-category:"Motors",
-
-description:"Outdoor air conditioning unit",
-
-electrical:{
-voltage:240,
-amps:30
-},
-
-terminals:[
-{
-  id:"hotA",
-  name:"Hot A",
-  type:"hot",
-  x:10,
-  y:35
-},
-{
-  id:"hotB",
-  name:"Hot B",
-  type:"hot",
-  x:10,
-  y:65
-},
-{
-  id:"neutral",
-  name:"Neutral",
-  type:"neutral",
-  x:130,
-  y:35
-},
-{
-  id:"ground",
-  name:"Ground",
-  type:"ground",
-  x:65,
-  y:85
-}
-],
-
-symbol:"hvac"
+export function applyBreakerProtection(
+  breaker: Breaker,
+  current: number
+): Breaker {
+
+  if (
+    isBreakerOverloaded(
+      breaker,
+      current
+    )
+  ) {
+
+    return tripBreaker(
+      breaker,
+      `Overcurrent: ${current.toFixed(2)}A exceeds ${breaker.amperage}A.`
+    );
+
+  }
+
+
+  return breaker;
 
 }
 
 
+// ============================================================
+// SIMULATE CONNECTION
+// ============================================================
 
-];
+export function simulateConnection(
+  connection: Connection,
+  devices: ElectricalDevice[]
+): Connection {
+
+  if (
+    connection.status !==
+    "CONNECTED"
+  ) {
+
+    return {
+
+      ...connection,
+
+      energized: false,
+
+      current: 0
+
+    };
+
+  }
+
+
+  const from =
+    devices.find(
+      device =>
+        device.id ===
+        connection.from.deviceId
+    );
+
+
+  const to =
+    devices.find(
+      device =>
+        device.id ===
+        connection.to.deviceId
+    );
+
+
+  if (
+    !from ||
+    !to
+  ) {
+
+    return {
+
+      ...connection,
+
+      status:
+        "FAULT",
+
+      energized:
+        false,
+
+      current:
+        0
+
+    };
+
+  }
+
+
+  const energized =
+    !from.tripped &&
+    !to.tripped;
+
+
+  return {
+
+    ...connection,
+
+    energized,
+
+    current:
+      energized
+        ? calculateDeviceCurrent(
+            to
+          )
+        : 0
+
+  };
+
+}
+
+
+// ============================================================
+// SIMULATE ALL CONNECTIONS
+// ============================================================
+
+export function simulateConnections(
+  connections: Connection[],
+  devices: ElectricalDevice[]
+): Connection[] {
+
+  return connections.map(
+    connection =>
+      simulateConnection(
+        connection,
+        devices
+      )
+  );
+
+}
+
+
+// ============================================================
+// FULL SIMULATION
+// ============================================================
+
+export function runSimulation(
+  devices: ElectricalDevice[],
+  connections: Connection[],
+  panels: BreakerPanel[]
+) {
+
+  const panelResults =
+    panels.map(
+      panel =>
+        simulatePanel(
+          devices,
+          connections,
+          panel
+        )
+    );
+
+
+  const updatedConnections =
+    simulateConnections(
+      connections,
+      devices
+    );
+
+
+  return {
+
+    panels:
+      panelResults,
+
+    connections:
+      updatedConnections
+
+  };
+
+}

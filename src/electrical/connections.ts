@@ -1,42 +1,47 @@
 // Residential Wiring Simulator v2.5
 // Electrical connection system
 //
-// Handles:
-// - physical wire connections
-// - wire properties
-// - installation methods
-// - conductor information
-// - future breaker/circuit integration
+// Responsibilities:
+//
+// - Physical wire connections
+// - Wire properties
+// - Installation methods
+// - Conductor information
+// - Electrical connection state
+// - Circuit/breaker/panel integration
+//
+// IMPORTANT:
+//
+// A Connection represents a physical electrical connection.
+//
+// The electrical hierarchy is:
+//
+//   Panel
+//      ↓
+//   Breaker
+//      ↓
+//   Circuit
+//      ↓
+//   Wiring
+//      ↓
+//   Devices
+//
+// The connection itself does not own the breaker or panel.
+// Optional IDs allow the simulation engine to associate a
+// physical connection with the appropriate circuit.
 
+// ============================================================
+// IMPORTS
+// ============================================================
 
 import type {
   WireGauge
 } from "./types";
 
 
-export function createDefaultWireProperties(){
-
-return {
-
-gauge:"#14" as WireGauge,
-
-cableType:"14/2 NM-B",
-
-installation:"NM-B",
-
-color:"BLACK",
-
-length:0,
-
-energized:false,
-
-current:0,
-
-voltage:120
-
-};
-
-}
+// ============================================================
+// CONNECTION STATUS
+// ============================================================
 
 export type ConnectionStatus =
   | "CONNECTED"
@@ -44,12 +49,9 @@ export type ConnectionStatus =
   | "FAULT";
 
 
-
-
-
-// ----------------------------------
-// Cable Types
-// ----------------------------------
+// ============================================================
+// CABLE TYPES
+// ============================================================
 
 export type CableType =
   | "14/2 NM-B"
@@ -59,22 +61,9 @@ export type CableType =
   | "12/3 NM-B";
 
 
-
-
-
-// ----------------------------------
-// Wire Properties
-// ----------------------------------
-
-
-// WireGauge is imported from ./types
-// Supported sizes:
-// "#14"
-// "#12"
-// "#10"
-// "#8"
-
-
+// ============================================================
+// INSTALLATION METHOD
+// ============================================================
 
 export type InstallationMethod =
   | "NM-B"
@@ -82,6 +71,9 @@ export type InstallationMethod =
   | "MC";
 
 
+// ============================================================
+// WIRE COLOR
+// ============================================================
 
 export type WireColor =
   | "BLACK"
@@ -90,158 +82,292 @@ export type WireColor =
   | "GREEN";
 
 
-
-
+// ============================================================
+// WIRE PROPERTIES
+// ============================================================
 
 export interface WireProperties {
 
-
-  // conductor size
-
-  gauge:WireGauge;
-
-
-
-  // number of conductors
-
-  conductors:number;
+  /**
+   * Conductor gauge.
+   */
+  gauge: WireGauge;
 
 
-
-  // cable type
-
-  cableType:CableType;
-
-
-
-  // physical length
-
-  length:number;
-
+  /**
+   * Number of conductors contained in the cable.
+   *
+   * Examples:
+   *
+   * 14/2 → 2 insulated conductors
+   * 14/3 → 3 insulated conductors
+   */
+  conductors: number;
 
 
-  // maximum current rating
-
-  ampacity:number;
-
-
-
-  // conductor color
-
-  color:WireColor;
+  /**
+   * Cable type.
+   */
+  cableType: CableType;
 
 
+  /**
+   * Physical wire/cable length.
+   */
+  length: number;
+
+
+  /**
+   * Maximum current rating represented by this
+   * connection.
+   */
+  ampacity: number;
+
+
+  /**
+   * Primary conductor color.
+   */
+  color: WireColor;
 
 }
 
 
+// ============================================================
+// DEFAULT WIRE PROPERTIES
+// ============================================================
+//
+// Creates the standard wire configuration used when a new
+// connection is created.
+//
+// The returned object exactly matches WireProperties.
+//
+
+export function createDefaultWireProperties(): WireProperties {
+
+  return {
+
+    gauge:
+      "#14",
+
+    conductors:
+      2,
+
+    cableType:
+      "14/2 NM-B",
+
+    length:
+      0,
+
+    ampacity:
+      15,
+
+    color:
+      "BLACK"
+
+  };
+
+}
 
 
-
-
-
-
-// ----------------------------------
-// Terminal Connection Point
-// ----------------------------------
+// ============================================================
+// TERMINAL CONNECTION POINT
+// ============================================================
 
 export interface ConnectionPoint {
 
+  /**
+   * Device containing the terminal.
+   */
+  deviceId: string;
 
-  deviceId:string;
 
-
-  terminalId:string;
-
+  /**
+   * Terminal identifier on that device.
+   */
+  terminalId: string;
 
 }
 
 
-
-
-
-
-
-
-
-// ----------------------------------
-// Electrical Connection
-// ----------------------------------
+// ============================================================
+// ELECTRICAL CONNECTION
+// ============================================================
+//
+// Represents a physical conductor/cable connection between
+// two device terminals.
+//
+// Example:
+//
+//   Panel breaker load terminal
+//          ↓
+//       Cable
+//          ↓
+//   Receptacle hot terminal
+//
+// Neutral and ground are represented through their respective
+// device terminals/conductor connections rather than being
+// stored as breaker properties.
+//
 
 export interface Connection {
 
-
-  id:string;
-
-
-
-  from:ConnectionPoint;
+  /**
+   * Unique connection identifier.
+   */
+  id: string;
 
 
-
-  to:ConnectionPoint;
-
-
-
-
-
-  // Wire information
-
-  cable:CableType;
+  /**
+   * Starting connection point.
+   */
+  from: ConnectionPoint;
 
 
-
-  wire:WireProperties;
-
-
-
-
-
-  // Physical installation
-
-  installationMethod:InstallationMethod;
+  /**
+   * Ending connection point.
+   */
+  to: ConnectionPoint;
 
 
+  // ----------------------------------------------------------
+  // WIRE INFORMATION
+  // ----------------------------------------------------------
+
+  /**
+   * Installed cable type.
+   */
+  cable: CableType;
 
 
-
-  // Connection state
-
-  status:ConnectionStatus;
-
-
+  /**
+   * Physical/electrical wire properties.
+   */
+  wire: WireProperties;
 
 
+  // ----------------------------------------------------------
+  // PHYSICAL INSTALLATION
+  // ----------------------------------------------------------
 
-  // Simulation engine
-
-  energized:boolean;
-
-
-
-
-
-  // Optional calculated values
-
-  voltageDrop?:number;
+  /**
+   * Installation method.
+   */
+  installationMethod: InstallationMethod;
 
 
+  // ----------------------------------------------------------
+  // CONNECTION STATE
+  // ----------------------------------------------------------
 
-  current?:number;
-
-
-
-  length?:number;
-
-
-
-  // Future v2.5 breaker integration
-
-  circuitId?:string;
+  /**
+   * Physical/electrical state of the connection.
+   */
+  status: ConnectionStatus;
 
 
+  /**
+   * Whether the connection is currently energized.
+   *
+   * This is a simulation value and should be calculated
+   * from the upstream electrical source whenever possible.
+   */
+  energized: boolean;
 
-  breakerId?:string;
 
+  // ----------------------------------------------------------
+  // CALCULATED VALUES
+  // ----------------------------------------------------------
+
+  /**
+   * Calculated voltage drop across this connection.
+   */
+  voltageDrop?: number;
+
+
+  /**
+   * Calculated current through this connection.
+   */
+  current?: number;
+
+
+  /**
+   * Optional calculated/overridden cable length.
+   */
+  length?: number;
+
+
+  // ----------------------------------------------------------
+  // ELECTRICAL OWNERSHIP
+  // ----------------------------------------------------------
+  //
+  // These IDs associate the physical connection with the
+  // logical electrical hierarchy.
+  //
+  // panelId:
+  //   Which panel ultimately supplies this connection.
+  //
+  // circuitId:
+  //   Which circuit this connection belongs to.
+  //
+  // breakerId:
+  //   Which breaker supplies the circuit.
+  //
+  // These are references only. The panel, circuit, and breaker
+  // remain the owners of their respective electrical models.
+  //
+
+  panelId?: string;
+
+  circuitId?: string;
+
+  breakerId?: string;
+
+}
+
+
+// ============================================================
+// DEFAULT CONNECTION FACTORY
+// ============================================================
+//
+// Provides a safe starting connection object.
+//
+// This is intentionally separate from
+// createDefaultWireProperties() so callers can create either
+// wire data or a complete connection.
+//
+
+export function createDefaultConnection(
+  id: string,
+  from: ConnectionPoint,
+  to: ConnectionPoint
+): Connection {
+
+  const wire =
+    createDefaultWireProperties();
+
+
+  return {
+
+    id,
+
+    from,
+
+    to,
+
+    cable:
+      wire.cableType,
+
+    wire,
+
+    installationMethod:
+      "NM-B",
+
+    status:
+      "CONNECTED",
+
+    energized:
+      false
+
+  };
 
 }

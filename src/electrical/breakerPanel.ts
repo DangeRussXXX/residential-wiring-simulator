@@ -1,337 +1,524 @@
-// Residential Wiring Simulator v2.5
-// Breaker Panel System
+// Residential Wiring Simulator
+// Electrical Core - Breaker Panel System
+//
+// Responsibilities:
+// - Panel service information
+// - Physical breaker slots
+// - Breaker installation/removal
+// - Single-pole and double-pole placement
+// - Panel slot occupancy
+//
+// The panel owns PHYSICAL breaker placement.
+// The breaker owns its electrical characteristics.
 
 import {
   createBreaker
 } from "./breaker";
 
-
-
 import type {
   Breaker
 } from "./breaker";
-
 
 import type {
   BreakerPoles
 } from "./types";
 
 
+// ============================================================
+// BREAKER SLOT
+// ============================================================
 
 export interface BreakerSlot {
 
-id:string;
+  id: string;
 
-slot:number;
+  slot: number;
 
-installed:boolean;
+  installed: boolean;
 
-breaker:Breaker | null;
+  breaker: Breaker | null;
 
-
-occupiedBy?:string;
+  /**
+   * If this physical slot is occupied by another
+   * position of a multi-pole breaker, this identifies
+   * the breaker occupying the space.
+   *
+   * Kept optional for compatibility with the existing UI.
+   */
+  occupiedBy?: string;
 
 }
 
 
+// ============================================================
+// BREAKER PANEL
+// ============================================================
 
 export interface BreakerPanel {
 
+  id: string;
 
-  id:string;
+  name: string;
 
-  name:string;
+  manufacturer?: string;
 
+  model?: string;
 
-  manufacturer?:string;
+  mainBreaker: number;
 
+  voltage: 240;
 
-  model?:string;
+  spaces: number;
 
+  serviceConnected: boolean;
 
-  mainBreaker:number;
+  grounded: boolean;
 
-
-  voltage:240;
-
-
-  spaces:number;
-
-
-  serviceConnected:boolean;
-
-
-  grounded:boolean;
-
-
-  breakers:BreakerSlot[];
+  breakers: BreakerSlot[];
 
 }
 
 
-
-
-
-
-// --------------------------------
-// Create Panel
-// --------------------------------
+// ============================================================
+// CREATE PANEL
+// ============================================================
 
 export function createBreakerPanel(
 
-  id:string,
+  id: string,
 
-  name:string,
+  name: string,
 
-  mainBreaker:number,
+  mainBreaker: number,
 
-  slots:number
+  slots: number
 
-):BreakerPanel {
+): BreakerPanel {
 
+  return {
 
-return {
+    id,
 
+    name,
 
-id,
+    manufacturer: "Generic",
 
-name,
+    model: "Residential Load Center",
 
+    mainBreaker,
 
-manufacturer:"Generic",
+    voltage: 240,
 
-model:"Residential Load Center",
+    spaces: slots,
 
+    serviceConnected: true,
 
-mainBreaker,
+    grounded: true,
 
+    breakers:
 
-voltage:240,
+      Array.from(
 
+        { length: slots },
 
-spaces:slots,
+        (_, index) => ({
 
+          id:
+            `slot-${index + 1}`,
 
-serviceConnected:true,
+          slot:
+            index + 1,
 
+          installed:
+            false,
 
-grounded:true,
+          breaker:
+            null
 
+        })
 
-breakers:
+      )
 
-Array.from(
-
-{length:slots},
-
-(_,index)=>({
-
-id:`slot-${index+1}`,
-
-slot:index+1,
-
-installed:false,
-
-breaker:null
-
-})
-
-)
-
-
-};
-
+  };
 
 }
 
 
+// ============================================================
+// GET BREAKER OCCUPIED SLOTS
+// ============================================================
+//
+// Returns the physical slots required by a breaker.
+//
+// Single-pole:
+//   [5]
+//
+// Double-pole:
+//   [5, 6]
+//
+// The breaker.slot property represents the starting
+// physical position.
+//
+
+export function getBreakerOccupiedSlots(
+
+  breaker: Breaker
+
+): number[] {
+
+  if (
+    breaker.poles === 2
+  ) {
+
+    return [
+
+      breaker.slot,
+
+      breaker.slot + 1
+
+    ];
+
+  }
 
 
+  return [
+
+    breaker.slot
+
+  ];
+
+}
 
 
+// ============================================================
+// FIND BREAKER IN SLOT
+// ============================================================
+//
+// Returns the breaker occupying a particular physical slot.
+//
+// This works for both:
+//
+// - primary slot
+// - secondary slot of a two-pole breaker
+//
 
-// --------------------------------
-// Install Breaker
-// --------------------------------
+function getBreakerAtSlot(
+
+  panel: BreakerPanel,
+
+  slotNumber: number
+
+): Breaker | null {
+
+  const slot =
+    panel.breakers.find(
+      item =>
+        item.slot === slotNumber
+    );
+
+
+  return slot?.breaker ?? null;
+
+}
+
+
+// ============================================================
+// CHECK SLOT RANGE
+// ============================================================
+
+function areSlotsAvailable(
+
+  panel: BreakerPanel,
+
+  breaker: Breaker
+
+): boolean {
+
+  const occupiedSlots =
+    getBreakerOccupiedSlots(
+      breaker
+    );
+
+
+  // ----------------------------------------------------------
+  // Every required physical slot must exist.
+  // ----------------------------------------------------------
+
+  const slotsExist =
+    occupiedSlots.every(
+      slotNumber =>
+        slotNumber >= 1 &&
+        slotNumber <= panel.spaces
+    );
+
+
+  if (!slotsExist) {
+
+    return false;
+
+  }
+
+
+  // ----------------------------------------------------------
+  // Every required physical slot must be empty.
+  // ----------------------------------------------------------
+
+  const slotsEmpty =
+    occupiedSlots.every(
+      slotNumber => {
+
+        const slot =
+          panel.breakers.find(
+            item =>
+              item.slot === slotNumber
+          );
+
+
+        return !!slot &&
+          !slot.installed &&
+          !slot.breaker;
+
+      }
+    );
+
+
+  return slotsEmpty;
+
+}
+
+
+// ============================================================
+// INSTALL BREAKER
+// ============================================================
+//
+// Single-pole:
+//
+//   Slot 5 → breaker
+//
+// Double-pole:
+//
+//   Slot 5 → breaker
+//   Slot 6 → same breaker
+//
+// The same Breaker object is referenced from both physical
+// slots. This keeps the breaker electrically singular while
+// allowing the panel to represent its physical footprint.
+//
 
 export function installBreaker(
 
-panel:BreakerPanel,
+  panel: BreakerPanel,
 
-breaker:Breaker
+  breaker: Breaker
 
-):BreakerPanel {
+): BreakerPanel {
 
+  if (
+    !areSlotsAvailable(
+      panel,
+      breaker
+    )
+  ) {
 
+    console.warn(
+      "Cannot install breaker: required panel slots are unavailable."
+    );
 
-return {
+    return panel;
 
-
-...panel,
-
-
-breakers:
-
-panel.breakers.map(slot=>{
-
-
-if(slot.slot !== breaker.slot)
-
-return slot;
+  }
 
 
-
-return {
-
-
-...slot,
-
-
-installed:true,
+  const occupiedSlots =
+    getBreakerOccupiedSlots(
+      breaker
+    );
 
 
-breaker
+  return {
+
+    ...panel,
+
+    breakers:
+
+      panel.breakers.map(
+        slot => {
+
+          if (
+            !occupiedSlots.includes(
+              slot.slot
+            )
+          ) {
+
+            return slot;
+
+          }
 
 
-};
+          return {
 
+            ...slot,
 
-})
+            installed:
+              true,
 
+            breaker,
 
-};
+            occupiedBy:
+              breaker.id
 
+          };
 
+        }
+      )
+
+  };
 
 }
 
 
-
-
-
-
-
-
-// --------------------------------
-// Remove Breaker
-// --------------------------------
+// ============================================================
+// REMOVE BREAKER
+// ============================================================
+//
+// The requested slot may be either:
+//
+// - the first slot of a breaker
+// - the second slot of a two-pole breaker
+//
+// We first resolve the breaker, then remove every physical
+// slot occupied by that breaker.
+//
 
 export function removeBreaker(
 
-panel:BreakerPanel,
+  panel: BreakerPanel,
 
-slotNumber:number
+  slotNumber: number
 
-):BreakerPanel {
+): BreakerPanel {
 
-
-
-return {
-
-
-...panel,
-
-
-breakers:
-
-panel.breakers.map(slot=>{
+  const breaker =
+    getBreakerAtSlot(
+      panel,
+      slotNumber
+    );
 
 
-if(slot.slot !== slotNumber)
+  if (!breaker) {
 
-return slot;
+    return panel;
 
-
-
-return {
+  }
 
 
-...slot,
+  const occupiedSlots =
+    getBreakerOccupiedSlots(
+      breaker
+    );
 
 
-installed:false,
+  return {
+
+    ...panel,
+
+    breakers:
+
+      panel.breakers.map(
+        slot => {
+
+          if (
+            !occupiedSlots.includes(
+              slot.slot
+            )
+          ) {
+
+            return slot;
+
+          }
 
 
-breaker:null
+          return {
 
+            ...slot,
 
-};
+            installed:
+              false,
 
+            breaker:
+              null,
 
-})
+            occupiedBy:
+              undefined
 
+          };
 
-};
+        }
+      )
 
-
+  };
 
 }
 
 
-
-
-
-
-
-// --------------------------------
-// Find Slot
-// --------------------------------
+// ============================================================
+// FIND SLOT
+// ============================================================
 
 export function getBreakerSlot(
 
-panel:BreakerPanel,
+  panel: BreakerPanel,
 
-slotNumber:number
+  slotNumber: number
 
-){
+): BreakerSlot | undefined {
 
+  return panel.breakers.find(
 
-return panel.breakers.find(
+    slot =>
+      slot.slot === slotNumber
 
-slot=>slot.slot===slotNumber
-
-);
-
+  );
 
 }
-// --------------------------------
-// Add Standard Breaker
-// --------------------------------
+
+
+// ============================================================
+// ADD STANDARD BREAKER
+// ============================================================
 
 export function addStandardBreaker(
 
   panel: BreakerPanel,
 
-  slotNumber:number,
+  slotNumber: number,
 
-  amperage:number
+  amperage: number
 
-):BreakerPanel {
+): BreakerPanel {
+
+  const breaker =
+    createBreaker(
+
+      `breaker-${panel.id}-${slotNumber}`,
+
+      slotNumber,
+
+      amperage,
+
+      1 as BreakerPoles,
+
+      "STANDARD"
+
+    );
 
 
-const breaker = createBreaker(
+  return installBreaker(
 
-`breaker-${slotNumber}`,
+    panel,
 
-slotNumber,
+    breaker
 
-amperage,
-
-1 as BreakerPoles,
-
-"STANDARD"
-
-);
-
-
-
-return installBreaker(
-
-panel,
-
-breaker
-
-);
-
+  );
 
 }

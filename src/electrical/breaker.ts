@@ -1,5 +1,11 @@
 // Residential Wiring Simulator v2.5
 // Individual breaker system
+//
+// Phase 1:
+// - Each breaker is independently identifiable
+// - Each breaker gets a unique line terminal
+// - Breakers retain their own circuit/device ownership
+// - Breaker state remains independent from other breakers
 
 import type {
   BreakerPoles,
@@ -7,6 +13,9 @@ import type {
 } from "./types";
 
 
+// --------------------------------
+// Breaker Type
+// --------------------------------
 
 export type BreakerType =
   | "STANDARD"
@@ -15,6 +24,9 @@ export type BreakerType =
   | "DUAL_FUNCTION";
 
 
+// --------------------------------
+// Breaker Status
+// --------------------------------
 
 export type BreakerStatus =
   | "OFF"
@@ -22,10 +34,13 @@ export type BreakerStatus =
   | "TRIPPED";
 
 
+// --------------------------------
+// Breaker Terminal
+// --------------------------------
 
 export interface BreakerTerminal {
 
-  id:string;
+  id: string;
 
   type:
     | "HOT"
@@ -34,248 +49,357 @@ export interface BreakerTerminal {
 }
 
 
+// --------------------------------
+// Breaker
+// --------------------------------
 
 export interface Breaker {
 
-  id:string;
+  id: string;
 
-  slot:number;
+  slot: number;
 
-  label:string;
+  label: string;
 
+  amperage: number;
 
-  amperage:number;
+  poles: BreakerPoles;
 
-  poles:BreakerPoles;
+  voltage: Voltage;
 
-  voltage:Voltage;
+  breakerType: BreakerType;
 
+  terminals: BreakerTerminal[];
 
-  breakerType:BreakerType;
+  // Circuit supplied by this breaker
+  circuitId?: string;
 
+  // Devices supplied by this breaker
+  connectedDevices: string[];
 
-  terminals:BreakerTerminal[];
+  status: BreakerStatus;
 
+  energized: boolean;
 
-  circuitId?:string;
+  tripped: boolean;
 
-
-  connectedDevices:string[];
-
-
-  status:BreakerStatus;
-
-
-  energized:boolean;
-
-
-  tripped:boolean;
-
-
-  tripReason?:string;
+  tripReason?: string;
 
 }
 
 
-
-
-
+// --------------------------------
+// Create Breaker
+// --------------------------------
 
 export function createBreaker(
 
-id:string,
+  id: string,
 
-slot:number,
+  slot: number,
 
-amperage:number,
+  amperage: number,
 
-poles:BreakerPoles,
+  poles: BreakerPoles,
 
-breakerType:BreakerType="STANDARD"
+  breakerType: BreakerType = "STANDARD"
 
-):Breaker {
+): Breaker {
 
+  /*
+   * IMPORTANT
+   *
+   * The terminal ID must be unique to this breaker.
+   *
+   * Previously every breaker used:
+   *
+   *     "line"
+   *
+   * That made multiple breakers look like the
+   * same electrical connection point to the
+   * workspace wiring system.
+   *
+   * We now create:
+   *
+   *     breaker-123-line
+   *
+   *     breaker-456-line
+   *
+   * etc.
+   */
 
-return {
-
-id,
-
-slot,
-
-
-label:
-`${amperage}A ${breakerType}`,
-
-
-
-amperage,
-
-
-poles,
-
-
-voltage:
-
-poles===2
-
-?240
-:120,
-
+  const lineTerminalId =
+    `${id}-line`;
 
 
-breakerType,
+  return {
 
+    id,
 
+    slot,
 
-terminals:[
+    label:
+      `${amperage}A ${breakerType}`,
 
-{
-id:"line",
-type:"HOT"
+    amperage,
+
+    poles,
+
+    voltage:
+      poles === 2
+        ? 240
+        : 120,
+
+    breakerType,
+
+    terminals: [
+
+      {
+        id: lineTerminalId,
+
+        type: "HOT"
+      }
+
+    ],
+
+    connectedDevices: [],
+
+    status: "OFF",
+
+    energized: false,
+
+    tripped: false
+
+  };
+
 }
-
-],
-
-
-
-connectedDevices:[],
-
-
-
-status:"OFF",
-
-
-energized:false,
-
-
-tripped:false
-
-};
-
-}
-
-
-
-
 
 
 // --------------------------------
-// Library breaker presets
+// Library Breaker Preset
 // --------------------------------
-
 
 export function createLibraryBreaker(
 
-amperage:number,
+  amperage: number,
 
-poles:BreakerPoles,
+  poles: BreakerPoles,
 
-breakerType:BreakerType
+  breakerType: BreakerType
 
-):Breaker {
+): Breaker {
 
+  return createBreaker(
 
-return createBreaker(
+    crypto.randomUUID(),
 
-crypto.randomUUID(),
+    0,
 
-0,
+    amperage,
 
-amperage,
+    poles,
 
-poles,
+    breakerType
 
-breakerType
-
-);
-
+  );
 
 }
 
 
-
-
-
+// --------------------------------
+// Trip Breaker
+// --------------------------------
 
 export function tripBreaker(
 
-breaker:Breaker,
+  breaker: Breaker,
 
-reason:string
+  reason: string
 
-):Breaker {
+): Breaker {
 
+  return {
 
-return {
+    ...breaker,
 
-...breaker,
+    status: "TRIPPED",
 
-status:"TRIPPED",
+    energized: false,
 
-energized:false,
+    tripped: true,
 
-tripped:true,
+    tripReason: reason
 
-tripReason:reason
-
-};
+  };
 
 }
 
 
-
-
-
+// --------------------------------
+// Reset Breaker
+// --------------------------------
 
 export function resetBreaker(
 
-breaker:Breaker
+  breaker: Breaker
 
-):Breaker {
+): Breaker {
 
+  return {
 
-return {
+    ...breaker,
 
-...breaker,
+    status: "OFF",
 
-status:"OFF",
+    energized: false,
 
-energized:false,
+    tripped: false,
 
-tripped:false,
+    tripReason: undefined
 
-tripReason:undefined
-
-};
+  };
 
 }
 
 
-
-
-
+// --------------------------------
+// Energize Breaker
+// --------------------------------
 
 export function energizeBreaker(
 
-breaker:Breaker
+  breaker: Breaker
 
-):Breaker {
+): Breaker {
+
+  if (breaker.tripped) {
+
+    return breaker;
+
+  }
 
 
-if(breaker.tripped)
+  return {
 
-return breaker;
+    ...breaker,
+
+    status: "ON",
+
+    energized: true
+
+  };
+
+}
 
 
+// --------------------------------
+// Connect Device To Breaker
+// --------------------------------
 
-return {
+export function connectDeviceToBreaker(
 
-...breaker,
+  breaker: Breaker,
 
-status:"ON",
+  deviceId: string
 
-energized:true
+): Breaker {
 
-};
+  if (
+    breaker.connectedDevices.includes(
+      deviceId
+    )
+  ) {
+
+    return breaker;
+
+  }
+
+
+  return {
+
+    ...breaker,
+
+    connectedDevices: [
+
+      ...breaker.connectedDevices,
+
+      deviceId
+
+    ]
+
+  };
+
+}
+
+
+// --------------------------------
+// Disconnect Device From Breaker
+// --------------------------------
+
+export function disconnectDeviceFromBreaker(
+
+  breaker: Breaker,
+
+  deviceId: string
+
+): Breaker {
+
+  return {
+
+    ...breaker,
+
+    connectedDevices:
+      breaker.connectedDevices.filter(
+
+        id =>
+          id !== deviceId
+
+      )
+
+  };
+
+}
+
+
+// --------------------------------
+// Assign Circuit To Breaker
+// --------------------------------
+
+export function assignCircuitToBreaker(
+
+  breaker: Breaker,
+
+  circuitId: string
+
+): Breaker {
+
+  return {
+
+    ...breaker,
+
+    circuitId
+
+  };
+
+}
+
+
+// --------------------------------
+// Remove Circuit From Breaker
+// --------------------------------
+
+export function clearBreakerCircuit(
+
+  breaker: Breaker
+
+): Breaker {
+
+  return {
+
+    ...breaker,
+
+    circuitId: undefined
+
+  };
 
 }

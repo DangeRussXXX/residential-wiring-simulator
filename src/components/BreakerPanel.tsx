@@ -105,7 +105,7 @@ const poleOptions: {
 
 function getBreakerDisplayName(
   breaker: Breaker
-) {
+): string {
 
   if (
     breaker.breakerType ===
@@ -185,11 +185,8 @@ export default function BreakerPanel({
    * the currently selected slot.
    *
    * For a 2-pole breaker, the second
-   * occupied slot may reference the
-   * same breaker. Therefore first look
-   * for a breaker directly on the slot,
-   * then fall back to a breaker whose
-   * occupied slots include this slot.
+   * occupied slot references the same
+   * breaker object.
    */
 
   const selectedBreaker =
@@ -221,8 +218,6 @@ export default function BreakerPanel({
   /*
    * Determine the actual starting slot
    * of the selected breaker.
-   *
-   * This is important for 2-pole breakers.
    */
 
   const selectedBreakerStartSlot =
@@ -239,21 +234,23 @@ export default function BreakerPanel({
 
 
   /*
-   * Removing a breaker always uses its
-   * actual starting slot.
+   * Remove the selected breaker.
    *
-   * This prevents removing slot 2 of a
-   * 2-pole breaker as if it were a
-   * separate breaker.
+   * For a two-pole breaker this passes
+   * the starting physical slot to the
+   * parent so the complete breaker can
+   * be removed.
    */
 
-  function handleRemoveBreaker() {
+  function handleRemoveBreaker(): void {
 
     if (
       selectedBreakerStartSlot === null ||
       !selectedBreaker
     ) {
+
       return;
+
     }
 
 
@@ -261,13 +258,6 @@ export default function BreakerPanel({
       selectedBreakerStartSlot
     );
 
-
-    /*
-     * Clear the selection immediately.
-     * The parent will update the panel,
-     * and this prevents stale breaker
-     * controls from remaining visible.
-     */
 
     setSelectedSlot(
       null
@@ -299,6 +289,10 @@ export default function BreakerPanel({
         gap: "12px"
       }}
     >
+
+      {/* ======================================================
+          PANEL HEADER
+          ====================================================== */}
 
       <h3
         style={{
@@ -336,7 +330,9 @@ export default function BreakerPanel({
       </div>
 
 
-      {/* PANEL INFORMATION */}
+      {/* ======================================================
+          PANEL INFORMATION
+          ====================================================== */}
 
       <div
         style={{
@@ -346,6 +342,8 @@ export default function BreakerPanel({
           gap: "10px"
         }}
       >
+
+        {/* MAIN BREAKER */}
 
         <div
           style={{
@@ -368,6 +366,8 @@ export default function BreakerPanel({
         </div>
 
 
+        {/* PANEL SPACES */}
+
         <div
           style={{
             background: "#080b10",
@@ -383,7 +383,7 @@ export default function BreakerPanel({
           <br />
 
           <strong>
-            {panel.slots ?? panel.breakers.length}
+            {panel.spaces}
           </strong>
 
         </div>
@@ -391,7 +391,9 @@ export default function BreakerPanel({
       </div>
 
 
-      {/* BREAKER SLOTS */}
+      {/* ======================================================
+          BREAKER SLOTS
+          ====================================================== */}
 
       <div
         style={{
@@ -492,7 +494,9 @@ export default function BreakerPanel({
       </div>
 
 
-      {/* SELECTED SLOT */}
+      {/* ======================================================
+          SELECTED SLOT
+          ====================================================== */}
 
       {selectedSlot !== null && (
 
@@ -515,7 +519,9 @@ export default function BreakerPanel({
           </h4>
 
 
-          {/* EXISTING BREAKER */}
+          {/* ==================================================
+              EXISTING BREAKER
+              ================================================== */}
 
           {selectedBreaker && (
 
@@ -575,7 +581,9 @@ export default function BreakerPanel({
           )}
 
 
-          {/* BREAKER SIZE */}
+          {/* ==================================================
+              BREAKER SIZE
+              ================================================== */}
 
           <label>
             Breaker Size
@@ -619,7 +627,9 @@ export default function BreakerPanel({
           </select>
 
 
-          {/* BREAKER TYPE */}
+          {/* ==================================================
+              BREAKER TYPE
+              ================================================== */}
 
           <label>
             Breaker Type
@@ -661,7 +671,9 @@ export default function BreakerPanel({
           </select>
 
 
-          {/* POLES */}
+          {/* ==================================================
+              POLES
+              ================================================== */}
 
           <label>
             Breaker Poles
@@ -710,7 +722,9 @@ export default function BreakerPanel({
           </select>
 
 
-          {/* VOLTAGE */}
+          {/* ==================================================
+              VOLTAGE
+              ================================================== */}
 
           <div
             style={{
@@ -734,7 +748,9 @@ export default function BreakerPanel({
           </div>
 
 
-          {/* INSTALL */}
+          {/* ==================================================
+              INSTALL / REPLACE
+              ================================================== */}
 
           <button
             onClick={() => {
@@ -742,8 +758,11 @@ export default function BreakerPanel({
               if (
                 selectedSlot === null
               ) {
+
                 return;
+
               }
+
 
               onInstallBreaker?.({
 
@@ -787,7 +806,9 @@ export default function BreakerPanel({
       )}
 
 
-      {/* CONTROLS */}
+      {/* ======================================================
+          PANEL CONTROLS
+          ====================================================== */}
 
       <div
         style={{

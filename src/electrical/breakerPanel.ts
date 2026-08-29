@@ -69,12 +69,22 @@ export interface BreakerPanel {
 
   voltage: 240;
 
+  /**
+   * Number of physical breaker spaces in the panel.
+   *
+   * This is the panel capacity.
+   */
   spaces: number;
 
   serviceConnected: boolean;
 
   grounded: boolean;
 
+  /**
+   * Physical breaker slots.
+   *
+   * The array length normally equals `spaces`.
+   */
   breakers: BreakerSlot[];
 
 }

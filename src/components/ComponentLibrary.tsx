@@ -7,848 +7,863 @@
 // - category filtering
 // - click placement
 // - drag placement preparation
-
+//
+// This component uses the electrical component catalog
+// as the single source of component definitions.
 
 import {
   useState
 } from "react";
 
+import type {
+  DragEvent
+} from "react";
 
 import type {
   WorkspaceHandle
 } from "../simulator/Workspace";
 
-
 import {
   componentCatalog
 } from "../electrical/componentCatalog";
-
 
 import {
   createLibraryBreaker
 } from "../electrical/breaker";
 
+
+// ============================================================
+// PROPS
+// ============================================================
+
 interface Props {
 
   workspaceRef:
-  React.RefObject<WorkspaceHandle | null>;
+    React.RefObject<WorkspaceHandle | null>;
 
 }
 
 
-
+// ============================================================
+// COMPONENT ITEM
+// ============================================================
 
 type ComponentItem = {
 
-  name:string;
+  name: string;
 
-  type:string;
+  type: string;
 
-  category:string;
+  category: string;
 
-  description:string;
+  description: string;
 
-  symbol:string;
+  symbol: string;
 
-  voltage?:number;
+  voltage?: number;
 
-  watts?:number;
+  watts?: number;
 
-  amps?:number;
+  amps?: number;
 
-  isBreaker?:boolean;
+  isBreaker: boolean;
 
 };
 
 
+// ============================================================
+// COMPONENT DESCRIPTIONS
+// ============================================================
+//
+// The catalog intentionally does not require descriptions.
+// We provide them here so the UI can display useful text
+// without changing the electrical catalog data model.
+//
+
+function getComponentDescription(
+  name: string
+): string {
+
+  switch (name) {
+
+    case "Service Entrance":
+      return "Main electrical service connection.";
+
+    case "Breaker Panel":
+      return "Residential breaker distribution panel.";
+
+    case "Sub Panel":
+      return "Secondary breaker distribution panel.";
+
+    case "15A Breaker":
+      return "15 amp single-pole circuit breaker.";
+
+    case "20A Breaker":
+      return "20 amp single-pole circuit breaker.";
+
+    case "30A Double Pole Breaker":
+      return "30 amp two-pole 240V circuit breaker.";
+
+    case "Receptacle":
+      return "Standard 120V electrical receptacle.";
+
+    case "GFCI Receptacle":
+      return "Ground-fault protected receptacle.";
+
+    case "Single Pole Switch":
+      return "Standard single-pole light switch.";
+
+    case "Three Way Switch":
+      return "Three-way lighting control switch.";
+
+    case "Light":
+      return "Standard 120V lighting load.";
+
+    case "LED Light":
+      return "Low-power LED lighting load.";
+
+    case "Motor":
+      return "120V motor load.";
+
+    case "Water Heater":
+      return "240V electric water heater.";
+
+    case "Electric Range":
+      return "240V electric cooking appliance.";
+
+    case "Dryer":
+      return "240V electric clothes dryer.";
+
+    case "HVAC":
+      return "240V HVAC equipment load.";
+
+    case "Thermostat":
+      return "Low-voltage HVAC control.";
+
+    case "Junction Box":
+      return "Electrical junction and wiring point.";
+
+    default:
+      return "Electrical component.";
+
+  }
+
+}
 
 
+// ============================================================
+// BUILD UI COMPONENT LIST
+// ============================================================
 
-const components:ComponentItem[] =
+const components: ComponentItem[] =
+  componentCatalog.map(
+    component => ({
 
-componentCatalog.map(c=>({
+      name:
+        component.name,
 
-  name:c.name,
+      type:
+        component.name,
 
-  type:c.name,
+      category:
+        component.category,
 
-  category:c.category,
+      description:
+        getComponentDescription(
+          component.name
+        ),
 
-  description:c.description,
+      symbol:
+        component.symbol,
 
-  symbol:c.symbol,
+      voltage:
+        component.electrical?.voltage,
 
-  voltage:c.electrical?.voltage,
+      watts:
+        component.electrical?.watts,
 
-  watts:c.electrical?.watts,
+      amps:
+        component.electrical?.amps,
 
-  amps:c.electrical?.amps,
+      isBreaker:
+        component.type === "Breaker"
 
-  isBreaker:
-
-  c.category==="Breakers"
-
-}));
-
-
-
+    })
+  );
 
 
-const categories = [
+// ============================================================
+// CATEGORIES
+// ============================================================
 
+const categories: string[] = [
   ...new Set(
-    componentCatalog.map(c=>c.category)
+    componentCatalog.map(
+      component =>
+        component.category
+    )
   )
-
 ];
 
 
-
-
-
-
-
+// ============================================================
+// COMPONENT LIBRARY
+// ============================================================
 
 export default function ComponentLibrary({
+  workspaceRef
+}: Props) {
 
-workspaceRef
 
-}:Props){
+  // ----------------------------------------------------------
+  // SEARCH
+  // ----------------------------------------------------------
 
+  const [
+    search,
+    setSearch
+  ] = useState<string>("");
 
 
+  // ----------------------------------------------------------
+  // OPEN CATEGORIES
+  // ----------------------------------------------------------
 
+  const [
+    openCategories,
+    setOpenCategories
+  ] = useState<string[]>(
+    categories
+  );
 
-const [search,setSearch] =
 
-useState("");
+  // ==========================================================
+  // ADD COMPONENT
+  // ==========================================================
 
+  function add(
+    type: string
+  ): void {
 
+    workspaceRef.current?.addDevice(
+      type
+    );
 
+  }
 
-const [openCategories,setOpenCategories] =
 
-useState<string[]>(categories);
+  // ==========================================================
+  // TOGGLE CATEGORY
+  // ==========================================================
 
+  function toggleCategory(
+    category: string
+  ): void {
 
+    setOpenCategories(
+      previous => {
 
+        if (
+          previous.includes(
+            category
+          )
+        ) {
 
+          return previous.filter(
+            item =>
+              item !== category
+          );
 
+        }
 
+        return [
+          ...previous,
+          category
+        ];
 
+      }
+    );
 
+  }
 
-function add(type:string){
 
-workspaceRef.current?.addDevice(type);
+  // ==========================================================
+  // CREATE BREAKER FOR DRAG
+  // ==========================================================
 
-}
+  function createBreakerFromItem(
+    item: ComponentItem
+  ) {
 
+    if (
+      item.name === "15A Breaker"
+    ) {
 
+      return createLibraryBreaker(
+        15,
+        1,
+        "STANDARD"
+      );
 
+    }
 
 
+    if (
+      item.name === "20A Breaker"
+    ) {
 
+      return createLibraryBreaker(
+        20,
+        1,
+        "STANDARD"
+      );
 
+    }
 
 
-function toggleCategory(
+    if (
+      item.name ===
+      "30A Double Pole Breaker"
+    ) {
 
-category:string
+      return createLibraryBreaker(
+        30,
+        2,
+        "STANDARD"
+      );
 
-){
+    }
 
-setOpenCategories(prev=>
 
-prev.includes(category)
+    /*
+     * Fallback for any future breaker
+     * that gets added to the catalog.
+     */
 
-?
+    return createLibraryBreaker(
+      item.amps ?? 20,
+      item.name.includes(
+        "Double Pole"
+      )
+        ? 2
+        : 1,
+      "STANDARD"
+    );
 
-prev.filter(c=>c!==category)
+  }
 
-:
 
-[
+  // ==========================================================
+  // DRAG START
+  // ==========================================================
 
-...prev,
+  function dragStart(
+    event: DragEvent<HTMLDivElement>,
+    item: ComponentItem
+  ): void {
 
-category
+    // --------------------------------------------------------
+    // BREAKER DRAG
+    // --------------------------------------------------------
 
-]
+    if (
+      item.isBreaker
+    ) {
 
-);
+      const breaker =
+        createBreakerFromItem(
+          item
+        );
 
-}
 
+      event.dataTransfer.setData(
+        "breaker",
+        JSON.stringify(
+          breaker
+        )
+      );
 
 
+      event.dataTransfer.effectAllowed =
+        "copy";
 
 
+      return;
 
+    }
 
 
+    // --------------------------------------------------------
+    // NORMAL DEVICE DRAG
+    // --------------------------------------------------------
 
-function dragStart(
+    event.dataTransfer.setData(
+      "componentType",
+      item.type
+    );
 
-e:React.DragEvent,
 
-item:ComponentItem
+    event.dataTransfer.effectAllowed =
+      "copy";
 
-){
+  }
 
 
+  // ==========================================================
+  // ICON
+  // ==========================================================
 
-// BREAKER DRAG
+  function getIcon(
+    symbol: string
+  ): string {
 
-if(item.isBreaker){
+    switch (symbol) {
 
+      case "breaker-panel":
+        return "⚡";
 
-let breaker;
+      case "switch-single":
+        return "◐";
 
+      case "light-ceiling":
+        return "💡";
 
+      case "outlet":
+        return "🔌";
 
-if(item.name.includes("15A")){
+      case "gfci":
+        return "GFCI";
 
+      case "range":
+        return "🔥";
 
-breaker=createLibraryBreaker(
+      case "fan":
+        return "🌀";
 
-15,
+      case "hvac":
+        return "❄";
 
-1,
+      default:
+        return symbol || "▣";
 
-"STANDARD"
+    }
 
-);
+  }
 
 
-}
+  // ==========================================================
+  // RENDER
+  // ==========================================================
 
-else if(item.name.includes("20A")){
+  return (
 
+    <div
+      style={{
 
-breaker=createLibraryBreaker(
+        padding: "15px",
 
-20,
+        height: "100%",
 
-1,
+        overflowY: "auto",
 
-"STANDARD"
+        overflowX: "hidden",
 
-);
+        background: "#252526",
 
+        color: "white"
 
-}
+      }}
+    >
 
-else if(item.name.includes("30A")){
+      {/* ================================================== */}
+      {/* HEADER */}
+      {/* ================================================== */}
 
+      <h2
+        style={{
+          marginTop: 0
+        }}
+      >
+        Components
+      </h2>
 
-breaker=createLibraryBreaker(
 
-30,
+      {/* ================================================== */}
+      {/* SEARCH */}
+      {/* ================================================== */}
 
-2,
+      <input
+        type="text"
 
-"STANDARD"
+        placeholder="Search components..."
 
-);
+        value={search}
 
+        onChange={(
+          event
+        ) => {
 
-}
+          setSearch(
+            event.target.value
+          );
 
-else {
+        }}
 
+        style={{
 
-breaker=createLibraryBreaker(
+          width: "100%",
 
-50,
+          boxSizing: "border-box",
 
-2,
+          padding: "8px",
 
-"STANDARD"
+          marginBottom: "15px",
 
-);
+          background: "#1e1e1e",
 
+          border: "1px solid #555",
 
-}
+          color: "white",
 
+          borderRadius: "4px"
 
+        }}
+      />
 
-e.dataTransfer.setData(
 
-"breaker",
+      {/* ================================================== */}
+      {/* CATEGORIES */}
+      {/* ================================================== */}
 
-JSON.stringify(breaker)
+      {
+        categories.map(
+          category => {
 
-);
+            const items =
+              components.filter(
+                component => {
 
+                  const matchesCategory =
+                    component.category ===
+                    category;
 
+                  const matchesSearch =
+                    component.name
+                      .toLowerCase()
+                      .includes(
+                        search
+                          .toLowerCase()
+                      );
 
-return;
+                  return (
+                    matchesCategory &&
+                    matchesSearch
+                  );
 
-}
+                }
+              );
 
 
+            if (
+              items.length === 0
+            ) {
 
+              return null;
 
+            }
 
 
-// NORMAL DEVICE DRAG
+            const isOpen =
+              openCategories.includes(
+                category
+              );
 
 
-e.dataTransfer.setData(
+            return (
 
-"componentType",
+              <div
+                key={category}
 
-item.type
+                style={{
+                  marginBottom: "12px"
+                }}
+              >
 
-);
+                {/* ====================================== */}
+                {/* CATEGORY HEADER */}
+                {/* ====================================== */}
 
+                <div
+                  onClick={() =>
+                    toggleCategory(
+                      category
+                    )
+                  }
 
-}
+                  style={{
 
+                    cursor: "pointer",
 
+                    fontWeight: "bold",
 
+                    padding: "10px",
 
+                    background: "#333",
 
+                    borderRadius: "5px"
 
+                  }}
+                >
 
+                  {isOpen
+                    ? "▼"
+                    : "▶"
+                  }
 
+                  {" "}
 
-function getIcon(symbol:string){
+                  {category}
 
+                </div>
 
-switch(symbol){
 
+                {/* ====================================== */}
+                {/* COMPONENT ITEMS */}
+                {/* ====================================== */}
 
-case "breaker-panel":
+                {isOpen &&
 
-return "⚡";
+                  items.map(
+                    item => (
 
+                      <div
+                        key={item.name}
 
-case "switch-single":
+                        draggable={true}
 
-return "◐";
+                        onDragStart={event =>
+                          dragStart(
+                            event,
+                            item
+                          )
+                        }
 
+                        onClick={() =>
+                          add(
+                            item.type
+                          )
+                        }
 
-case "light-ceiling":
+                        style={{
 
-return "💡";
+                          marginTop: "8px",
 
+                          padding: "12px",
 
-case "outlet":
+                          background:
+                            "#1e1e1e",
 
-return "🔌";
+                          border:
+                            "1px solid #555",
 
+                          borderRadius: "8px",
 
-case "gfci":
+                          cursor: "grab",
 
-return "GFCI";
+                          userSelect: "none"
 
+                        }}
+                      >
 
-case "range":
+                        {/* ================================= */}
+                        {/* COMPONENT HEADER */}
+                        {/* ================================= */}
 
-return "🔥";
+                        <div
+                          style={{
 
+                            display:
+                              "flex",
 
-case "fan":
+                            alignItems:
+                              "center",
 
-return "🌀";
+                            gap: "10px"
 
+                          }}
+                        >
 
-case "hvac":
+                          {/* ICON */}
 
-return "❄";
+                          <div
+                            style={{
 
+                              width: "45px",
 
-default:
+                              height: "45px",
 
-return "▣";
+                              background: "#ddd",
 
-}
+                              color: "#111",
 
+                              borderRadius:
+                                "6px",
 
-}
+                              display:
+                                "flex",
 
+                              alignItems:
+                                "center",
 
+                              justifyContent:
+                                "center",
 
+                              fontSize: "22px",
 
+                              fontWeight:
+                                "bold",
 
+                              flexShrink: 0
 
+                            }}
+                          >
 
+                            {
+                              getIcon(
+                                item.symbol
+                              )
+                            }
 
+                          </div>
 
-return (
 
-<div
+                          {/* NAME / DESCRIPTION */}
 
-style={{
+                          <div>
 
-padding:"15px",
+                            <div
+                              style={{
+                                fontWeight:
+                                  "bold"
+                              }}
+                            >
+                              {item.name}
+                            </div>
 
-height:"100%",
 
-overflowY:"auto",
+                            <div
+                              style={{
 
-overflowX:"hidden",
+                                fontSize:
+                                  "12px",
 
-background:"#252526",
+                                color:
+                                  "#aaa",
 
-color:"white"
+                                marginTop:
+                                  "3px"
 
-}}
+                              }}
+                            >
+                              {item.description}
+                            </div>
 
->
+                          </div>
 
+                        </div>
 
 
+                        {/* ================================= */}
+                        {/* ELECTRICAL INFORMATION */}
+                        {/* ================================= */}
 
+                        <div
+                          style={{
 
-<h2
+                            marginTop: "8px",
 
-style={{
+                            fontSize: "11px",
 
-marginTop:0
+                            color: "#888"
 
-}}
+                          }}
+                        >
 
->
+                          {item.voltage !==
+                            undefined && (
 
-Components
+                            <span>
+                              {item.voltage}V{" "}
+                            </span>
 
-</h2>
+                          )}
 
 
+                          {item.amps !==
+                            undefined && (
 
+                            <span>
+                              {item.amps}A{" "}
+                            </span>
 
+                          )}
 
 
+                          {item.watts !==
+                            undefined && (
 
-<input
+                            <span>
+                              {item.watts}W
+                            </span>
 
-placeholder="Search components..."
+                          )}
 
-value={search}
+                        </div>
 
-onChange={e=>
 
-setSearch(e.target.value)
+                        {/* ================================= */}
+                        {/* PLACEMENT INSTRUCTION */}
+                        {/* ================================= */}
 
-}
+                        <div
+                          style={{
 
-style={{
+                            marginTop: "8px",
 
-width:"100%",
+                            fontSize: "11px",
 
-padding:"8px",
+                            color: "#00eaff"
 
-marginBottom:"15px",
+                          }}
+                        >
 
-background:"#1e1e1e",
+                          {item.isBreaker
 
-border:"1px solid #555",
+                            ? "Drag into breaker panel slot"
 
-color:"white",
+                            : "Click to place • Drag to workspace"
 
-borderRadius:"4px"
+                          }
 
-}}
+                        </div>
 
-/>
+                      </div>
 
+                    )
+                  )
 
+                }
 
+              </div>
 
+            );
 
+          }
+        )
+      }
 
+    </div>
 
-
-
-{
-
-categories.map(category=>{
-
-
-const items =
-
-components.filter(c=>
-
-c.category===category &&
-
-c.name
-.toLowerCase()
-.includes(
-search.toLowerCase()
-)
-
-);
-
-
-
-
-if(items.length===0)
-
-return null;
-
-
-
-
-
-
-
-return (
-
-<div
-
-key={category}
-
-style={{
-
-marginBottom:"12px"
-
-}}
-
->
-
-
-
-
-
-<div
-
-onClick={()=>toggleCategory(category)}
-
-style={{
-
-cursor:"pointer",
-
-fontWeight:"bold",
-
-padding:"10px",
-
-background:"#333",
-
-borderRadius:"5px"
-
-}}
-
->
-
-{
-
-openCategories.includes(category)
-
-?
-
-"▼"
-
-:
-
-"▶"
-
-}
-
-{" "}
-
-{category}
-
-</div>
-
-
-
-
-
-
-
-
-
-{
-
-openCategories.includes(category)
-
-&&
-
-items.map(item=>(
-
-
-
-<div
-
-key={item.name}
-
-
-
-draggable={true}
-
-
-
-onDragStart={(e)=>
-
-dragStart(
-
-e,
-
-item
-
-)
-
-}
-
-
-
-onClick={()=>add(item.type)}
-
-
-
-style={{
-
-marginTop:"8px",
-
-padding:"12px",
-
-background:"#1e1e1e",
-
-border:"1px solid #555",
-
-borderRadius:"8px",
-
-cursor:"grab",
-
-userSelect:"none"
-
-}}
-
->
-
-
-
-
-
-<div
-
-style={{
-
-display:"flex",
-
-alignItems:"center",
-
-gap:"10px"
-
-}}
-
->
-
-
-
-<div
-
-style={{
-
-width:"45px",
-
-height:"45px",
-
-background:"#ddd",
-
-color:"#111",
-
-borderRadius:"6px",
-
-display:"flex",
-
-alignItems:"center",
-
-justifyContent:"center",
-
-fontSize:"22px",
-
-fontWeight:"bold"
-
-}}
-
->
-
-{
-
-getIcon(item.symbol)
-
-}
-
-</div>
-
-
-
-
-
-
-
-<div>
-
-<div
-
-style={{
-
-fontWeight:"bold"
-
-}}
-
->
-
-{item.name}
-
-</div>
-
-
-<div
-
-style={{
-
-fontSize:"12px",
-
-color:"#aaa"
-
-}}
-
->
-
-{item.description}
-
-</div>
-
-
-</div>
-
-
-</div>
-
-
-
-
-
-
-
-
-
-<div
-
-style={{
-
-marginTop:"8px",
-
-fontSize:"11px",
-
-color:"#888"
-
-}}
-
->
-
-
-{
-
-item.voltage
-
-&&
-
-`${item.voltage}V `
-
-}
-
-
-
-{
-
-item.amps
-
-&&
-
-`${item.amps}A `
-
-}
-
-
-
-{
-
-item.watts
-
-&&
-
-`${item.watts}W`
-
-}
-
-
-</div>
-
-
-
-
-
-
-
-<div
-
-style={{
-
-marginTop:"8px",
-
-fontSize:"11px",
-
-color:"#00eaff"
-
-}}
-
->
-
-{
-item.isBreaker
-?
-"Drag into breaker panel slot"
-:
-"Click to place • Drag to workspace"
-}
-
-</div>
-
-
-
-
-
-</div>
-
-
-))
-
-
-}
-
-
-
-
-
-
-
-
-
-</div>
-
-
-);
-
-
-})
-
-
-}
-
-
-
-
-
-
-
-</div>
-
-);
+  );
 
 }

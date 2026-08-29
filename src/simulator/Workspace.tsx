@@ -54,38 +54,103 @@ import type {
 
 export type WorkspaceHandle = {
 
-  addDevice:
-    (
-      name: string,
-      x?: number,
-      y?: number
-    ) => void;
+  addDevice: (
+    name: string,
+    x?: number,
+    y?: number
+  ) => void;
 
-  updateDevice:
-    (
-      device: ElectricalDevice
-    ) => void;
+  updateDevice: (
+    device: ElectricalDevice
+  ) => void;
 
-  getConnections:
-    (
-    ) => Connection[];
+  getConnections: (
+  ) => Connection[];
 
 };
 
 
 type WorkspaceProps = {
 
-  onSelectDevice?:
-    (
-      device: ElectricalDevice | null
-    ) => void;
+  onSelectDevice?: (
+    device: ElectricalDevice | null
+  ) => void;
 
-  onCircuitPathsChange?:
-    (
-      paths: string[][]
-    ) => void;
+  onCircuitPathsChange?: (
+    paths: string[][]
+  ) => void;
 
 };
+
+
+// ============================================================
+// TERMINAL TYPE NORMALIZATION
+// ============================================================
+//
+// Component catalog terminals use uppercase types such as:
+//
+// LINE
+// LOAD
+// NEUTRAL
+// GROUND
+// HOT
+// CONTROL
+//
+// ElectricalDevice / DeviceTerminal uses:
+//
+// hot
+// neutral
+// ground
+// load
+// traveler
+// control
+//
+// Keep this conversion in one place.
+// ============================================================
+
+function normalizeTerminalType(
+  type: string
+):
+  "hot" |
+  "neutral" |
+  "ground" |
+  "load" |
+  "traveler" |
+  "control" {
+
+  switch (type) {
+
+    case "LINE":
+    case "HOT":
+    case "hot":
+      return "hot";
+
+    case "NEUTRAL":
+    case "neutral":
+      return "neutral";
+
+    case "GROUND":
+    case "ground":
+      return "ground";
+
+    case "LOAD":
+    case "load":
+      return "load";
+
+    case "TRAVELER":
+    case "traveler":
+      return "traveler";
+
+    case "CONTROL":
+    case "control":
+      return "control";
+
+    default:
+      return "load";
+
+  }
+
+}
 
 
 // ============================================================
@@ -177,12 +242,6 @@ function Workspace(
 
   // ==========================================================
   // CURRENTLY SELECTED PANEL
-  //
-  // IMPORTANT:
-  // There is NO DEFAULT PANEL.
-  //
-  // If the selected device is a panel, new devices inherit
-  // that panel's ID.
   // ==========================================================
 
   function getSelectedPanelId(): string | undefined {
@@ -219,31 +278,81 @@ function Workspace(
 
 
     if (!definition) {
+
+      console.warn(
+        `Component not found in catalog: ${name}`
+      );
+
       return;
+
     }
 
 
-    const terminals =
+    // ========================================================
+    // CREATE DEVICE TERMINALS
+    // ========================================================
+    //
+    // Explicitly type the result as ElectricalDevice["terminals"]
+    // so TypeScript does not widen the normalized terminal
+    // type to generic "string".
+    //
+    // ComponentTerminalDefinition provides:
+    //
+    // label
+    // type
+    // x
+    // y
+    //
+    // DeviceTerminal requires:
+    //
+    // name
+    // label
+    // type
+    // x
+    // y
+    //
+    // Therefore label is used as the terminal name.
+    // ========================================================
+
+    const terminals: ElectricalDevice["terminals"] =
       definition.terminals.map(
         terminal => ({
-          ...terminal,
+
           id:
-            `${terminal.id}-${crypto.randomUUID()}`
+            `${terminal.id}-${crypto.randomUUID()}`,
+
+          name:
+            terminal.label,
+
+          label:
+            terminal.label,
+
+          type:
+            normalizeTerminalType(
+              terminal.type
+            ),
+
+          x:
+            terminal.x,
+
+          y:
+            terminal.y
+
         })
       );
 
 
-    // --------------------------------------------------------
-    // IMPORTANT:
-    // If a panel is selected, the newly created circuit/device
-    // belongs to that panel.
-    //
-    // If NO panel is selected, panelId stays undefined.
-    // --------------------------------------------------------
+    // ========================================================
+    // PANEL OWNERSHIP
+    // ========================================================
 
     const panelId =
       getSelectedPanelId();
 
+
+    // ========================================================
+    // CREATE ELECTRICAL DEVICE
+    // ========================================================
 
     const device: ElectricalDevice = {
 
@@ -259,11 +368,14 @@ function Workspace(
       type:
         definition.type,
 
-      connectedDevices: [],
+      connectedDevices:
+        [],
 
-      calculatedLoad: 0,
+      calculatedLoad:
+        0,
 
-      calculatedAmps: 0,
+      calculatedAmps:
+        0,
 
       amperage:
         definition.electrical?.amps,
@@ -287,16 +399,7 @@ function Workspace(
           ? definition.electrical?.amps
           : undefined,
 
-      // ------------------------------------------------------
-      // PANEL OWNERSHIP
-      // ------------------------------------------------------
-
       panelId,
-
-      // ------------------------------------------------------
-      // No breaker is assigned until a breaker is actually
-      // associated with this circuit.
-      // ------------------------------------------------------
 
       breakerId:
         undefined,
@@ -304,8 +407,10 @@ function Workspace(
       terminals,
 
       load: {
+
         watts:
           definition.electrical?.watts ?? 0
+
       },
 
       voltage:
@@ -325,9 +430,16 @@ function Workspace(
     };
 
 
+    // ========================================================
+    // ADD DEVICE
+    // ========================================================
+
     setDevices(prev => [
+
       ...prev,
+
       device
+
     ]);
 
   }
@@ -399,13 +511,15 @@ function Workspace(
 
 
     if (!device) {
+
       return;
+
     }
 
 
-    // --------------------------------------------------------
-    // Panels calculate only THEIR OWN circuits.
-    // --------------------------------------------------------
+    // ========================================================
+    // PANEL CALCULATIONS
+    // ========================================================
 
     if (
       isPanel(device)
@@ -470,21 +584,7 @@ function Workspace(
 
 
   // ==========================================================
-  // ASSIGN PANEL OWNERSHIP TO CONNECTED CIRCUIT
-  // ==========================================================
-  //
-  // Traverses the connected-device graph.
-  //
-  // Rules:
-  //
-  // 1. Start at the supplied device.
-  //
-  // 2. Every reachable non-panel device belongs to panelId.
-  //
-  // 3. Another panel is never absorbed.
-  //
-  // 4. Traversal stops at another panel.
-  //
+  // ASSIGN PANEL OWNERSHIP
   // ==========================================================
 
   function assignCircuitOwnership(
@@ -544,9 +644,9 @@ function Workspace(
       }
 
 
-      // ------------------------------------------------------
-      // Never absorb another panel.
-      // ------------------------------------------------------
+      // ======================================================
+      // NEVER ABSORB ANOTHER PANEL
+      // ======================================================
 
       if (
         isPanel(currentDevice) &&
@@ -558,9 +658,9 @@ function Workspace(
       }
 
 
-      // ------------------------------------------------------
-      // Panels themselves do not receive panelId.
-      // ------------------------------------------------------
+      // ======================================================
+      // PANELS THEMSELVES DO NOT RECEIVE panelId
+      // ======================================================
 
       if (
         !isPanel(currentDevice)
@@ -573,9 +673,9 @@ function Workspace(
       }
 
 
-      // ------------------------------------------------------
-      // Continue through connected devices.
-      // ------------------------------------------------------
+      // ======================================================
+      // CONTINUE THROUGH CONNECTED DEVICES
+      // ======================================================
 
       (
         currentDevice.connectedDevices ?? []
@@ -615,15 +715,24 @@ function Workspace(
   ) {
 
     if (!wireMode) {
+
       return;
+
     }
 
+
+    // ========================================================
+    // FIRST TERMINAL
+    // ========================================================
 
     if (!selectedTerminal) {
 
       setSelectedTerminal({
+
         deviceId,
+
         terminalId
+
       });
 
       return;
@@ -631,9 +740,9 @@ function Workspace(
     }
 
 
-    // --------------------------------------------------------
-    // Same terminal clicked twice
-    // --------------------------------------------------------
+    // ========================================================
+    // SAME TERMINAL
+    // ========================================================
 
     if (
       selectedTerminal.deviceId ===
@@ -652,7 +761,7 @@ function Workspace(
 
 
     // ========================================================
-    // PREVENT DUPLICATE CONNECTIONS
+    // DUPLICATE CONNECTION CHECK
     // ========================================================
 
     const duplicateExists =
@@ -755,9 +864,7 @@ function Workspace(
 
 
     // --------------------------------------------------------
-    // Case 1:
-    //
-    // Directly connecting FROM a panel.
+    // FROM PANEL
     // --------------------------------------------------------
 
     if (
@@ -771,9 +878,7 @@ function Workspace(
 
 
     // --------------------------------------------------------
-    // Case 2:
-    //
-    // Directly connecting TO a panel.
+    // TO PANEL
     // --------------------------------------------------------
 
     else if (
@@ -787,9 +892,7 @@ function Workspace(
 
 
     // --------------------------------------------------------
-    // Case 3:
-    //
-    // Existing circuit already belongs to a panel.
+    // EXISTING FROM DEVICE OWNERSHIP
     // --------------------------------------------------------
 
     else if (
@@ -802,6 +905,10 @@ function Workspace(
     }
 
 
+    // --------------------------------------------------------
+    // EXISTING TO DEVICE OWNERSHIP
+    // --------------------------------------------------------
+
     else if (
       toDevice.panelId
     ) {
@@ -813,9 +920,7 @@ function Workspace(
 
 
     // --------------------------------------------------------
-    // Case 4:
-    //
-    // A panel is currently selected.
+    // CURRENTLY SELECTED PANEL
     // --------------------------------------------------------
 
     else {
@@ -971,26 +1076,21 @@ function Workspace(
 
 
     // ========================================================
-    // UPDATE CONNECTED DEVICES + PANEL OWNERSHIP
-    //
-    // IMPORTANT:
-    //
-    // We perform both operations in the same setDevices()
-    // transaction so ownership sees the NEW connection graph.
+    // UPDATE DEVICES + OWNERSHIP
     // ========================================================
 
     setDevices(prev => {
 
       // ------------------------------------------------------
-      // First create the new connected-device graph.
+      // CREATE UPDATED CONNECTION GRAPH
       // ------------------------------------------------------
 
       const updatedDevices =
         prev.map(device => {
 
-          // -----------------------------------------------
-          // First endpoint
-          // -----------------------------------------------
+          // --------------------------------------------------
+          // FIRST ENDPOINT
+          // --------------------------------------------------
 
           if (
             device.id ===
@@ -1018,9 +1118,9 @@ function Workspace(
           }
 
 
-          // -----------------------------------------------
-          // Second endpoint
-          // -----------------------------------------------
+          // --------------------------------------------------
+          // SECOND ENDPOINT
+          // --------------------------------------------------
 
           if (
             device.id ===
@@ -1053,10 +1153,9 @@ function Workspace(
         });
 
 
-      // ------------------------------------------------------
-      // If there is no panel, preserve the devices exactly
-      // as updated above.
-      // ------------------------------------------------------
+      // ======================================================
+      // NO PANEL
+      // ======================================================
 
       if (
         !connectionPanelId
@@ -1067,13 +1166,9 @@ function Workspace(
       }
 
 
-      // ------------------------------------------------------
-      // Determine which side should be used as the traversal
-      // starting point.
-      //
-      // If one side is the panel, traverse from the other side.
-      // Otherwise traverse from both sides.
-      // ------------------------------------------------------
+      // ======================================================
+      // DETERMINE OWNERSHIP STARTS
+      // ======================================================
 
       const ownershipStarts: string[] = [];
 
@@ -1100,9 +1195,9 @@ function Workspace(
       }
 
 
-      // ------------------------------------------------------
-      // Find all devices reachable from the new connection.
-      // ------------------------------------------------------
+      // ======================================================
+      // FIND OWNED DEVICES
+      // ======================================================
 
       const ownedDeviceIds =
         new Set<string>();
@@ -1133,9 +1228,9 @@ function Workspace(
       );
 
 
-      // ------------------------------------------------------
-      // Apply panel ownership.
-      // ------------------------------------------------------
+      // ======================================================
+      // APPLY PANEL OWNERSHIP
+      // ======================================================
 
       return updatedDevices.map(
         device => {
@@ -1166,9 +1261,9 @@ function Workspace(
     });
 
 
-    // --------------------------------------------------------
-    // Clear terminal selection.
-    // --------------------------------------------------------
+    // ========================================================
+    // CLEAR TERMINAL SELECTION
+    // ========================================================
 
     setSelectedTerminal(
       null
@@ -1178,7 +1273,7 @@ function Workspace(
 
 
   // ==========================================================
-  // DRAGGING
+  // DEVICE DRAGGING
   // ==========================================================
 
   function startDrag(
@@ -1201,7 +1296,9 @@ function Workspace(
   ) {
 
     if (!dragging) {
+
       return;
+
     }
 
 
@@ -1230,9 +1327,7 @@ function Workspace(
 
             }
 
-          :
-
-            device
+          : device
 
       )
     );
@@ -1265,8 +1360,6 @@ function Workspace(
 
   // ==========================================================
   // FIND CIRCUIT PATHS
-  //
-  // ONLY returns devices belonging to this panel.
   // ==========================================================
 
   function getCircuitPaths(
@@ -1277,7 +1370,9 @@ function Workspace(
   ): string[][] {
 
     if (
-      visited.has(device.id)
+      visited.has(
+        device.id
+      )
     ) {
 
       return [];
@@ -1310,7 +1405,9 @@ function Workspace(
 
 
         if (!connected) {
+
           return;
+
         }
 
 
@@ -1326,7 +1423,7 @@ function Workspace(
 
 
         // ----------------------------------------------------
-        // Never traverse into another panel.
+        // NEVER TRAVERSE INTO ANOTHER PANEL
         // ----------------------------------------------------
 
         if (
@@ -1340,12 +1437,7 @@ function Workspace(
 
 
         // ----------------------------------------------------
-        // Only display devices belonging to THIS panel.
-        //
-        // IMPORTANT:
-        //
-        // connected.panelId must be compared against the
-        // actual panel ID, not against device.id.
+        // ONLY DISPLAY DEVICES FROM THIS PANEL
         // ----------------------------------------------------
 
         if (
@@ -1394,8 +1486,6 @@ function Workspace(
 
   // ==========================================================
   // CALCULATE PANEL LOAD
-  //
-  // ONLY counts loads assigned to this panel.
   // ==========================================================
 
   function calculateLoad(
@@ -1436,12 +1526,14 @@ function Workspace(
 
 
         if (!connected) {
+
           return total;
+
         }
 
 
         // ----------------------------------------------------
-        // Do not count another panel.
+        // DO NOT COUNT ANOTHER PANEL
         // ----------------------------------------------------
 
         if (
@@ -1454,7 +1546,7 @@ function Workspace(
 
 
         // ----------------------------------------------------
-        // Do not count devices belonging to another panel.
+        // DO NOT COUNT ANOTHER PANEL'S DEVICE
         // ----------------------------------------------------
 
         if (
@@ -1816,6 +1908,7 @@ function Workspace(
           >
 
             {
+
               wires.map(
                 wire => {
 
@@ -1881,6 +1974,7 @@ function Workspace(
 
                 }
               )
+
             }
 
           </svg>
@@ -1891,6 +1985,7 @@ function Workspace(
               ================================================= */}
 
           {
+
             devices.map(
               device => (
 
@@ -1945,6 +2040,7 @@ function Workspace(
 
               )
             )
+
           }
 
         </div>

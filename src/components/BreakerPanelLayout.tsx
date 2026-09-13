@@ -1,31 +1,30 @@
-// Residential Wiring Simulator
-// Breaker panel internal layout
+// Residential Wiring Simulator v3.3
+// Breaker Panel Internal Layout
 //
-// Breaker workflow:
-//
-// 1. Drag breaker from Component Library.
-// 2. Move over panel slots.
-// 3. Valid slots highlight while dragging.
-// 4. Drop breaker on a valid slot.
-// 5. Dropped breaker becomes the "pending" breaker.
-// 6. Configure name, amperage, type and poles.
-// 7. Press INSTALL BREAKER.
-// 8. Breaker is installed into the selected slot.
+// Supports:
+// - Installing breakers
+// - Editing installed breakers
+// - Renaming breakers/circuits
+// - Changing breaker amperage
+// - Changing breaker type
+// - Changing pole count
+// - Changing panel main breaker amperage
+// - Removing breakers
+// - Native drag/drop support
 //
 // IMPORTANT:
-// DROP does NOT install the breaker.
-// INSTALL BREAKER performs the actual installation.
-//
-// IMPORTANT DRAG FIX:
-// ComponentLibrary publishes the dragged breaker through
-// a browser CustomEvent because custom dataTransfer values
-// are not reliably available during dragover.
+// Use React's DragEvent type explicitly as ReactDragEvent.
+// This avoids conflict with the browser DOM DragEvent type.
 
 import {
   useEffect,
   useMemo,
-  useState,
-  type DragEvent
+  useRef,
+  useState
+} from "react";
+
+import type {
+  DragEvent as ReactDragEvent
 } from "react";
 
 import type {
@@ -41,16 +40,10 @@ import type {
   BreakerPoles
 } from "../electrical/types";
 
-
-// ============================================================
-// DRAG EVENTS
-// ============================================================
-
-const BREAKER_DRAG_EVENT =
-  "residential-wiring-breaker-drag";
-
-const BREAKER_DRAG_END_EVENT =
-  "residential-wiring-breaker-drag-end";
+import {
+  BREAKER_DRAG_EVENT,
+  BREAKER_DRAG_END_EVENT
+} from "./ComponentLibrary";
 
 
 // ============================================================
@@ -73,6 +66,10 @@ type BreakerPanelLayoutProps = {
 
   onBreakerRemoved?: (
     breaker: Breaker
+  ) => void;
+
+  onMainBreakerChanged?: (
+    amperage: number
   ) => void;
 
 };
@@ -103,6 +100,24 @@ const BREAKER_SIZES = [
   40,
   50,
   60
+];
+
+
+// ============================================================
+// MAIN BREAKER SIZES
+// ============================================================
+
+const MAIN_BREAKER_SIZES = [
+  60,
+  80,
+  100,
+  125,
+  150,
+  175,
+  200,
+  225,
+  300,
+  400
 ];
 
 
@@ -139,7 +154,7 @@ const BREAKER_TYPES: {
 
 
 // ============================================================
-// POLE OPTIONS
+// POLES
 // ============================================================
 
 const POLE_OPTIONS: {
@@ -161,7 +176,7 @@ const POLE_OPTIONS: {
 
 
 // ============================================================
-// CREATE PANEL SLOTS
+// MAKE SLOTS
 // ============================================================
 
 function makeSlots(
@@ -170,11 +185,7 @@ function makeSlots(
 
   return Array.from(
     {
-      length:
-        Math.max(
-          1,
-          count
-        )
+      length: Math.max(1, count)
     },
     (_, index) => ({
 
@@ -186,12 +197,275 @@ function makeSlots(
 
     })
   );
-
 }
 
 
 // ============================================================
-// BREAKER LABEL
+// BREAKER VALIDATION
+// ============================================================
+
+function isValidBreaker(
+  value: unknown
+): value is Breaker {
+
+  if (
+    !value ||
+    typeof value !== "object"
+  ) {
+    return false;
+  }
+
+  const breaker =
+    value as Partial<Breaker>;
+
+  return (
+
+    typeof breaker.id === "string" &&
+
+    typeof breaker.amperage === "number" &&
+
+    (
+      breaker.poles === 1 ||
+      breaker.poles === 2
+    ) &&
+
+    (
+      breaker.breakerType === "STANDARD" ||
+      breaker.breakerType === "GFCI" ||
+      breaker.breakerType === "AFCI" ||
+      breaker.breakerType === "DUAL_FUNCTION"
+    )
+
+  );
+}
+
+
+// ============================================================
+// READ BREAKER FROM DROP
+// ============================================================
+
+function readDraggedBreaker(
+  event: ReactDragEvent<HTMLDivElement>
+): Breaker | null {
+
+  const dataTransfer =
+    event.dataTransfer;
+
+  if (!dataTransfer) {
+    return null;
+  }
+
+
+  // ----------------------------------------------------------
+  // APPLICATION/JSON
+  // ----------------------------------------------------------
+
+  try {
+
+    const json =
+      dataTransfer.getData(
+        "application/json"
+      );
+
+    if (json) {
+
+      const parsed =
+        JSON.parse(json) as unknown;
+
+      if (
+        isValidBreaker(parsed)
+      ) {
+
+        return parsed;
+
+      }
+
+    }
+
+  } catch {
+    // Continue to other formats.
+  }
+
+
+  // ----------------------------------------------------------
+  // BREAKER
+  // ----------------------------------------------------------
+
+  try {
+
+    const json =
+      dataTransfer.getData(
+        "breaker"
+      );
+
+    if (json) {
+
+      const parsed =
+        JSON.parse(json) as unknown;
+
+      if (
+        isValidBreaker(parsed)
+      ) {
+
+        return parsed;
+
+      }
+
+    }
+
+  } catch {
+    // Continue to text/plain.
+  }
+
+
+  // ----------------------------------------------------------
+  // TEXT
+  // ----------------------------------------------------------
+
+  try {
+
+    const json =
+      dataTransfer.getData(
+        "text/plain"
+      );
+
+    if (json) {
+
+      const parsed =
+        JSON.parse(json) as unknown;
+
+      if (
+        isValidBreaker(parsed)
+      ) {
+
+        return parsed;
+
+      }
+
+    }
+
+  } catch {
+    // Not a breaker payload.
+  }
+
+
+  return null;
+}
+
+
+// ============================================================
+// CAN DROP
+// ============================================================
+
+function canDropBreaker(
+  breaker: Breaker,
+  slotNumber: number,
+  panelSlots: PanelSlot[]
+): boolean {
+
+  const firstIndex =
+    slotNumber - 1;
+
+
+  if (
+    firstIndex < 0 ||
+    firstIndex >= panelSlots.length
+  ) {
+
+    return false;
+
+  }
+
+
+  const first =
+    panelSlots[firstIndex];
+
+
+  if (
+    !first ||
+    first.breaker
+  ) {
+
+    return false;
+
+  }
+
+
+  // ----------------------------------------------------------
+  // ONE POLE
+  // ----------------------------------------------------------
+
+  if (
+    breaker.poles === 1
+  ) {
+
+    return true;
+
+  }
+
+
+  // ----------------------------------------------------------
+  // TWO POLE
+  // ----------------------------------------------------------
+
+  const second =
+    panelSlots[firstIndex + 1];
+
+
+  if (
+    !second ||
+    second.breaker
+  ) {
+
+    return false;
+
+  }
+
+
+  return true;
+}
+
+
+// ============================================================
+// FIND BREAKER START SLOT
+//
+// A two-pole breaker is stored in both physical slots.
+// Therefore clicking either physical slot must resolve back
+// to the first/starting slot.
+//
+// The panel array itself is the source of truth.
+// ============================================================
+
+function findBreakerStartSlot(
+  breakerId: string,
+  panelSlots: PanelSlot[]
+): number | null {
+
+  const index =
+    panelSlots.findIndex(
+      slot =>
+        slot.breaker?.id ===
+        breakerId
+    );
+
+
+  if (
+    index === -1
+  ) {
+
+    return null;
+
+  }
+
+
+  return (
+    index + 1
+  );
+}
+
+
+// ============================================================
+// GET BREAKER LABEL
 // ============================================================
 
 function getBreakerLabel(
@@ -200,9 +474,10 @@ function getBreakerLabel(
 
   return (
     breaker.label ||
-    `${breaker.amperage}A ${breaker.breakerType}`
+    `${breaker.amperage}A ${getTypeLabel(
+      breaker.breakerType
+    )}`
   );
-
 }
 
 
@@ -229,109 +504,11 @@ function getTypeLabel(
       return "STANDARD";
 
   }
-
 }
 
 
 // ============================================================
-// READ DRAGGED BREAKER
-// ============================================================
-
-function readDraggedBreaker(
-  event: DragEvent<HTMLDivElement>
-): Breaker | null {
-
-  const data =
-    event.dataTransfer.getData(
-      "breaker"
-    );
-
-
-  if (
-    !data
-  ) {
-
-    return null;
-
-  }
-
-
-  try {
-
-    const parsed =
-      JSON.parse(
-        data
-      ) as Partial<Breaker>;
-
-
-    if (
-      !parsed ||
-      typeof parsed.id !== "string" ||
-      typeof parsed.amperage !== "number" ||
-      (
-        parsed.poles !== 1 &&
-        parsed.poles !== 2
-      ) ||
-      (
-        parsed.breakerType !== "STANDARD" &&
-        parsed.breakerType !== "GFCI" &&
-        parsed.breakerType !== "AFCI" &&
-        parsed.breakerType !== "DUAL_FUNCTION"
-      )
-    ) {
-
-      return null;
-
-    }
-
-
-    return parsed as Breaker;
-
-  }
-
-  catch (error) {
-
-    console.error(
-      "Could not read dragged breaker:",
-      error
-    );
-
-    return null;
-
-  }
-
-}
-
-
-// ============================================================
-// SLOT BELONGS TO BREAKER
-// ============================================================
-
-function slotBelongsToBreaker(
-  slot: PanelSlot,
-  breaker: Breaker | null
-): boolean {
-
-  if (
-    !breaker ||
-    !slot.breaker
-  ) {
-
-    return false;
-
-  }
-
-
-  return (
-    slot.breaker.id ===
-    breaker.id
-  );
-
-}
-
-
-// ============================================================
-// PANEL
+// COMPONENT
 // ============================================================
 
 export default function BreakerPanelLayout({
@@ -346,7 +523,9 @@ export default function BreakerPanelLayout({
 
   onBreakerInstalled,
 
-  onBreakerRemoved
+  onBreakerRemoved,
+
+  onMainBreakerChanged
 
 }: BreakerPanelLayoutProps) {
 
@@ -360,9 +539,7 @@ export default function BreakerPanelLayout({
     setPanelSlots
   ] = useState<PanelSlot[]>(
     () =>
-      makeSlots(
-        slots
-      )
+      makeSlots(slots)
   );
 
 
@@ -379,8 +556,11 @@ export default function BreakerPanelLayout({
 
 
   // ==========================================================
-  // DRAGGED BREAKER
+  // ACTIVE DRAG BREAKER
   // ==========================================================
+
+  const draggingBreakerRef =
+    useRef<Breaker | null>(null);
 
   const [
     draggingBreaker,
@@ -403,7 +583,7 @@ export default function BreakerPanelLayout({
 
 
   // ==========================================================
-  // PENDING BREAKER
+  // PENDING / EDITING BREAKER
   // ==========================================================
 
   const [
@@ -415,24 +595,28 @@ export default function BreakerPanelLayout({
 
 
   // ==========================================================
-  // CONFIGURATION
+  // BREAKER NAME
   // ==========================================================
 
   const [
     breakerName,
     setBreakerName
-  ] = useState(
-    ""
-  );
+  ] = useState("");
 
+
+  // ==========================================================
+  // AMPERAGE
+  // ==========================================================
 
   const [
     amperage,
     setAmperage
-  ] = useState(
-    20
-  );
+  ] = useState(20);
 
+
+  // ==========================================================
+  // BREAKER TYPE
+  // ==========================================================
 
   const [
     breakerType,
@@ -441,6 +625,10 @@ export default function BreakerPanelLayout({
     "STANDARD"
   );
 
+
+  // ==========================================================
+  // POLES
+  // ==========================================================
 
   const [
     poles,
@@ -451,21 +639,113 @@ export default function BreakerPanelLayout({
 
 
   // ==========================================================
-  // LISTEN FOR COMPONENT LIBRARY BREAKER DRAG
+  // MAIN BREAKER
   // ==========================================================
-  //
-  // This is the central fix.
-  //
-  // ComponentLibrary sends:
-  //
-  // window.dispatchEvent(
-  //   new CustomEvent(
-  //     "residential-wiring-breaker-drag",
-  //     { detail: breaker }
-  //   )
-  // );
-  //
-  // The panel receives the complete breaker immediately.
+
+  const [
+    panelMainBreaker,
+    setPanelMainBreaker
+  ] = useState(
+    mainBreaker
+  );
+
+
+  // ==========================================================
+  // SYNC MAIN BREAKER
+  // ==========================================================
+
+  useEffect(() => {
+
+    setPanelMainBreaker(
+      mainBreaker
+    );
+
+  }, [
+    mainBreaker
+  ]);
+
+
+  // ==========================================================
+  // SYNC SLOT COUNT
+  // ==========================================================
+
+  useEffect(() => {
+
+    setPanelSlots(
+      previous => {
+
+        if (
+          previous.length === slots
+        ) {
+
+          return previous;
+
+        }
+
+
+        const next =
+          makeSlots(slots);
+
+
+        previous.forEach(
+          existing => {
+
+            if (
+              existing.id <=
+              next.length
+            ) {
+
+              next[
+                existing.id - 1
+              ].breaker =
+                existing.breaker;
+
+            }
+
+          }
+        );
+
+
+        return next;
+
+      }
+    );
+
+  }, [
+    slots
+  ]);
+
+
+  // ==========================================================
+  // DETERMINE WHETHER SELECTED BREAKER IS INSTALLED
+  // ==========================================================
+
+  const isEditingInstalledBreaker =
+    useMemo(() => {
+
+      if (
+        !pendingBreaker
+      ) {
+
+        return false;
+
+      }
+
+
+      return panelSlots.some(
+        slot =>
+          slot.breaker?.id ===
+          pendingBreaker.id
+      );
+
+    }, [
+      pendingBreaker,
+      panelSlots
+    ]);
+
+
+  // ==========================================================
+  // CAPTURE BREAKER DRAG
   // ==========================================================
 
   useEffect(() => {
@@ -475,26 +755,34 @@ export default function BreakerPanelLayout({
     ): void {
 
       const customEvent =
-        event as CustomEvent<Breaker>;
-
+        event as CustomEvent<unknown>;
 
       const breaker =
         customEvent.detail;
 
 
       if (
-        !breaker
+        !isValidBreaker(
+          breaker
+        )
       ) {
+
+        console.warn(
+          "[BreakerPanelLayout] Invalid drag event:",
+          breaker
+        );
 
         return;
 
       }
 
 
+      draggingBreakerRef.current =
+        breaker;
+
       setDraggingBreaker(
         breaker
       );
-
 
       setDragOverSlot(
         null
@@ -504,6 +792,9 @@ export default function BreakerPanelLayout({
 
 
     function handleBreakerDragEnd(): void {
+
+      draggingBreakerRef.current =
+        null;
 
       setDraggingBreaker(
         null
@@ -521,7 +812,6 @@ export default function BreakerPanelLayout({
       handleBreakerDrag
     );
 
-
     window.addEventListener(
       BREAKER_DRAG_END_EVENT,
       handleBreakerDragEnd
@@ -534,7 +824,6 @@ export default function BreakerPanelLayout({
         BREAKER_DRAG_EVENT,
         handleBreakerDrag
       );
-
 
       window.removeEventListener(
         BREAKER_DRAG_END_EVENT,
@@ -553,17 +842,20 @@ export default function BreakerPanelLayout({
   const validDropSlots =
     useMemo(() => {
 
-      if (
-        !draggingBreaker
-      ) {
-
-        return new Set<number>();
-
-      }
-
-
       const result =
         new Set<number>();
+
+
+      const breaker =
+        draggingBreakerRef.current ||
+        draggingBreaker;
+
+
+      if (!breaker) {
+
+        return result;
+
+      }
 
 
       for (
@@ -576,56 +868,17 @@ export default function BreakerPanelLayout({
           index + 1;
 
 
-        // ----------------------------------------------------
-        // 1-POLE
-        // ----------------------------------------------------
-
         if (
-          draggingBreaker.poles === 1
+          canDropBreaker(
+            breaker,
+            slotNumber,
+            panelSlots
+          )
         ) {
 
-          if (
-            !panelSlots[index].breaker
-          ) {
-
-            result.add(
-              slotNumber
-            );
-
-          }
-
-
-          continue;
-
-        }
-
-
-        // ----------------------------------------------------
-        // 2-POLE
-        // ----------------------------------------------------
-
-        if (
-          index + 1 <
-          panelSlots.length
-        ) {
-
-          const first =
-            panelSlots[index];
-
-          const second =
-            panelSlots[index + 1];
-
-
-          if (
-            !first.breaker &&
-            !second.breaker
-          ) {
-
-            result.add(
-              slotNumber
-            );
-
-          }
+          result.add(
+            slotNumber
+          );
 
         }
 
@@ -646,6 +899,9 @@ export default function BreakerPanelLayout({
 
   function clearDragState(): void {
 
+    draggingBreakerRef.current =
+      null;
+
     setDraggingBreaker(
       null
     );
@@ -658,133 +914,35 @@ export default function BreakerPanelLayout({
 
 
   // ==========================================================
-  // DRAG OVER
+  // DRAG ENTER
   // ==========================================================
 
-  function handleDragOver(
-    event: DragEvent<HTMLDivElement>,
+  function handleDragEnter(
+    event: ReactDragEvent<HTMLDivElement>,
     slotNumber: number
   ): void {
 
     event.preventDefault();
+    event.stopPropagation();
 
 
-    event.dataTransfer.dropEffect =
-      "copy";
+    const breaker =
+      draggingBreakerRef.current;
 
 
-    /*
-     * Normally the CustomEvent has already supplied the
-     * breaker. This fallback is retained for compatibility
-     * with other breaker drag sources.
-     */
-
-    let breaker =
-      draggingBreaker;
-
-
-    if (
-      !breaker
-    ) {
-
-      breaker =
-        readDraggedBreaker(
-          event
-        );
-
-
-      if (
-        breaker
-      ) {
-
-        setDraggingBreaker(
-          breaker
-        );
-
-      }
-
-    }
-
-
-    if (
-      !breaker
-    ) {
-
-      setDragOverSlot(
-        null
-      );
+    if (!breaker) {
 
       return;
 
     }
 
 
-    // --------------------------------------------------------
-    // 1-POLE
-    // --------------------------------------------------------
-
     if (
-      breaker.poles === 1
-    ) {
-
-      const target =
-        panelSlots.find(
-          item =>
-            item.id ===
-            slotNumber
-        );
-
-
-      if (
-        target &&
-        !target.breaker
-      ) {
-
-        setDragOverSlot(
-          slotNumber
-        );
-
-      }
-
-      else {
-
-        setDragOverSlot(
-          null
-        );
-
-      }
-
-
-      return;
-
-    }
-
-
-    // --------------------------------------------------------
-    // 2-POLE
-    // --------------------------------------------------------
-
-    const first =
-      panelSlots.find(
-        item =>
-          item.id ===
-          slotNumber
-      );
-
-
-    const second =
-      panelSlots.find(
-        item =>
-          item.id ===
-          slotNumber + 1
-      );
-
-
-    if (
-      first &&
-      second &&
-      !first.breaker &&
-      !second.breaker
+      canDropBreaker(
+        breaker,
+        slotNumber,
+        panelSlots
+      )
     ) {
 
       setDragOverSlot(
@@ -793,7 +951,57 @@ export default function BreakerPanelLayout({
 
     }
 
-    else {
+  }
+
+
+  // ==========================================================
+  // DRAG OVER
+  // ==========================================================
+
+  function handleDragOver(
+    event: ReactDragEvent<HTMLDivElement>,
+    slotNumber: number
+  ): void {
+
+    event.preventDefault();
+    event.stopPropagation();
+
+
+    const breaker =
+      draggingBreakerRef.current;
+
+
+    if (!breaker) {
+
+      event.dataTransfer.dropEffect =
+        "none";
+
+      return;
+
+    }
+
+
+    const valid =
+      canDropBreaker(
+        breaker,
+        slotNumber,
+        panelSlots
+      );
+
+
+    if (valid) {
+
+      event.dataTransfer.dropEffect =
+        "copy";
+
+      setDragOverSlot(
+        slotNumber
+      );
+
+    } else {
+
+      event.dataTransfer.dropEffect =
+        "none";
 
       setDragOverSlot(
         null
@@ -809,8 +1017,12 @@ export default function BreakerPanelLayout({
   // ==========================================================
 
   function handleDragLeave(
+    event: ReactDragEvent<HTMLDivElement>,
     slotNumber: number
   ): void {
+
+    event.stopPropagation();
+
 
     if (
       dragOverSlot ===
@@ -831,51 +1043,55 @@ export default function BreakerPanelLayout({
   // ==========================================================
 
   function handleDrop(
-    event: DragEvent<HTMLDivElement>,
+    event: ReactDragEvent<HTMLDivElement>,
     slotNumber: number
   ): void {
 
     event.preventDefault();
-
     event.stopPropagation();
 
 
-    /*
-     * Try the actual drop payload first.
-     */
-
     let breaker =
-      readDraggedBreaker(
-        event
-      );
+      draggingBreakerRef.current;
 
 
-    /*
-     * If the browser does not provide the custom dataTransfer
-     * value, use the breaker already received through the
-     * CustomEvent.
-     */
-
-    if (
-      !breaker
-    ) {
+    if (!breaker) {
 
       breaker =
-        draggingBreaker;
+        readDraggedBreaker(
+          event
+        );
 
     }
 
 
-    clearDragState();
+    if (!breaker) {
+
+      console.error(
+        "[BreakerPanelLayout] Drop failed: no breaker."
+      );
+
+      clearDragState();
+
+      return;
+
+    }
 
 
     if (
-      !breaker
+      !canDropBreaker(
+        breaker,
+        slotNumber,
+        panelSlots
+      )
     ) {
 
       console.warn(
-        "Panel received a breaker drop, but no breaker was available."
+        "[BreakerPanelLayout] Invalid drop:",
+        slotNumber
       );
+
+      clearDragState();
 
       return;
 
@@ -883,90 +1099,25 @@ export default function BreakerPanelLayout({
 
 
     // --------------------------------------------------------
-    // VALIDATE 1-POLE
+    // OPEN CONFIGURATION
     // --------------------------------------------------------
-
-    if (
-      breaker.poles === 1
-    ) {
-
-      const target =
-        panelSlots.find(
-          item =>
-            item.id ===
-            slotNumber
-        );
-
-
-      if (
-        !target ||
-        target.breaker
-      ) {
-
-        return;
-
-      }
-
-    }
-
-
-    // --------------------------------------------------------
-    // VALIDATE 2-POLE
-    // --------------------------------------------------------
-
-    if (
-      breaker.poles === 2
-    ) {
-
-      const first =
-        panelSlots.find(
-          item =>
-            item.id ===
-            slotNumber
-        );
-
-
-      const second =
-        panelSlots.find(
-          item =>
-            item.id ===
-            slotNumber + 1
-        );
-
-
-      if (
-        !first ||
-        !second ||
-        first.breaker ||
-        second.breaker
-      ) {
-
-        return;
-
-      }
-
-    }
-
-
-    /*
-     * DROP = PENDING.
-     *
-     * Nothing is installed yet.
-     */
 
     setPendingBreaker(
       breaker
     );
-
 
     setSelectedSlot(
       slotNumber
     );
 
 
-    /*
-     * Generic library labels become blank circuit names.
-     */
+    // --------------------------------------------------------
+    // LOAD NAME
+    //
+    // Preserve a real custom circuit name.
+    // Generic generated labels are replaced by the editor
+    // placeholder instead.
+    // --------------------------------------------------------
 
     setBreakerName(
       breaker.label &&
@@ -978,25 +1129,30 @@ export default function BreakerPanelLayout({
     );
 
 
+    // --------------------------------------------------------
+    // LOAD SETTINGS
+    // --------------------------------------------------------
+
     setAmperage(
       breaker.amperage
     );
-
 
     setBreakerType(
       breaker.breakerType
     );
 
-
     setPoles(
       breaker.poles
     );
+
+
+    clearDragState();
 
   }
 
 
   // ==========================================================
-  // INSTALL
+  // INSTALL BREAKER
   // ==========================================================
 
   function installBreaker(): void {
@@ -1011,54 +1167,44 @@ export default function BreakerPanelLayout({
     }
 
 
-    /*
-     * Determine whether the pending breaker is already
-     * installed and is being edited.
-     */
+    const configuredBreaker: Breaker = {
 
-    const existingBreaker =
-      panelSlots.some(
-        slot =>
-          slot.breaker?.id ===
-          pendingBreaker.id
-      );
+      ...pendingBreaker,
 
+      amperage,
 
-    const selectedTarget =
-      panelSlots.find(
-        item =>
-          item.id ===
-          selectedSlot
-      );
+      breakerType,
 
+      poles,
 
-    if (
-      !selectedTarget
-    ) {
+      voltage:
+        poles === 2
+          ? 240
+          : 120,
 
-      return;
+      label:
+        breakerName.trim() ||
+        `${amperage}A ${getTypeLabel(
+          breakerType
+        )}`
 
-    }
+    };
 
 
     // --------------------------------------------------------
-    // FIRST SLOT
+    // Verify placement.
     // --------------------------------------------------------
 
-    const firstOccupiedByOther =
-      selectedTarget.breaker &&
-      !slotBelongsToBreaker(
-        selectedTarget,
-        pendingBreaker
-      );
-
-
     if (
-      firstOccupiedByOther
+      !canDropBreaker(
+        configuredBreaker,
+        selectedSlot,
+        panelSlots
+      )
     ) {
 
       alert(
-        "The selected slot is already occupied."
+        "The selected slot is no longer available."
       );
 
       return;
@@ -1067,69 +1213,17 @@ export default function BreakerPanelLayout({
 
 
     // --------------------------------------------------------
-    // SECOND SLOT
+    // Assign physical starting slot.
     // --------------------------------------------------------
 
-    if (
-      poles === 2
-    ) {
-
-      const second =
-        panelSlots.find(
-          item =>
-            item.id ===
-            selectedSlot + 1
-        );
-
-
-      if (
-        !second
-      ) {
-
-        alert(
-          "A 2-pole breaker requires two consecutive physical slots."
-        );
-
-        return;
-
-      }
-
-
-      const secondOccupiedByOther =
-        second.breaker &&
-        !slotBelongsToBreaker(
-          second,
-          pendingBreaker
-        );
-
-
-      if (
-        secondOccupiedByOther
-      ) {
-
-        alert(
-          "A 2-pole breaker requires two consecutive empty slots."
-        );
-
-        return;
-
-      }
-
-    }
-
-
-    // --------------------------------------------------------
-    // BUILD BREAKER
-    // --------------------------------------------------------
-
-    let installed =
+    const installed =
       assignBreakerSlot(
-        pendingBreaker,
+        configuredBreaker,
         selectedSlot
       );
 
 
-    installed = {
+    const finalBreaker: Breaker = {
 
       ...installed,
 
@@ -1153,149 +1247,308 @@ export default function BreakerPanelLayout({
     };
 
 
-    /*
-     * Recalculate electrical slot/bus information after
-     * applying the final pole configuration.
-     */
-
-    installed =
-      assignBreakerSlot(
-        installed,
-        selectedSlot
-      );
-
-
     // --------------------------------------------------------
-    // UPDATE PANEL
+    // Put breaker into physical slot(s).
     // --------------------------------------------------------
 
     setPanelSlots(
       previous => {
 
-        /*
-         * Remove all physical positions belonging to the
-         * breaker being edited.
-         */
+        return previous.map(
+          item => {
 
-        const cleared =
-          previous.map(
-            item => {
+            if (
+              item.id ===
+              selectedSlot
+            ) {
 
-              if (
-                item.breaker?.id ===
-                pendingBreaker.id
-              ) {
-
-                return {
-
-                  ...item,
-
-                  breaker:
-                    null
-
-                };
-
-              }
-
-
-              return item;
+              return {
+                ...item,
+                breaker:
+                  finalBreaker
+              };
 
             }
-          );
 
 
-        /*
-         * Install the first physical slot.
-         */
+            if (
+              finalBreaker.poles === 2 &&
+              item.id ===
+              selectedSlot + 1
+            ) {
 
-        const installedSlots =
-          cleared.map(
-            item => {
-
-              if (
-                item.id ===
-                selectedSlot
-              ) {
-
-                return {
-
-                  ...item,
-
-                  breaker:
-                    installed
-
-                };
-
-              }
-
-
-              /*
-               * A 2-pole breaker occupies the next physical
-               * slot as well.
-               */
-
-              if (
-                poles === 2 &&
-                item.id ===
-                  selectedSlot + 1
-              ) {
-
-                return {
-
-                  ...item,
-
-                  breaker:
-                    installed
-
-                };
-
-              }
-
-
-              return item;
+              return {
+                ...item,
+                breaker:
+                  finalBreaker
+              };
 
             }
-          );
 
 
-        return installedSlots;
+            return item;
+
+          }
+        );
 
       }
     );
 
 
-    // --------------------------------------------------------
-    // NOTIFY PARENT
-    // --------------------------------------------------------
-
     onBreakerInstalled?.(
-      installed
+      finalBreaker
     );
 
 
     // --------------------------------------------------------
-    // CLOSE CONFIGURATION
+    // CLOSE CONFIGURATION.
     // --------------------------------------------------------
 
     setPendingBreaker(
       null
     );
 
-
     setSelectedSlot(
-      selectedSlot
+      null
     );
-
 
     clearDragState();
 
+  }
 
-    /*
-     * Keep this variable referenced because it explicitly
-     * documents the edit/replacement path.
-     */
 
-    void existingBreaker;
+  // ==========================================================
+  // UPDATE EXISTING BREAKER
+  // ==========================================================
+
+  function updateBreaker(): void {
+
+    if (
+      !pendingBreaker
+    ) {
+
+      return;
+
+    }
+
+
+    // --------------------------------------------------------
+    // Find the physical starting slot from actual panel state.
+    // --------------------------------------------------------
+
+    const firstSlot =
+      findBreakerStartSlot(
+        pendingBreaker.id,
+        panelSlots
+      );
+
+
+    if (
+      firstSlot === null
+    ) {
+
+      installBreaker();
+
+      return;
+
+    }
+
+
+    // --------------------------------------------------------
+    // Create updated breaker.
+    // --------------------------------------------------------
+
+    const updated: Breaker = {
+
+      ...pendingBreaker,
+
+      label:
+        breakerName.trim() ||
+        `${amperage}A ${getTypeLabel(
+          breakerType
+        )}`,
+
+      amperage,
+
+      breakerType,
+
+      poles,
+
+      voltage:
+        poles === 2
+          ? 240
+          : 120
+
+    };
+
+
+    // --------------------------------------------------------
+    // Remove ALL physical positions of old breaker.
+    // --------------------------------------------------------
+
+    const withoutOld =
+      panelSlots.map(
+        item => {
+
+          if (
+            item.breaker?.id ===
+            pendingBreaker.id
+          ) {
+
+            return {
+              ...item,
+              breaker: null
+            };
+
+          }
+
+
+          return item;
+
+        }
+      );
+
+
+    // --------------------------------------------------------
+    // Check whether new configuration fits.
+    // --------------------------------------------------------
+
+    if (
+      !canDropBreaker(
+        updated,
+        firstSlot,
+        withoutOld
+      )
+    ) {
+
+      alert(
+        "The new breaker configuration does not fit in the selected panel slots."
+      );
+
+      return;
+
+    }
+
+
+    // --------------------------------------------------------
+    // Assign updated breaker to its starting slot.
+    // --------------------------------------------------------
+
+    const assigned =
+      assignBreakerSlot(
+        updated,
+        firstSlot
+      );
+
+
+    const finalBreaker: Breaker = {
+
+      ...assigned,
+
+      label:
+        breakerName.trim() ||
+        `${amperage}A ${getTypeLabel(
+          breakerType
+        )}`,
+
+      amperage,
+
+      breakerType,
+
+      poles,
+
+      voltage:
+        poles === 2
+          ? 240
+          : 120
+
+    };
+
+
+    // --------------------------------------------------------
+    // Put updated breaker into physical slot(s).
+    // --------------------------------------------------------
+
+    const updatedPanel =
+      withoutOld.map(
+        item => {
+
+          if (
+            item.id ===
+            firstSlot
+          ) {
+
+            return {
+              ...item,
+              breaker:
+                finalBreaker
+            };
+
+          }
+
+
+          if (
+            finalBreaker.poles === 2 &&
+            item.id ===
+            firstSlot + 1
+          ) {
+
+            return {
+              ...item,
+              breaker:
+                finalBreaker
+            };
+
+          }
+
+
+          return item;
+
+        }
+      );
+
+
+    setPanelSlots(
+      updatedPanel
+    );
+
+
+    // --------------------------------------------------------
+    // Notify parent.
+    // --------------------------------------------------------
+
+    onBreakerInstalled?.(
+      finalBreaker
+    );
+
+
+    // --------------------------------------------------------
+    // Keep editor open.
+    // --------------------------------------------------------
+
+    setPendingBreaker(
+      finalBreaker
+    );
+
+    setSelectedSlot(
+      firstSlot
+    );
+
+    setBreakerName(
+      breakerName.trim()
+    );
+
+    setAmperage(
+      amperage
+    );
+
+    setBreakerType(
+      breakerType
+    );
+
+    setPoles(
+      poles
+    );
 
   }
 
@@ -1319,12 +1572,8 @@ export default function BreakerPanelLayout({
             ) {
 
               return {
-
                 ...item,
-
-                breaker:
-                  null
-
+                breaker: null
               };
 
             }
@@ -1346,9 +1595,12 @@ export default function BreakerPanelLayout({
       null
     );
 
-
     setSelectedSlot(
       null
+    );
+
+    setBreakerName(
+      ""
     );
 
   }
@@ -1362,11 +1614,6 @@ export default function BreakerPanelLayout({
     slotNumber: number
   ): void {
 
-    setSelectedSlot(
-      slotNumber
-    );
-
-
     const slot =
       panelSlots.find(
         item =>
@@ -1375,18 +1622,42 @@ export default function BreakerPanelLayout({
       );
 
 
+    if (!slot) {
+
+      return;
+
+    }
+
+
+    setSelectedSlot(
+      slotNumber
+    );
+
+
+    // --------------------------------------------------------
+    // EMPTY SLOT
+    // --------------------------------------------------------
+
     if (
-      !slot?.breaker
+      !slot.breaker
     ) {
 
       setPendingBreaker(
         null
       );
 
+      setBreakerName(
+        ""
+      );
+
       return;
 
     }
 
+
+    // --------------------------------------------------------
+    // INSTALLED BREAKER
+    // --------------------------------------------------------
 
     const breaker =
       slot.breaker;
@@ -1397,9 +1668,23 @@ export default function BreakerPanelLayout({
     );
 
 
+    // --------------------------------------------------------
+    // IMPORTANT:
+    //
+    // Always load the actual stored label.
+    //
+    // This makes:
+    // Bedroom
+    // Kitchen
+    // Dishwasher
+    // Garage
+    // HVAC
+    //
+    // appear immediately when clicked.
+    // --------------------------------------------------------
+
     setBreakerName(
-      breaker.label ||
-      ""
+      breaker.label || ""
     );
 
 
@@ -1407,14 +1692,52 @@ export default function BreakerPanelLayout({
       breaker.amperage
     );
 
-
     setBreakerType(
       breaker.breakerType
     );
 
-
     setPoles(
       breaker.poles
+    );
+
+  }
+
+
+  // ==========================================================
+  // MAIN BREAKER CHANGE
+  // ==========================================================
+
+  function handleMainBreakerChange(
+    value: number
+  ): void {
+
+    setPanelMainBreaker(
+      value
+    );
+
+    onMainBreakerChanged?.(
+      value
+    );
+
+  }
+
+
+  // ==========================================================
+  // CLOSE SETTINGS
+  // ==========================================================
+
+  function closeBreakerSettings(): void {
+
+    setPendingBreaker(
+      null
+    );
+
+    setSelectedSlot(
+      null
+    );
+
+    setBreakerName(
+      ""
     );
 
   }
@@ -1428,21 +1751,45 @@ export default function BreakerPanelLayout({
 
     <div
       style={{
+
         position: "fixed",
+
         right: "30px",
+
         top: "80px",
+
         width: "380px",
+
         maxHeight: "80vh",
+
         overflowY: "auto",
+
         background: "#111827",
-        border: "2px solid #00eaff",
-        borderRadius: "12px",
-        padding: "18px",
-        color: "white",
-        fontFamily: "monospace",
-        zIndex: 1000,
+
+        border:
+          "2px solid #00eaff",
+
+        borderRadius:
+          "12px",
+
+        padding:
+          "18px",
+
+        color:
+          "white",
+
+        fontFamily:
+          "monospace",
+
+        zIndex:
+          1000,
+
+        pointerEvents:
+          "auto",
+
         boxShadow:
           "0 0 25px rgba(0,234,255,.4)"
+
       }}
     >
 
@@ -1452,16 +1799,28 @@ export default function BreakerPanelLayout({
 
       <div
         style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center"
+
+          display:
+            "flex",
+
+          justifyContent:
+            "space-between",
+
+          alignItems:
+            "center"
+
         }}
       >
 
         <h2
           style={{
-            margin: 0,
-            color: "#00eaff"
+
+            margin:
+              0,
+
+            color:
+              "#00eaff"
+
           }}
         >
           ⚡ {panelName}
@@ -1476,12 +1835,25 @@ export default function BreakerPanelLayout({
             }
 
             style={{
-              background: "#3b1010",
-              color: "#ff8080",
-              border: "1px solid #ff4040",
-              borderRadius: "5px",
-              padding: "6px 10px",
-              cursor: "pointer"
+
+              background:
+                "#3b1010",
+
+              color:
+                "#ff8080",
+
+              border:
+                "1px solid #ff4040",
+
+              borderRadius:
+                "5px",
+
+              padding:
+                "6px 10px",
+
+              cursor:
+                "pointer"
+
             }}
           >
             X
@@ -1493,15 +1865,148 @@ export default function BreakerPanelLayout({
 
 
       {/* ================================================== */}
+      {/* PANEL SETTINGS */}
+      {/* ================================================== */}
+
+      <div
+        style={{
+
+          marginTop:
+            "15px",
+
+          padding:
+            "12px",
+
+          background:
+            "#080b10",
+
+          border:
+            "1px solid #176070",
+
+          borderRadius:
+            "8px"
+
+        }}
+      >
+
+        <div
+          style={{
+
+            color:
+              "#00eaff",
+
+            fontWeight:
+              800,
+
+            marginBottom:
+              "10px"
+
+          }}
+        >
+          PANEL SETTINGS
+        </div>
+
+
+        <label>
+          Main Breaker
+        </label>
+
+
+        <select
+          value={
+            panelMainBreaker
+          }
+
+          onChange={
+            event =>
+              handleMainBreakerChange(
+                Number(
+                  event.target.value
+                )
+              )
+          }
+
+          style={{
+
+            width:
+              "100%",
+
+            padding:
+              "9px",
+
+            marginTop:
+              "5px",
+
+            background:
+              "#111827",
+
+            color:
+              "white",
+
+            border:
+              "1px solid #176070",
+
+            borderRadius:
+              "5px"
+
+          }}
+        >
+
+          {MAIN_BREAKER_SIZES.map(
+            size => (
+
+              <option
+                key={size}
+                value={size}
+              >
+                {size}A
+              </option>
+
+            )
+          )}
+
+        </select>
+
+
+        <div
+          style={{
+
+            marginTop:
+              "8px",
+
+            color:
+              "#777",
+
+            fontSize:
+              "11px"
+
+          }}
+        >
+          Panel service/main breaker size
+        </div>
+
+      </div>
+
+
+      {/* ================================================== */}
       {/* MAIN BREAKER */}
       {/* ================================================== */}
 
       <div
         style={{
-          marginTop: "15px",
-          padding: "12px",
-          background: "#222",
-          borderRadius: "8px"
+
+          marginTop:
+            "15px",
+
+          padding:
+            "12px",
+
+          background:
+            "#222",
+
+          borderRadius:
+            "8px"
+
         }}
       >
 
@@ -1511,8 +2016,13 @@ export default function BreakerPanelLayout({
 
         <span
           style={{
-            color: "#39ff14",
-            fontSize: "20px"
+
+            color:
+              "#39ff14",
+
+            fontSize:
+              "20px"
+
           }}
         >
           ● ON
@@ -1520,7 +2030,7 @@ export default function BreakerPanelLayout({
 
         {" "}
 
-        {mainBreaker}A
+        {panelMainBreaker}A
 
       </div>
 
@@ -1531,19 +2041,37 @@ export default function BreakerPanelLayout({
 
       <div
         style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: "8px",
-          marginTop: "15px"
+
+          display:
+            "grid",
+
+          gridTemplateColumns:
+            "1fr 1fr",
+
+          gap:
+            "8px",
+
+          marginTop:
+            "15px"
+
         }}
       >
 
         <div
           style={{
-            textAlign: "center",
-            color: "#ffcc00",
-            background: "#050505",
-            padding: "8px"
+
+            textAlign:
+              "center",
+
+            color:
+              "#ffcc00",
+
+            background:
+              "#050505",
+
+            padding:
+              "8px"
+
           }}
         >
           L1 BUS
@@ -1552,10 +2080,19 @@ export default function BreakerPanelLayout({
 
         <div
           style={{
-            textAlign: "center",
-            color: "#ffcc00",
-            background: "#050505",
-            padding: "8px"
+
+            textAlign:
+              "center",
+
+            color:
+              "#ffcc00",
+
+            background:
+              "#050505",
+
+            padding:
+              "8px"
+
           }}
         >
           L2 BUS
@@ -1565,22 +2102,38 @@ export default function BreakerPanelLayout({
 
 
       {/* ================================================== */}
-      {/* DRAG INSTRUCTION */}
+      {/* DRAG ACTIVE */}
       {/* ================================================== */}
 
       {draggingBreaker && (
 
         <div
           style={{
-            marginTop: "12px",
-            padding: "10px",
-            background: "#063b2d",
+
+            marginTop:
+              "12px",
+
+            padding:
+              "10px",
+
+            background:
+              "#063b2d",
+
             border:
               "1px solid #00ff99",
-            borderRadius: "7px",
-            color: "#00ff99",
-            textAlign: "center",
-            fontWeight: 800
+
+            borderRadius:
+              "7px",
+
+            color:
+              "#00ff99",
+
+            textAlign:
+              "center",
+
+            fontWeight:
+              800
+
           }}
         >
 
@@ -1588,8 +2141,17 @@ export default function BreakerPanelLayout({
 
           <br />
 
+          {draggingBreaker.amperage}A{" "}
+
           {draggingBreaker.poles === 2
-            ? "2-pole breaker: choose two consecutive highlighted slots"
+            ? "2-POLE / 240V"
+            : "1-POLE / 120V"
+          }
+
+          <br />
+
+          {draggingBreaker.poles === 2
+            ? "Choose two consecutive highlighted slots"
             : "Choose a highlighted slot"
           }
 
@@ -1604,13 +2166,28 @@ export default function BreakerPanelLayout({
 
       <div
         style={{
-          marginTop: "15px",
-          display: "flex",
-          flexDirection: "column",
-          gap: "6px",
-          maxHeight: "300px",
-          overflowY: "auto",
-          paddingRight: "5px"
+
+          marginTop:
+            "15px",
+
+          display:
+            "flex",
+
+          flexDirection:
+            "column",
+
+          gap:
+            "6px",
+
+          maxHeight:
+            "300px",
+
+          overflowY:
+            "auto",
+
+          paddingRight:
+            "5px"
+
         }}
       >
 
@@ -1637,11 +2214,34 @@ export default function BreakerPanelLayout({
               slot.id;
 
 
+            const breakerStartSlot =
+              breaker
+                ? findBreakerStartSlot(
+                    breaker.id,
+                    panelSlots
+                  )
+                : null;
+
+
+            const isSecondPole =
+              breaker?.poles === 2 &&
+              breakerStartSlot !== null &&
+              slot.id !== breakerStartSlot;
+
+
             return (
 
               <div
                 key={
                   `panel-slot-${slot.id}`
+                }
+
+                onDragEnter={
+                  event =>
+                    handleDragEnter(
+                      event,
+                      slot.id
+                    )
                 }
 
                 onDragOver={
@@ -1652,10 +2252,12 @@ export default function BreakerPanelLayout({
                     )
                 }
 
-                onDragLeave={() =>
-                  handleDragLeave(
-                    slot.id
-                  )
+                onDragLeave={
+                  event =>
+                    handleDragLeave(
+                      event,
+                      slot.id
+                    )
                 }
 
                 onDrop={
@@ -1719,7 +2321,12 @@ export default function BreakerPanelLayout({
                     "border-box",
 
                   transition:
-                    "all .15s"
+                    "all .15s",
+
+                  opacity:
+                    isSecondPole
+                      ? 0.9
+                      : 1
 
                 }}
               >
@@ -1728,10 +2335,16 @@ export default function BreakerPanelLayout({
 
                   <div
                     style={{
+
                       color:
                         "#39ff14",
+
                       textAlign:
-                        "center"
+                        "center",
+
+                      width:
+                        "100%"
+
                     }}
                   >
 
@@ -1739,11 +2352,39 @@ export default function BreakerPanelLayout({
                       SLOT {slot.id}
                     </strong>
 
+
+                    {isSecondPole && (
+                      <>
+                        {" "}
+                        <span
+                          style={{
+                            color:
+                              "#ffcc00"
+                          }}
+                        >
+                          2-POLE
+                        </span>
+                      </>
+                    )}
+
                     <br />
 
-                    {getBreakerLabel(
-                      breaker
-                    )}
+
+                    <span
+                      style={{
+
+                        fontSize:
+                          "15px",
+
+                        fontWeight:
+                          800
+
+                      }}
+                    >
+                      {getBreakerLabel(
+                        breaker
+                      )}
+                    </span>
 
                     <br />
 
@@ -1751,16 +2392,20 @@ export default function BreakerPanelLayout({
 
                     {breaker.poles === 2
                       ? "2P / 240V"
-                      : "1P / 120V"}
+                      : "1P / 120V"
+                    }
 
                     <br />
 
                     <span
                       style={{
+
                         fontSize:
                           "10px",
+
                         color:
                           "#8cff8c"
+
                       }}
                     >
                       {getTypeLabel(
@@ -1768,25 +2413,21 @@ export default function BreakerPanelLayout({
                       )}
                     </span>
 
+                    <br />
 
-                    {breaker.poles === 2 && (
+                    <span
+                      style={{
 
-                      <>
-                        <br />
+                        fontSize:
+                          "9px",
 
-                        <span
-                          style={{
-                            fontSize:
-                              "10px",
-                            color:
-                              "#8cff8c"
-                          }}
-                        >
-                          2-POLE BREAKER
-                        </span>
-                      </>
+                        color:
+                          "#00eaff"
 
-                    )}
+                      }}
+                    >
+                      CLICK TO EDIT
+                    </span>
 
                   </div>
 
@@ -1794,12 +2435,15 @@ export default function BreakerPanelLayout({
 
                   <div
                     style={{
+
                       textAlign:
                         "center",
+
                       color:
                         isValidDrop
                           ? "#00aaff"
                           : "#777"
+
                     }}
                   >
 
@@ -1811,7 +2455,8 @@ export default function BreakerPanelLayout({
 
                     {isValidDrop
                       ? "DROP BREAKER HERE"
-                      : "EMPTY"}
+                      : "EMPTY"
+                    }
 
                   </div>
 
@@ -1828,31 +2473,53 @@ export default function BreakerPanelLayout({
 
 
       {/* ================================================== */}
-      {/* CONFIGURATION */}
+      {/* BREAKER SETTINGS */}
       {/* ================================================== */}
 
       {pendingBreaker && (
 
         <div
           style={{
-            marginTop: "15px",
-            padding: "12px",
-            background: "#080b10",
+
+            marginTop:
+              "15px",
+
+            padding:
+              "12px",
+
+            background:
+              "#080b10",
+
             border:
               "1px solid #00eaff",
-            borderRadius: "8px"
+
+            borderRadius:
+              "8px"
+
           }}
         >
 
+          {/* ================================================= */}
+          {/* TITLE */}
+          {/* ================================================= */}
+
           <h3
             style={{
-              marginTop: 0,
-              color: "#00eaff"
+
+              marginTop:
+                0,
+
+              color:
+                "#00eaff"
+
             }}
           >
-            {pendingBreaker.slot === -1
-              ? "Configure Breaker"
-              : "Breaker Settings"}
+
+            {isEditingInstalledBreaker
+              ? "EDIT BREAKER"
+              : "NEW BREAKER"
+            }
+
           </h3>
 
 
@@ -1862,8 +2529,13 @@ export default function BreakerPanelLayout({
 
           <div
             style={{
-              marginBottom: "10px",
-              color: "#aaa"
+
+              marginBottom:
+                "10px",
+
+              color:
+                "#aaa"
+
             }}
           >
 
@@ -1871,22 +2543,22 @@ export default function BreakerPanelLayout({
 
             <strong
               style={{
-                color: "#fff"
+                color:
+                  "#fff"
               }}
             >
               {selectedSlot}
             </strong>
 
-            {poles === 2 && (
+
+            {poles === 2 &&
+              selectedSlot !== null && (
+
               <>
                 {" "}—{" "}
-
-                {selectedSlot !== null
-                  ? selectedSlot + 1
-                  : ""
-                }
-
+                {selectedSlot + 1}
               </>
+
             )}
 
           </div>
@@ -1896,9 +2568,17 @@ export default function BreakerPanelLayout({
           {/* NAME */}
           {/* ================================================= */}
 
-          <label>
+          <label
+            style={{
+              display:
+                "block",
+              fontWeight:
+                800
+            }}
+          >
             Breaker / Circuit Name
           </label>
+
 
           <input
             value={
@@ -1912,19 +2592,39 @@ export default function BreakerPanelLayout({
                 )
             }
 
-            placeholder="Kitchen"
+            placeholder="Bedroom, Kitchen, Dishwasher..."
+
+            autoComplete="off"
 
             style={{
-              width: "100%",
-              boxSizing: "border-box",
-              padding: "9px",
-              marginTop: "5px",
-              marginBottom: "10px",
-              background: "#111827",
-              color: "white",
+
+              width:
+                "100%",
+
+              boxSizing:
+                "border-box",
+
+              padding:
+                "9px",
+
+              marginTop:
+                "5px",
+
+              marginBottom:
+                "10px",
+
+              background:
+                "#111827",
+
+              color:
+                "white",
+
               border:
                 "1px solid #176070",
-              borderRadius: "5px"
+
+              borderRadius:
+                "5px"
+
             }}
           />
 
@@ -1933,9 +2633,17 @@ export default function BreakerPanelLayout({
           {/* AMPERAGE */}
           {/* ================================================= */}
 
-          <label>
+          <label
+            style={{
+              display:
+                "block",
+              fontWeight:
+                800
+            }}
+          >
             Breaker Size
           </label>
+
 
           <select
             value={
@@ -1952,15 +2660,31 @@ export default function BreakerPanelLayout({
             }
 
             style={{
-              width: "100%",
-              padding: "9px",
-              marginTop: "5px",
-              marginBottom: "10px",
-              background: "#111827",
-              color: "white",
+
+              width:
+                "100%",
+
+              padding:
+                "9px",
+
+              marginTop:
+                "5px",
+
+              marginBottom:
+                "10px",
+
+              background:
+                "#111827",
+
+              color:
+                "white",
+
               border:
                 "1px solid #176070",
-              borderRadius: "5px"
+
+              borderRadius:
+                "5px"
+
             }}
           >
 
@@ -1984,9 +2708,17 @@ export default function BreakerPanelLayout({
           {/* TYPE */}
           {/* ================================================= */}
 
-          <label>
+          <label
+            style={{
+              display:
+                "block",
+              fontWeight:
+                800
+            }}
+          >
             Breaker Type
           </label>
+
 
           <select
             value={
@@ -2001,15 +2733,31 @@ export default function BreakerPanelLayout({
             }
 
             style={{
-              width: "100%",
-              padding: "9px",
-              marginTop: "5px",
-              marginBottom: "10px",
-              background: "#111827",
-              color: "white",
+
+              width:
+                "100%",
+
+              padding:
+                "9px",
+
+              marginTop:
+                "5px",
+
+              marginBottom:
+                "10px",
+
+              background:
+                "#111827",
+
+              color:
+                "white",
+
               border:
                 "1px solid #176070",
-              borderRadius: "5px"
+
+              borderRadius:
+                "5px"
+
             }}
           >
 
@@ -2020,6 +2768,7 @@ export default function BreakerPanelLayout({
                   key={
                     option.value
                   }
+
                   value={
                     option.value
                   }
@@ -2037,9 +2786,17 @@ export default function BreakerPanelLayout({
           {/* POLES */}
           {/* ================================================= */}
 
-          <label>
+          <label
+            style={{
+              display:
+                "block",
+              fontWeight:
+                800
+            }}
+          >
             Number of Poles
           </label>
+
 
           <select
             value={
@@ -2065,15 +2822,31 @@ export default function BreakerPanelLayout({
             }
 
             style={{
-              width: "100%",
-              padding: "9px",
-              marginTop: "5px",
-              marginBottom: "10px",
-              background: "#111827",
-              color: "white",
+
+              width:
+                "100%",
+
+              padding:
+                "9px",
+
+              marginTop:
+                "5px",
+
+              marginBottom:
+                "10px",
+
+              background:
+                "#111827",
+
+              color:
+                "white",
+
               border:
                 "1px solid #176070",
-              borderRadius: "5px"
+
+              borderRadius:
+                "5px"
+
             }}
           >
 
@@ -2084,6 +2857,7 @@ export default function BreakerPanelLayout({
                   key={
                     option.value
                   }
+
                   value={
                     option.value
                   }
@@ -2103,12 +2877,22 @@ export default function BreakerPanelLayout({
 
           <div
             style={{
-              padding: "9px",
-              marginBottom: "10px",
-              background: "#111827",
+
+              padding:
+                "9px",
+
+              marginBottom:
+                "10px",
+
+              background:
+                "#111827",
+
               border:
                 "1px solid #176070",
-              borderRadius: "5px"
+
+              borderRadius:
+                "5px"
+
             }}
           >
 
@@ -2125,35 +2909,93 @@ export default function BreakerPanelLayout({
 
 
           {/* ================================================= */}
-          {/* INSTALL */}
+          {/* SAVE / UPDATE */}
           {/* ================================================= */}
 
-          <button
-            onClick={
-              installBreaker
-            }
+          {isEditingInstalledBreaker ? (
 
-            style={{
-              width: "100%",
-              padding: "11px",
-              background: "#123b12",
-              color: "#39ff14",
-              border:
-                "1px solid #39ff14",
-              borderRadius: "6px",
-              fontWeight: 800,
-              cursor: "pointer"
-            }}
-          >
-            INSTALL BREAKER
-          </button>
+            <button
+              onClick={
+                updateBreaker
+              }
+
+              style={{
+
+                width:
+                  "100%",
+
+                padding:
+                  "11px",
+
+                background:
+                  "#123b12",
+
+                color:
+                  "#39ff14",
+
+                border:
+                  "1px solid #39ff14",
+
+                borderRadius:
+                  "6px",
+
+                fontWeight:
+                  800,
+
+                cursor:
+                  "pointer"
+
+              }}
+            >
+              UPDATE BREAKER
+            </button>
+
+          ) : (
+
+            <button
+              onClick={
+                installBreaker
+              }
+
+              style={{
+
+                width:
+                  "100%",
+
+                padding:
+                  "11px",
+
+                background:
+                  "#123b12",
+
+                color:
+                  "#39ff14",
+
+                border:
+                  "1px solid #39ff14",
+
+                borderRadius:
+                  "6px",
+
+                fontWeight:
+                  800,
+
+                cursor:
+                  "pointer"
+
+              }}
+            >
+              INSTALL BREAKER
+            </button>
+
+          )}
 
 
           {/* ================================================= */}
           {/* REMOVE */}
           {/* ================================================= */}
 
-          {pendingBreaker.slot >= 1 && (
+          {isEditingInstalledBreaker && (
 
             <button
               onClick={() =>
@@ -2163,16 +3005,34 @@ export default function BreakerPanelLayout({
               }
 
               style={{
-                width: "100%",
-                padding: "9px",
-                marginTop: "8px",
-                background: "#3b1010",
-                color: "#ff8080",
+
+                width:
+                  "100%",
+
+                padding:
+                  "9px",
+
+                marginTop:
+                  "8px",
+
+                background:
+                  "#3b1010",
+
+                color:
+                  "#ff8080",
+
                 border:
                   "1px solid #ff4040",
-                borderRadius: "6px",
-                fontWeight: 800,
-                cursor: "pointer"
+
+                borderRadius:
+                  "6px",
+
+                fontWeight:
+                  800,
+
+                cursor:
+                  "pointer"
+
               }}
             >
               REMOVE BREAKER
@@ -2180,13 +3040,57 @@ export default function BreakerPanelLayout({
 
           )}
 
+
+          {/* ================================================= */}
+          {/* CLOSE */}
+          {/* ================================================= */}
+
+          <button
+            onClick={
+              closeBreakerSettings
+            }
+
+            style={{
+
+              width:
+                "100%",
+
+              padding:
+                "9px",
+
+              marginTop:
+                "8px",
+
+              background:
+                "#222",
+
+              color:
+                "#aaa",
+
+              border:
+                "1px solid #555",
+
+              borderRadius:
+                "6px",
+
+              fontWeight:
+                800,
+
+              cursor:
+                "pointer"
+
+            }}
+          >
+            CLOSE SETTINGS
+          </button>
+
         </div>
 
       )}
 
 
       {/* ================================================== */}
-      {/* DEFAULT INSTRUCTION */}
+      {/* DEFAULT MESSAGE */}
       {/* ================================================== */}
 
       {!draggingBreaker &&
@@ -2194,30 +3098,47 @@ export default function BreakerPanelLayout({
 
         <div
           style={{
-            marginTop: "15px",
-            padding: "10px",
-            background: "#222",
-            borderRadius: "8px",
-            color: "#aaa",
-            textAlign: "center"
+
+            marginTop:
+              "15px",
+
+            padding:
+              "10px",
+
+            background:
+              "#222",
+
+            borderRadius:
+              "8px",
+
+            color:
+              "#aaa",
+
+            textAlign:
+              "center"
+
           }}
         >
 
-          Drag a breaker from the
-          Component Library into a
-          highlighted slot.
+          Click an installed breaker
+          to edit its name and settings.
 
           <br />
 
           <span
             style={{
-              fontSize: "11px",
-              color: "#777"
+
+              fontSize:
+                "11px",
+
+              color:
+                "#777"
+
             }}
           >
-            Dropping opens configuration.
-            Installation occurs only after
-            pressing INSTALL BREAKER.
+            Example: Bedroom, Kitchen,
+            Dishwasher, Garage, HVAC.
+
           </span>
 
         </div>

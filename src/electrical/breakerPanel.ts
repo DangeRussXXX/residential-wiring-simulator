@@ -2,15 +2,32 @@
 // Electrical Core - Breaker Panel System
 //
 // Responsibilities:
+//
 // - Panel service information
 // - Physical breaker slots
 // - Breaker installation/removal
-// - Single-pole and double-pole placement
-// - Panel slot occupancy
-// - Safe breaker replacement
+// - Single-pole placement
+// - Two-pole placement
+// - Physical slot occupancy
+// - Safe replacement
+//
+// IMPORTANT:
 //
 // The panel owns PHYSICAL breaker placement.
-// The breaker owns its electrical characteristics.
+//
+// A Breaker is one electrical object.
+//
+// A two-pole breaker therefore has:
+//
+//   one Breaker object
+//   two physical slots
+//
+// Example:
+//
+//   Slot 5 -> breaker ABC
+//   Slot 6 -> breaker ABC
+//
+// Both slots reference the same Breaker object.
 
 import {
   createBreaker
@@ -31,23 +48,42 @@ import type {
 
 export interface BreakerSlot {
 
+  /**
+   * Stable physical slot identifier.
+   */
   id: string;
 
-  slot: number;
-
-  installed: boolean;
-
-  breaker: Breaker | null;
 
   /**
-   * If this physical slot is occupied by another
-   * position of a multi-pole breaker, this identifies
-   * the breaker occupying the space.
+   * Human-readable physical slot number.
    *
-   * Kept optional for compatibility with the existing UI.
+   * Starts at 1.
+   */
+  slot: number;
+
+
+  /**
+   * Whether something occupies this physical slot.
+   */
+  installed: boolean;
+
+
+  /**
+   * Electrical breaker occupying this slot.
+   *
+   * For a two-pole breaker, the SAME object is referenced
+   * from both physical slots.
+   */
+  breaker: Breaker | null;
+
+
+  /**
+   * Compatibility field.
+   *
+   * For a secondary pole this contains the primary breaker's
+   * ID.
    */
   occupiedBy?: string;
-
 }
 
 
@@ -65,28 +101,43 @@ export interface BreakerPanel {
 
   model?: string;
 
-  mainBreaker: number;
-
-  voltage: 240;
 
   /**
-   * Number of physical breaker spaces in the panel.
-   *
-   * This is the panel capacity.
+   * Main service breaker rating.
+   */
+  mainBreaker: number;
+
+
+  /**
+   * Residential split-phase service.
+   */
+  voltage: 240;
+
+
+  /**
+   * Number of physical breaker spaces.
    */
   spaces: number;
 
+
+  /**
+   * Whether the panel is connected to service.
+   */
   serviceConnected: boolean;
 
+
+  /**
+   * Whether the panel has a grounding connection.
+   */
   grounded: boolean;
+
 
   /**
    * Physical breaker slots.
    *
-   * The array length normally equals `spaces`.
+   * Normally breakers.length === spaces.
    */
   breakers: BreakerSlot[];
-
 }
 
 
@@ -106,51 +157,70 @@ export function createBreakerPanel(
 
 ): BreakerPanel {
 
+  const normalizedSlots =
+    Math.max(
+      1,
+      Math.floor(slots)
+    );
+
+
   return {
 
     id,
 
     name,
 
-    manufacturer: "Generic",
+    manufacturer:
+      "Generic",
 
-    model: "Residential Load Center",
+    model:
+      "Residential Load Center",
 
     mainBreaker,
 
-    voltage: 240,
+    voltage:
+      240,
 
-    spaces: slots,
+    spaces:
+      normalizedSlots,
 
-    serviceConnected: true,
+    serviceConnected:
+      true,
 
-    grounded: true,
+    grounded:
+      true,
 
     breakers:
-
       Array.from(
+        {
+          length:
+            normalizedSlots
+        },
+        (_, index) => {
 
-        { length: slots },
+          const slotNumber =
+            index + 1;
 
-        (_, index) => ({
+          return {
 
-          id:
-            `slot-${index + 1}`,
+            id:
+              `slot-${id}-${slotNumber}`,
 
-          slot:
-            index + 1,
+            slot:
+              slotNumber,
 
-          installed:
-            false,
+            installed:
+              false,
 
-          breaker:
-            null,
+            breaker:
+              null,
 
-          occupiedBy:
-            undefined
+            occupiedBy:
+              undefined
 
-        })
+          };
 
+        }
       )
 
   };
@@ -162,16 +232,17 @@ export function createBreakerPanel(
 // GET BREAKER OCCUPIED SLOTS
 // ============================================================
 //
-// Returns the physical slots required by a breaker.
+// Single pole:
 //
-// Single-pole:
-//   [5]
+//   breaker.slot = 5
+//   result = [5]
 //
-// Double-pole:
-//   [5, 6]
+// Two pole:
 //
-// The breaker.slot property represents the starting
-// physical position.
+//   breaker.slot = 5
+//   result = [5, 6]
+//
+// The Breaker.slot property is ALWAYS the starting slot.
 //
 
 export function getBreakerOccupiedSlots(
@@ -205,18 +276,59 @@ export function getBreakerOccupiedSlots(
 
 
 // ============================================================
-// FIND BREAKER IN SLOT
+// GET BREAKER START SLOT
 // ============================================================
 //
-// Returns the breaker occupying a particular physical slot.
+// If a caller supplies either physical slot of a two-pole
+// breaker, this resolves the actual starting slot.
+//
+// Examples:
+//
+//   slot 5 -> breaker starts at 5
+//   slot 6 -> breaker starts at 5
+//
+
+export function getBreakerStartSlot(
+
+  panel: BreakerPanel,
+
+  slotNumber: number
+
+): number | null {
+
+  const breaker =
+    getBreakerAtSlot(
+      panel,
+      slotNumber
+    );
+
+
+  if (!breaker) {
+
+    return null;
+
+  }
+
+
+  return breaker.slot;
+
+}
+
+
+// ============================================================
+// GET BREAKER AT PHYSICAL SLOT
+// ============================================================
 //
 // Works for:
 //
-// - primary slot
-// - secondary slot of a two-pole breaker
+// - primary pole
+// - secondary pole
+// - compatibility occupiedBy data
+//
+// Exported because the UI needs exactly this operation.
 //
 
-function getBreakerAtSlot(
+export function getBreakerAtSlot(
 
   panel: BreakerPanel,
 
@@ -238,6 +350,10 @@ function getBreakerAtSlot(
   }
 
 
+  // ----------------------------------------------------------
+  // Current representation.
+  // ----------------------------------------------------------
+
   if (
     slot.breaker
   ) {
@@ -247,13 +363,9 @@ function getBreakerAtSlot(
   }
 
 
-  /*
-   * Compatibility fallback:
-   *
-   * Older panel data may have occupiedBy
-   * without a breaker reference on the
-   * secondary physical slot.
-   */
+  // ----------------------------------------------------------
+  // Compatibility representation.
+  // ----------------------------------------------------------
 
   if (
     slot.occupiedBy
@@ -267,21 +379,57 @@ function getBreakerAtSlot(
       );
 
 
-    return owner?.breaker ?? null;
+    if (
+      owner?.breaker
+    ) {
+
+      return owner.breaker;
+
+    }
+
+  }
+
+
+  // ----------------------------------------------------------
+  // Legacy two-pole representation.
+  //
+  // Some older saved data only stored the breaker on the first
+  // physical slot.
+  // ----------------------------------------------------------
+
+  if (
+    slotNumber > 1
+  ) {
+
+    const previousSlot =
+      panel.breakers.find(
+        item =>
+          item.slot ===
+          slotNumber - 1
+      );
+
+
+    if (
+      previousSlot?.breaker &&
+      previousSlot.breaker.poles === 2
+    ) {
+
+      return previousSlot.breaker;
+
+    }
 
   }
 
 
   return null;
-
 }
 
 
 // ============================================================
-// CHECK SLOT RANGE
+// CHECK PHYSICAL SLOT RANGE
 // ============================================================
 
-function areSlotsAvailable(
+function areRequiredSlotsInRange(
 
   panel: BreakerPanel,
 
@@ -295,50 +443,155 @@ function areSlotsAvailable(
     );
 
 
-  // ----------------------------------------------------------
-  // Every required physical slot must exist.
-  // ----------------------------------------------------------
+  return occupiedSlots.every(
+    slotNumber =>
 
-  const slotsExist =
-    occupiedSlots.every(
-      slotNumber =>
-        slotNumber >= 1 &&
-        slotNumber <= panel.spaces
-    );
+      slotNumber >= 1 &&
+
+      slotNumber <= panel.spaces
+
+  );
+
+}
 
 
-  if (!slotsExist) {
+// ============================================================
+// CHECK SLOT AVAILABILITY
+// ============================================================
+//
+// IMPORTANT:
+//
+// An available slot must have:
+//
+//   installed === false
+//   breaker === null
+//   occupiedBy === undefined
+//
+// This prevents stale compatibility data from allowing
+// accidental double installation.
+//
+
+export function areBreakerSlotsAvailable(
+
+  panel: BreakerPanel,
+
+  breaker: Breaker
+
+): boolean {
+
+  if (
+    !areRequiredSlotsInRange(
+      panel,
+      breaker
+    )
+  ) {
 
     return false;
 
   }
 
 
-  // ----------------------------------------------------------
-  // Every required physical slot must be empty.
-  // ----------------------------------------------------------
-
-  const slotsEmpty =
-    occupiedSlots.every(
-      slotNumber => {
-
-        const slot =
-          panel.breakers.find(
-            item =>
-              item.slot === slotNumber
-          );
-
-
-        return !!slot &&
-          !slot.installed &&
-          !slot.breaker &&
-          !slot.occupiedBy;
-
-      }
+  const occupiedSlots =
+    getBreakerOccupiedSlots(
+      breaker
     );
 
 
-  return slotsEmpty;
+  return occupiedSlots.every(
+    slotNumber => {
+
+      const slot =
+        panel.breakers.find(
+          item =>
+            item.slot ===
+            slotNumber
+        );
+
+
+      if (!slot) {
+
+        return false;
+
+      }
+
+
+      return (
+
+        !slot.installed &&
+
+        !slot.breaker &&
+
+        !slot.occupiedBy
+
+      );
+
+    }
+  );
+
+}
+
+
+// ============================================================
+// CLEAR BREAKER FOOTPRINT
+// ============================================================
+//
+// Internal helper.
+//
+// Removes a breaker from every physical slot it occupies.
+//
+
+function clearBreakerFootprint(
+
+  panel: BreakerPanel,
+
+  breaker: Breaker
+
+): BreakerPanel {
+
+  const occupiedSlots =
+    getBreakerOccupiedSlots(
+      breaker
+    );
+
+
+  return {
+
+    ...panel,
+
+    breakers:
+      panel.breakers.map(
+        slot => {
+
+          if (
+            !occupiedSlots.includes(
+              slot.slot
+            )
+          ) {
+
+            return slot;
+
+          }
+
+
+          return {
+
+            ...slot,
+
+            installed:
+              false,
+
+            breaker:
+              null,
+
+            occupiedBy:
+              undefined
+
+          };
+
+        }
+      )
+
+  };
 
 }
 
@@ -347,18 +600,12 @@ function areSlotsAvailable(
 // INSTALL BREAKER
 // ============================================================
 //
-// Single-pole:
+// Installs a NEW breaker.
 //
-//   Slot 5 → breaker
+// This function intentionally does NOT replace existing
+// breakers.
 //
-// Double-pole:
-//
-//   Slot 5 → breaker
-//   Slot 6 → same breaker
-//
-// The same Breaker object is referenced from both physical
-// slots. This keeps the breaker electrically singular while
-// allowing the panel to represent its physical footprint.
+// Use replaceBreaker() when replacing.
 //
 
 export function installBreaker(
@@ -369,15 +616,50 @@ export function installBreaker(
 
 ): BreakerPanel {
 
+  // ----------------------------------------------------------
+  // Basic validation.
+  // ----------------------------------------------------------
+
   if (
-    !areSlotsAvailable(
+    breaker.poles !== 1 &&
+    breaker.poles !== 2
+  ) {
+
+    console.warn(
+      "[BreakerPanel] Invalid breaker pole count."
+    );
+
+    return panel;
+
+  }
+
+
+  if (
+    breaker.amperage <= 0
+  ) {
+
+    console.warn(
+      "[BreakerPanel] Breaker amperage must be greater than zero."
+    );
+
+    return panel;
+
+  }
+
+
+  // ----------------------------------------------------------
+  // Physical slot validation.
+  // ----------------------------------------------------------
+
+  if (
+    !areBreakerSlotsAvailable(
       panel,
       breaker
     )
   ) {
 
     console.warn(
-      "Cannot install breaker: required panel slots are unavailable."
+      `[BreakerPanel] Cannot install breaker in slot ${breaker.slot}. Required physical slots are unavailable.`
     );
 
     return panel;
@@ -391,12 +673,15 @@ export function installBreaker(
     );
 
 
+  // ----------------------------------------------------------
+  // Install one electrical object into every physical slot.
+  // ----------------------------------------------------------
+
   return {
 
     ...panel,
 
     breakers:
-
       panel.breakers.map(
         slot => {
 
@@ -437,13 +722,15 @@ export function installBreaker(
 // REMOVE BREAKER
 // ============================================================
 //
-// The requested slot may be either:
+// The requested physical slot may be:
 //
-// - the first slot of a breaker
-// - the second slot of a two-pole breaker
+//   primary slot
 //
-// We first resolve the breaker, then remove every physical
-// slot occupied by that breaker.
+// OR:
+//
+//   secondary slot of a two-pole breaker
+//
+// The complete physical footprint is removed.
 //
 
 export function removeBreaker(
@@ -468,51 +755,10 @@ export function removeBreaker(
   }
 
 
-  const occupiedSlots =
-    getBreakerOccupiedSlots(
-      breaker
-    );
-
-
-  return {
-
-    ...panel,
-
-    breakers:
-
-      panel.breakers.map(
-        slot => {
-
-          if (
-            !occupiedSlots.includes(
-              slot.slot
-            )
-          ) {
-
-            return slot;
-
-          }
-
-
-          return {
-
-            ...slot,
-
-            installed:
-              false,
-
-            breaker:
-              null,
-
-            occupiedBy:
-              undefined
-
-          };
-
-        }
-      )
-
-  };
+  return clearBreakerFootprint(
+    panel,
+    breaker
+  );
 
 }
 
@@ -521,18 +767,19 @@ export function removeBreaker(
 // REPLACE BREAKER
 // ============================================================
 //
-// Replaces whatever breaker occupies the requested starting
-// slot.
+// The UI can safely call this for both:
 //
-// This is especially important for the UI because
-// BreakerPanel.tsx displays:
+//   INSTALL
 //
-//   "REPLACE BREAKER"
+// and:
 //
-// when a breaker already exists.
+//   REPLACE
 //
-// For a two-pole breaker, the entire physical footprint
-// is removed before the new breaker is installed.
+// If the requested breaker footprint overlaps an existing
+// breaker, that breaker is removed first.
+//
+// This also handles replacing a two-pole breaker with a
+// single-pole breaker and vice versa.
 //
 
 export function replaceBreaker(
@@ -543,32 +790,73 @@ export function replaceBreaker(
 
 ): BreakerPanel {
 
-  const existingBreaker =
-    getBreakerAtSlot(
-      panel,
-      breaker.slot
-    );
+  // ----------------------------------------------------------
+  // Find every existing breaker occupying the requested
+  // footprint.
+  // ----------------------------------------------------------
 
-
-  if (existingBreaker) {
-
-    const clearedPanel =
-      removeBreaker(
-        panel,
-        breaker.slot
-      );
-
-
-    return installBreaker(
-      clearedPanel,
+  const targetSlots =
+    getBreakerOccupiedSlots(
       breaker
     );
 
-  }
 
+  const breakersToRemove =
+    new Map<string, Breaker>();
+
+
+  targetSlots.forEach(
+    slotNumber => {
+
+      const existing =
+        getBreakerAtSlot(
+          panel,
+          slotNumber
+        );
+
+
+      if (
+        existing
+      ) {
+
+        breakersToRemove.set(
+          existing.id,
+          existing
+        );
+
+      }
+
+    }
+  );
+
+
+  // ----------------------------------------------------------
+  // Remove all overlapping breakers.
+  // ----------------------------------------------------------
+
+  let clearedPanel =
+    panel;
+
+
+  breakersToRemove.forEach(
+    existing => {
+
+      clearedPanel =
+        clearBreakerFootprint(
+          clearedPanel,
+          existing
+        );
+
+    }
+  );
+
+
+  // ----------------------------------------------------------
+  // Install the replacement.
+  // ----------------------------------------------------------
 
   return installBreaker(
-    panel,
+    clearedPanel,
     breaker
   );
 
@@ -576,7 +864,7 @@ export function replaceBreaker(
 
 
 // ============================================================
-// FIND SLOT
+// FIND PHYSICAL SLOT
 // ============================================================
 
 export function getBreakerSlot(
@@ -588,17 +876,16 @@ export function getBreakerSlot(
 ): BreakerSlot | undefined {
 
   return panel.breakers.find(
-
     slot =>
-      slot.slot === slotNumber
-
+      slot.slot ===
+      slotNumber
   );
 
 }
 
 
 // ============================================================
-// CHECK WHETHER SLOT IS OCCUPIED
+// CHECK SLOT OCCUPANCY
 // ============================================================
 
 export function isBreakerSlotOccupied(
@@ -618,8 +905,74 @@ export function isBreakerSlotOccupied(
 
 
 // ============================================================
+// GET ALL INSTALLED BREAKERS
+// ============================================================
+//
+// IMPORTANT:
+//
+// A two-pole breaker appears in two physical slots but only
+// once in this result.
+//
+
+export function getInstalledBreakers(
+
+  panel: BreakerPanel
+
+): Breaker[] {
+
+  const result: Breaker[] = [];
+
+  const seen =
+    new Set<string>();
+
+
+  panel.breakers.forEach(
+    slot => {
+
+      if (
+        !slot.breaker
+      ) {
+
+        return;
+
+      }
+
+
+      if (
+        seen.has(
+          slot.breaker.id
+        )
+      ) {
+
+        return;
+
+      }
+
+
+      seen.add(
+        slot.breaker.id
+      );
+
+
+      result.push(
+        slot.breaker
+      );
+
+    }
+  );
+
+
+  return result;
+
+}
+
+
+// ============================================================
 // ADD STANDARD BREAKER
 // ============================================================
+//
+// Convenience helper for older callers.
+//
 
 export function addStandardBreaker(
 
@@ -648,11 +1001,8 @@ export function addStandardBreaker(
 
 
   return installBreaker(
-
     panel,
-
     breaker
-
   );
 
 }

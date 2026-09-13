@@ -1,22 +1,31 @@
-// Residential Wiring Simulator v2.7
+// Residential Wiring Simulator v3.1
 // Component Library
 //
-// Handles:
-// - component browsing
-// - search
-// - category filtering
-// - click placement
-// - drag placement preparation
+// BREAKER DRAG WORKFLOW:
 //
-// Breaker drag workflow:
-// 1. Create a complete Breaker object.
-// 2. Keep the normal dataTransfer payload.
-// 3. Publish the breaker through a browser CustomEvent.
-// 4. BreakerPanelLayout listens for that event.
-// 5. The panel can therefore highlight valid slots during drag.
+// Component Library
+//      ↓
+// create Breaker
+//      ↓
+// put JSON into DataTransfer
+//      ↓
+// put breaker into shared window drag store/event
+//      ↓
+// BreakerPanelLayout captures breaker synchronously
+//      ↓
+// panel highlights valid slots
+//      ↓
+// drop
+//      ↓
+// breaker becomes pending
+//      ↓
+// configure
+//      ↓
+// INSTALL BREAKER
 //
-// This preserves normal workspace drag behavior while fixing
-// breaker-panel drag highlighting.
+// IMPORTANT:
+// DROP DOES NOT INSTALL.
+// INSTALL BREAKER performs the actual installation.
 
 import {
   useState
@@ -37,6 +46,46 @@ import {
 import {
   createLibraryBreaker
 } from "../electrical/breaker";
+
+
+// ============================================================
+// SHARED BREAKER DRAG EVENTS
+// ============================================================
+
+export const BREAKER_DRAG_EVENT =
+  "residential-wiring-breaker-drag";
+
+export const BREAKER_DRAG_END_EVENT =
+  "residential-wiring-breaker-drag-end";
+
+
+// ============================================================
+// SHARED DRAG STORE
+// ============================================================
+//
+// This is intentionally outside React.
+//
+// Native browser dragging is not synchronized with React state
+// updates reliably enough for dragenter/dragover.
+//
+// BreakerPanelLayout reads this synchronously through the event.
+// ============================================================
+
+let activeDraggedBreaker:
+  ReturnType<typeof createLibraryBreaker> | null = null;
+
+
+// ============================================================
+// PUBLIC HELPERS
+// ============================================================
+
+export function getActiveDraggedBreaker() {
+  return activeDraggedBreaker;
+}
+
+export function clearActiveDraggedBreaker(): void {
+  activeDraggedBreaker = null;
+}
 
 
 // ============================================================
@@ -154,7 +203,7 @@ function getComponentDescription(
 
 
 // ============================================================
-// BUILD UI COMPONENT LIST
+// BUILD COMPONENT LIST
 // ============================================================
 
 const components: ComponentItem[] =
@@ -209,25 +258,6 @@ const categories: string[] = [
 
 
 // ============================================================
-// BREAKER DRAG EVENT
-// ============================================================
-//
-// BreakerPanelLayout listens for this event.
-//
-// The event contains the complete Breaker object.
-//
-// We intentionally use a string event name so both components
-// remain independent and do not need to import each other.
-// ============================================================
-
-const BREAKER_DRAG_EVENT =
-  "residential-wiring-breaker-drag";
-
-const BREAKER_DRAG_END_EVENT =
-  "residential-wiring-breaker-drag-end";
-
-
-// ============================================================
 // COMPONENT LIBRARY
 // ============================================================
 
@@ -236,19 +266,19 @@ export default function ComponentLibrary({
 }: Props) {
 
 
-  // ----------------------------------------------------------
+  // ==========================================================
   // SEARCH
-  // ----------------------------------------------------------
+  // ==========================================================
 
   const [
     search,
     setSearch
-  ] = useState<string>("");
+  ] = useState("");
 
 
-  // ----------------------------------------------------------
+  // ==========================================================
   // OPEN CATEGORIES
-  // ----------------------------------------------------------
+  // ==========================================================
 
   const [
     openCategories,
@@ -259,7 +289,7 @@ export default function ComponentLibrary({
 
 
   // ==========================================================
-  // ADD COMPONENT
+  // ADD NORMAL COMPONENT
   // ==========================================================
 
   function add(
@@ -285,9 +315,7 @@ export default function ComponentLibrary({
       previous => {
 
         if (
-          previous.includes(
-            category
-          )
+          previous.includes(category)
         ) {
 
           return previous.filter(
@@ -309,7 +337,7 @@ export default function ComponentLibrary({
 
 
   // ==========================================================
-  // CREATE BREAKER FOR DRAG
+  // CREATE BREAKER
   // ==========================================================
 
   function createBreakerFromItem(
@@ -343,8 +371,7 @@ export default function ComponentLibrary({
 
 
     if (
-      item.name ===
-      "30A Double Pole Breaker"
+      item.name === "30A Double Pole Breaker"
     ) {
 
       return createLibraryBreaker(
@@ -356,17 +383,15 @@ export default function ComponentLibrary({
     }
 
 
-    /*
-     * Fallback for future breaker catalog entries.
-     */
-
     return createLibraryBreaker(
       item.amps ?? 20,
+
       item.name.includes(
         "Double Pole"
       )
         ? 2
         : 1,
+
       "STANDARD"
     );
 
@@ -377,14 +402,20 @@ export default function ComponentLibrary({
   // DRAG START
   // ==========================================================
 
-  function dragStart(
+  function handleDragStart(
     event: DragEvent<HTMLDivElement>,
     item: ComponentItem
   ): void {
 
-    // --------------------------------------------------------
-    // BREAKER DRAG
-    // --------------------------------------------------------
+    console.log(
+      "[ComponentLibrary] DRAG START:",
+      item.name
+    );
+
+
+    // ========================================================
+    // BREAKER
+    // ========================================================
 
     if (
       item.isBreaker
@@ -396,17 +427,69 @@ export default function ComponentLibrary({
         );
 
 
-      /*
-       * Keep the original dataTransfer payload.
-       *
-       * This is still used by the drop handler.
-       */
+      console.log(
+        "[ComponentLibrary] CREATED BREAKER:",
+        breaker
+      );
+
+
+      // ------------------------------------------------------
+      // CRITICAL:
+      // Store synchronously BEFORE dispatching event.
+      // ------------------------------------------------------
+
+      activeDraggedBreaker =
+        breaker;
+
+
+      // ------------------------------------------------------
+      // SERIALIZE
+      // ------------------------------------------------------
+
+      const serialized =
+        JSON.stringify(
+          breaker
+        );
+
+
+      // ------------------------------------------------------
+      // DATA TRANSFER
+      // ------------------------------------------------------
+
+      try {
+
+        event.dataTransfer.clearData();
+
+      }
+
+      catch {
+
+        // Firefox may reject clearData in some situations.
+
+      }
+
+
+      event.dataTransfer.setData(
+        "application/json",
+        serialized
+      );
+
 
       event.dataTransfer.setData(
         "breaker",
-        JSON.stringify(
-          breaker
-        )
+        serialized
+      );
+
+
+      event.dataTransfer.setData(
+        "text/plain",
+        serialized
+      );
+
+
+      event.dataTransfer.setData(
+        "componentType",
+        item.type
       );
 
 
@@ -414,24 +497,105 @@ export default function ComponentLibrary({
         "copy";
 
 
-      /*
-       * IMPORTANT:
-       *
-       * Browsers do not reliably expose custom dataTransfer
-       * values during dragover.
-       *
-       * Publish the breaker separately so the panel can learn
-       * about the breaker immediately when dragging begins.
-       */
+      // ------------------------------------------------------
+      // CUSTOM EVENT
+      // ------------------------------------------------------
 
       window.dispatchEvent(
         new CustomEvent(
           BREAKER_DRAG_EVENT,
           {
-            detail: breaker
+            detail:
+              breaker
           }
         )
       );
+
+
+      console.log(
+        "[ComponentLibrary] BREAKER EVENT DISPATCHED"
+      );
+
+
+      // ------------------------------------------------------
+      // DRAG IMAGE
+      // ------------------------------------------------------
+
+      try {
+
+        const dragImage =
+          document.createElement(
+            "div"
+          );
+
+
+        dragImage.textContent =
+          `${breaker.amperage}A Breaker`;
+
+
+        dragImage.style.position =
+          "absolute";
+
+        dragImage.style.top =
+          "-1000px";
+
+        dragImage.style.left =
+          "-1000px";
+
+        dragImage.style.padding =
+          "8px 12px";
+
+        dragImage.style.background =
+          "#063b2d";
+
+        dragImage.style.color =
+          "#00ff99";
+
+        dragImage.style.border =
+          "2px solid #00ff99";
+
+        dragImage.style.borderRadius =
+          "6px";
+
+        dragImage.style.fontWeight =
+          "bold";
+
+        dragImage.style.pointerEvents =
+          "none";
+
+        document.body.appendChild(
+          dragImage
+        );
+
+
+        event.dataTransfer.setDragImage(
+          dragImage,
+          10,
+          10
+        );
+
+
+        window.setTimeout(
+          () => {
+
+            dragImage.remove();
+
+          },
+          0
+        );
+
+      }
+
+      catch (
+        error
+      ) {
+
+        console.warn(
+          "[ComponentLibrary] drag image failed:",
+          error
+        );
+
+      }
 
 
       return;
@@ -439,9 +603,13 @@ export default function ComponentLibrary({
     }
 
 
-    // --------------------------------------------------------
-    // NORMAL DEVICE DRAG
-    // --------------------------------------------------------
+    // ========================================================
+    // NORMAL COMPONENT
+    // ========================================================
+
+    activeDraggedBreaker =
+      null;
+
 
     event.dataTransfer.setData(
       "componentType",
@@ -459,21 +627,33 @@ export default function ComponentLibrary({
   // DRAG END
   // ==========================================================
 
-  function dragEnd(
-    item: ComponentItem
-  ): void {
+  function handleDragEnd(): void {
 
-    /*
-     * Only breaker drags need to clear the panel's
-     * special breaker-drag state.
-     */
+    console.log(
+      "[ComponentLibrary] DRAG END"
+    );
+
+
+    // IMPORTANT:
+    // Do NOT call event.dataTransfer.getData().
+    //
+    // The browser protects the drag data store during dragend
+    // and getData is not reliable there.
 
     if (
-      item.isBreaker
+      activeDraggedBreaker
     ) {
 
+      console.log(
+        "[ComponentLibrary] CLEARING BREAKER DRAG"
+      );
+
+      activeDraggedBreaker =
+        null;
+
+
       window.dispatchEvent(
-        new CustomEvent(
+        new Event(
           BREAKER_DRAG_END_EVENT
         )
       );
@@ -526,6 +706,39 @@ export default function ComponentLibrary({
 
 
   // ==========================================================
+  // FILTER
+  // ==========================================================
+
+  function getFilteredItems(
+    category: string
+  ): ComponentItem[] {
+
+    return components.filter(
+      component => {
+
+        const matchesCategory =
+          component.category ===
+          category;
+
+        const matchesSearch =
+          component.name
+            .toLowerCase()
+            .includes(
+              search.toLowerCase()
+            );
+
+        return (
+          matchesCategory &&
+          matchesSearch
+        );
+
+      }
+    );
+
+  }
+
+
+  // ==========================================================
   // RENDER
   // ==========================================================
 
@@ -534,24 +747,26 @@ export default function ComponentLibrary({
     <div
       style={{
 
-        padding: "15px",
+        padding:
+          "15px",
 
-        height: "100%",
+        height:
+          "100%",
 
-        overflowY: "auto",
+        overflowY:
+          "auto",
 
-        overflowX: "hidden",
+        overflowX:
+          "hidden",
 
-        background: "#252526",
+        background:
+          "#252526",
 
-        color: "white"
+        color:
+          "white"
 
       }}
     >
-
-      {/* ================================================== */}
-      {/* HEADER */}
-      {/* ================================================== */}
 
       <h2
         style={{
@@ -562,204 +777,233 @@ export default function ComponentLibrary({
       </h2>
 
 
-      {/* ================================================== */}
-      {/* SEARCH */}
-      {/* ================================================== */}
-
       <input
         type="text"
 
         placeholder="Search components..."
 
-        value={search}
+        value={
+          search
+        }
 
         onChange={
-          event => {
-
+          event =>
             setSearch(
               event.target.value
-            );
-
-          }
+            )
         }
 
         style={{
 
-          width: "100%",
+          width:
+            "100%",
 
-          boxSizing: "border-box",
+          boxSizing:
+            "border-box",
 
-          padding: "8px",
+          padding:
+            "8px",
 
-          marginBottom: "15px",
+          marginBottom:
+            "15px",
 
-          background: "#1e1e1e",
+          background:
+            "#1e1e1e",
 
-          border: "1px solid #555",
+          border:
+            "1px solid #555",
 
-          color: "white",
+          color:
+            "white",
 
-          borderRadius: "4px"
+          borderRadius:
+            "4px"
 
         }}
       />
 
 
-      {/* ================================================== */}
-      {/* CATEGORIES */}
-      {/* ================================================== */}
+      {categories.map(
+        category => {
 
-      {
-        categories.map(
-          category => {
-
-            const items =
-              components.filter(
-                component => {
-
-                  const matchesCategory =
-                    component.category ===
-                    category;
-
-                  const matchesSearch =
-                    component.name
-                      .toLowerCase()
-                      .includes(
-                        search.toLowerCase()
-                      );
-
-                  return (
-                    matchesCategory &&
-                    matchesSearch
-                  );
-
-                }
-              );
+          const items =
+            getFilteredItems(
+              category
+            );
 
 
-            if (
-              items.length === 0
-            ) {
+          if (
+            items.length === 0
+          ) {
 
-              return null;
+            return null;
 
-            }
+          }
 
 
-            const isOpen =
-              openCategories.includes(
+          const isOpen =
+            openCategories.includes(
+              category
+            );
+
+
+          return (
+
+            <div
+              key={
                 category
-              );
+              }
 
-
-            return (
+              style={{
+                marginBottom:
+                  "12px"
+              }}
+            >
 
               <div
-                key={category}
+                onClick={() =>
+                  toggleCategory(
+                    category
+                  )
+                }
+
                 style={{
-                  marginBottom: "12px"
+
+                  cursor:
+                    "pointer",
+
+                  fontWeight:
+                    "bold",
+
+                  padding:
+                    "10px",
+
+                  background:
+                    "#333",
+
+                  borderRadius:
+                    "5px"
+
                 }}
               >
 
-                {/* ====================================== */}
-                {/* CATEGORY HEADER */}
-                {/* ====================================== */}
+                {isOpen
+                  ? "▼"
+                  : "▶"
+                }
 
-                <div
-                  onClick={() =>
-                    toggleCategory(
-                      category
-                    )
-                  }
+                {" "}
 
-                  style={{
+                {category}
 
-                    cursor: "pointer",
-
-                    fontWeight: "bold",
-
-                    padding: "10px",
-
-                    background: "#333",
-
-                    borderRadius: "5px"
-
-                  }}
-                >
-
-                  {isOpen
-                    ? "▼"
-                    : "▶"
-                  }
-
-                  {" "}
-
-                  {category}
-
-                </div>
+              </div>
 
 
-                {/* ====================================== */}
-                {/* COMPONENT ITEMS */}
-                {/* ====================================== */}
+              {isOpen &&
+                items.map(
+                  item => (
 
-                {isOpen &&
+                    <div
+                      key={
+                        item.name
+                      }
 
-                  items.map(
-                    item => (
+                      draggable={
+                        true
+                      }
 
-                      <div
-                        key={item.name}
-
-                        draggable={true}
-
-                        onDragStart={
-                          event =>
-                            dragStart(
-                              event,
-                              item
-                            )
-                        }
-
-                        onDragEnd={() =>
-                          dragEnd(
+                      onDragStart={
+                        event =>
+                          handleDragStart(
+                            event,
                             item
                           )
-                        }
+                      }
 
-                        onClick={() =>
+                      onDragEnd={
+                        handleDragEnd
+                      }
+
+                      onClick={() => {
+
+                        if (
+                          !item.isBreaker
+                        ) {
+
                           add(
                             item.type
-                          )
+                          );
+
                         }
 
+                      }}
+
+                      style={{
+
+                        marginTop:
+                          "8px",
+
+                        padding:
+                          "12px",
+
+                        background:
+                          "#1e1e1e",
+
+                        border:
+                          item.isBreaker
+                            ? "1px solid #00eaff"
+                            : "1px solid #555",
+
+                        borderRadius:
+                          "8px",
+
+                        cursor:
+                          "grab",
+
+                        userSelect:
+                          "none",
+
+                        WebkitUserSelect:
+                          "none",
+
+                        touchAction:
+                          "none"
+
+                      }}
+                    >
+
+                      <div
                         style={{
 
-                          marginTop: "8px",
+                          display:
+                            "flex",
 
-                          padding: "12px",
+                          alignItems:
+                            "center",
 
-                          background:
-                            "#1e1e1e",
-
-                          border:
-                            "1px solid #555",
-
-                          borderRadius: "8px",
-
-                          cursor: "grab",
-
-                          userSelect: "none"
+                          gap:
+                            "10px"
 
                         }}
                       >
 
-                        {/* ================================= */}
-                        {/* COMPONENT HEADER */}
-                        {/* ================================= */}
-
                         <div
                           style={{
+
+                            width:
+                              "45px",
+
+                            height:
+                              "45px",
+
+                            background:
+                              "#ddd",
+
+                            color:
+                              "#111",
+
+                            borderRadius:
+                              "6px",
 
                             display:
                               "flex",
@@ -767,172 +1011,134 @@ export default function ComponentLibrary({
                             alignItems:
                               "center",
 
-                            gap: "10px"
+                            justifyContent:
+                              "center",
+
+                            fontSize:
+                              "22px",
+
+                            fontWeight:
+                              "bold",
+
+                            flexShrink:
+                              0
 
                           }}
                         >
+
+                          {getIcon(
+                            item.symbol
+                          )}
+
+                        </div>
+
+
+                        <div>
+
+                          <div
+                            style={{
+                              fontWeight:
+                                "bold"
+                            }}
+                          >
+                            {item.name}
+                          </div>
+
 
                           <div
                             style={{
 
-                              width: "45px",
+                              fontSize:
+                                "12px",
 
-                              height: "45px",
+                              color:
+                                "#aaa",
 
-                              background: "#ddd",
-
-                              color: "#111",
-
-                              borderRadius:
-                                "6px",
-
-                              display:
-                                "flex",
-
-                              alignItems:
-                                "center",
-
-                              justifyContent:
-                                "center",
-
-                              fontSize: "22px",
-
-                              fontWeight:
-                                "bold",
-
-                              flexShrink: 0
+                              marginTop:
+                                "3px"
 
                             }}
                           >
-
-                            {
-                              getIcon(
-                                item.symbol
-                              )
-                            }
-
+                            {item.description}
                           </div>
-
-
-                          <div>
-
-                            <div
-                              style={{
-                                fontWeight:
-                                  "bold"
-                              }}
-                            >
-                              {item.name}
-                            </div>
-
-
-                            <div
-                              style={{
-
-                                fontSize:
-                                  "12px",
-
-                                color:
-                                  "#aaa",
-
-                                marginTop:
-                                  "3px"
-
-                              }}
-                            >
-                              {item.description}
-                            </div>
-
-                          </div>
-
-                        </div>
-
-
-                        {/* ================================= */}
-                        {/* ELECTRICAL INFORMATION */}
-                        {/* ================================= */}
-
-                        <div
-                          style={{
-
-                            marginTop: "8px",
-
-                            fontSize: "11px",
-
-                            color: "#888"
-
-                          }}
-                        >
-
-                          {item.voltage !==
-                            undefined && (
-
-                            <span>
-                              {item.voltage}V{" "}
-                            </span>
-
-                          )}
-
-
-                          {item.amps !==
-                            undefined && (
-
-                            <span>
-                              {item.amps}A{" "}
-                            </span>
-
-                          )}
-
-
-                          {item.watts !==
-                            undefined && (
-
-                            <span>
-                              {item.watts}W
-                            </span>
-
-                          )}
-
-                        </div>
-
-
-                        {/* ================================= */}
-                        {/* PLACEMENT INSTRUCTION */}
-                        {/* ================================= */}
-
-                        <div
-                          style={{
-
-                            marginTop: "8px",
-
-                            fontSize: "11px",
-
-                            color: "#00eaff"
-
-                          }}
-                        >
-
-                          {item.isBreaker
-                            ? "Drag into breaker panel slot"
-                            : "Click to place • Drag to workspace"
-                          }
 
                         </div>
 
                       </div>
 
-                    )
+
+                      <div
+                        style={{
+
+                          marginTop:
+                            "8px",
+
+                          fontSize:
+                            "11px",
+
+                          color:
+                            "#888"
+
+                        }}
+                      >
+
+                        {item.voltage !==
+                          undefined && (
+                          <span>
+                            {item.voltage}V{" "}
+                          </span>
+                        )}
+
+                        {item.amps !==
+                          undefined && (
+                          <span>
+                            {item.amps}A{" "}
+                          </span>
+                        )}
+
+                        {item.watts !==
+                          undefined && (
+                          <span>
+                            {item.watts}W
+                          </span>
+                        )}
+
+                      </div>
+
+
+                      <div
+                        style={{
+
+                          marginTop:
+                            "8px",
+
+                          fontSize:
+                            "11px",
+
+                          color:
+                            "#00eaff"
+
+                        }}
+                      >
+
+                        {item.isBreaker
+                          ? "Drag into breaker panel slot"
+                          : "Click to place • Drag to workspace"
+                        }
+
+                      </div>
+
+                    </div>
+
                   )
+                )}
 
-                }
+            </div>
 
-              </div>
+          );
 
-            );
-
-          }
-        )
-      }
+        }
+      )}
 
     </div>
 

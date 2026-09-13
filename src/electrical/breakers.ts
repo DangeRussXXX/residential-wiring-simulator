@@ -1,241 +1,179 @@
-// Residential Wiring Simulator v2.3
-// Breaker management utilities
-
+// Residential Wiring Simulator
+// Electrical Core - Breaker Utilities
+//
+// Responsibilities:
+// - Find breakers
+// - Assign/remove circuits
+// - Report breaker status
+// - Calculate breaker loading
+//
+// IMPORTANT:
+// The Breaker data model lives in ./breaker.ts.
+// This file contains utility functions only.
 
 import type {
-  Breaker
+  Breaker,
 } from "./breaker";
 
 
-
-
-
-// Find breaker by circuit assignment
-
+// ============================================================
+// FIND BREAKER BY CIRCUIT
+// ============================================================
 
 export function findBreakerByCircuit(
+  breakers: Breaker[],
+  circuitId: string
+): Breaker | undefined {
 
-breakers:Breaker[],
-
-circuitId:string
-
-):Breaker | undefined {
-
-
-return breakers.find(
-
-breaker =>
-
-breaker.circuitId === circuitId
-
-);
-
+  return breakers.find(
+    breaker =>
+      breaker.circuitId === circuitId
+  );
 
 }
 
 
-
-
-
-
-
-// Find unused breaker
-
+// ============================================================
+// FIND AVAILABLE BREAKER
+// ============================================================
+//
+// Returns the first breaker that is not currently assigned
+// to a circuit.
+//
+// Physical panel occupancy is NOT checked here.
+// Physical placement belongs to breakerPanel.ts.
+//
 
 export function findAvailableBreaker(
+  breakers: Breaker[]
+): Breaker | undefined {
 
-breakers:Breaker[]
-
-):Breaker | undefined {
-
-
-return breakers.find(
-
-breaker =>
-
-!breaker.circuitId
-
-);
-
+  return breakers.find(
+    breaker =>
+      !breaker.circuitId
+  );
 
 }
 
 
-
-
-
-
-
-// Assign circuit to breaker
-
+// ============================================================
+// ASSIGN CIRCUIT
+// ============================================================
 
 export function assignCircuitToBreaker(
+  breaker: Breaker,
+  circuitId: string
+): Breaker {
 
-breaker:Breaker,
-
-circuitId:string
-
-):Breaker {
-
-
-return {
-
-
-...breaker,
-
-
-circuitId
-
-
-};
-
+  return {
+    ...breaker,
+    circuitId,
+  };
 
 }
 
 
-
-
-
-
-
-// Remove circuit assignment
-
+// ============================================================
+// REMOVE CIRCUIT ASSIGNMENT
+// ============================================================
 
 export function removeCircuitFromBreaker(
+  breaker: Breaker
+): Breaker {
 
-breaker:Breaker
-
-):Breaker {
-
-
-return {
-
-
-...breaker,
-
-
-circuitId:undefined
-
-
-};
-
+  return {
+    ...breaker,
+    circuitId: undefined,
+  };
 
 }
 
 
-
-
-
-
-
-// Get breaker status for UI
-
+// ============================================================
+// BREAKER STATUS
+// ============================================================
 
 export function getBreakerStatus(
+  breaker: Breaker | undefined
+): string {
 
-breaker:Breaker | undefined
+  if (!breaker) {
+    return "NO BREAKER";
+  }
 
-):string {
+  if (breaker.tripped) {
 
+    return breaker.tripReason
+      ? `TRIPPED - ${breaker.tripReason}`
+      : "TRIPPED";
 
+  }
 
-if(!breaker)
+  if (!breaker.energized) {
+    return "OFF";
+  }
 
-return "NO BREAKER";
-
-
-
-if(breaker.tripped)
-
-{
-
-return breaker.tripReason
-
-?
-
-`TRIPPED - ${breaker.tripReason}`
-
-:
-
-"TRIPPED";
+  return "ENERGIZED";
 
 }
 
 
-
-if(!breaker.energized)
-
-return "OFF";
-
-
-
-return "ENERGIZED";
-
-
-}
-
-
-
-
-
-
-
-// Calculate breaker loading
-
+// ============================================================
+// CALCULATE BREAKER LOAD
+// ============================================================
+//
+// watts / voltage = amps
+//
+// percent = amps / breaker rating * 100
+//
+// This is a calculation utility only. It does not change
+// breaker state.
+//
 
 export function calculateBreakerLoad(
+  breaker: Breaker,
+  watts: number
+): {
+  amps: number;
+  percent: number;
+} {
 
-breaker:Breaker,
+  if (
+    !Number.isFinite(watts) ||
+    watts < 0
+  ) {
 
-watts:number
+    return {
+      amps: 0,
+      percent: 0,
+    };
 
-){
+  }
 
+  const amps =
+    watts /
+    breaker.voltage;
 
-return {
+  const percent =
+    breaker.amperage > 0
+      ? (
+          amps /
+          breaker.amperage
+        ) * 100
+      : 0;
 
+  return {
 
-amps:
+    amps:
+      Number(
+        amps.toFixed(2)
+      ),
 
-Number(
+    percent:
+      Number(
+        percent.toFixed(1)
+      ),
 
-(
-watts /
-
-breaker.voltage
-
-)
-.toFixed(2)
-
-),
-
-
-percent:
-
-Number(
-
-(
-(
-watts /
-
-breaker.voltage
-)
-
-/
-
-breaker.amperage
-
-*
-
-100
-
-)
-.toFixed(1)
-
-)
-
-
-};
-
+  };
 
 }

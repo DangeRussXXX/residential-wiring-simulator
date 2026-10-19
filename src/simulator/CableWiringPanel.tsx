@@ -159,6 +159,27 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove,allCab
   const selectedFamily=selectedMembers.length>0?selectedMembers[0].conductor==="ground"?"ground":selectedMembers[0].conductor==="white"?"neutral":"hot":null;
   const compatibleTerminals=terms.filter(t=>selectedFamily==="ground"?["ground","ground-bar"].includes(t.id):selectedFamily==="neutral"?["silver","neutral-bar","load-neutral","fixture-neutral"].includes(t.id):["line","load","common","traveler-1","traveler-2","brass","breaker-hot","load-hot","fixture-hot"].includes(t.id));
   const hasPigtailTo=(terminal:string)=>splices.some(sp=>sp.pigtailTerminal===terminal);
+  const deviceLabel=(id:string, fallback?:string)=>{
+    if(id===PANEL_SOURCE_ID)return `Panel P1 · Breaker #${cable.breakerSlot??1}`;
+    const matching=devices.find(d=>d.id===id);
+    return matching?.name||fallback||"Device";
+  };
+  const terminalLabel=(terminal:string|null|undefined)=>{
+    if(!terminal)return "Not connected";
+    if(terminal==="cap")return "Individually capped";
+    if(terminal.startsWith("splice:"))return "Wire-nut splice";
+    return terms.find(t=>t.id===terminal)?.label||terminal.replaceAll("-"," ");
+  };
+  const otherEnd:CableEnd=end==="from"?"to":"from";
+  const wireLabels=colorsList.map(color=>{
+    const current=attached[color];
+    const opposite=cable.ends[otherEnd]?.[color];
+    const currentSplice=current?.startsWith("splice:")?splices.find(sp=>`splice:${sp.id}`===current):undefined;
+    const source=deviceLabel(cable.from,cable.fromName);
+    const target=deviceLabel(cable.to,cable.toName);
+    return {color,source,target,current,opposite,currentSplice};
+  });
+
   const saveAll=(next:CableRecord[])=>{
     if(onChangeCables)onChangeCables(next);
     else {const updated=next.find(c=>c.id===cable.id);if(updated)onChange(updated);}
@@ -230,38 +251,39 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove,allCab
         const groupIndex=splice?splices.findIndex(sp=>sp.id===splice.id):-1;
         // Every conductor in the same splice converges at one connector.
         const targetX=t?.x??(splice?201:201);
-        const targetY=t?.y??(splice?60+Math.max(0,groupIndex)*62:y);
+        const targetY=t?.y??(splice?48+Math.max(0,groupIndex)*76:y);
         const endX=isCapped||splice?targetX-4:targetX;
-        const path=`M 76 124 Q 115 124 132 ${y} L ${endX} ${targetY}`;
+        const path=splice
+          ?`M 76 124 C 105 124 112 ${y} 145 ${y} C 164 ${y} 166 ${targetY} ${endX} ${targetY}`
+          :`M 76 124 Q 115 124 132 ${y} L ${endX} ${targetY}`;
         return <g key={c} onClick={()=>setSelected(c)} style={{cursor:"pointer"}}>
           <path d={path} fill="none" stroke={c==="white"?"#263c49":"#d2e5ee"} strokeWidth="13" strokeLinecap="round"/>
           <path d={path} fill="none" stroke={colors[c]} strokeWidth="7" strokeLinecap="round"/>
           {!isCapped&&!splice&&<circle cx={targetX} cy={targetY} r="7" fill={colors[c]} stroke={selected===c?"#24e6ff":"#7895a4"} strokeWidth={selected===c?4:2}/>}
           {isCapped&&<WireConnector x={targetX-4} y={targetY} selected={selected===c}/>}
 
-          <text x="120" y={Math.max(14,y-11)} fontSize="13" fontWeight="bold" fill="#fff" stroke="#16394b" strokeWidth="2" paintOrder="stroke">{c.toUpperCase()}</text>
+
         </g>;
       })}
       {view==="rear"&&splices.flatMap((sp,i)=>sp.members.filter(m=>m.cableId!==cable.id).map((m,j)=>{
-        const sx=197,sy=60+i*62;
-        const fromY=Math.min(255,Math.max(25,sy-35+(j*23)));
+        const sx=197,sy=48+i*76;
+        const fromY=Math.min(255,Math.max(20,sy-26+(j*22)));
         const family=m.conductor;
         const path=`M 0 ${fromY} C 72 ${fromY} 100 ${sy} ${sx-4} ${sy}`;
         return <g key={`${sp.id}-${m.cableId}-${m.end}-${family}`}>
           <path d={path} fill="none" stroke="#e3f1f6" strokeWidth="12" strokeLinecap="round"/>
           <path d={path} fill="none" stroke={colors[family]} strokeWidth="7" strokeLinecap="round"/>
-          <text x="8" y={Math.max(12,fromY-8)} fontSize="11" fontWeight="bold" fill="#fff" stroke="#16394b" strokeWidth="2" paintOrder="stroke">{family.toUpperCase()} · OTHER CABLE</text>
+
         </g>;
       }))}
       {view==="rear"&&splices.map((sp,i)=>{
-        const sx=197,sy=60+i*62;
+        const sx=197,sy=48+i*76;
         const destination=sp.pigtailTerminal?points[sp.pigtailTerminal]:undefined;
         const family=sp.members[0]?.conductor==="ground"?"ground":sp.members[0]?.conductor==="white"?"white":"black";
         return <g key={sp.id}>
           {destination&&<>
-            <path d={`M ${sx+24} ${sy} Q ${sx+54} ${sy} ${destination.x} ${destination.y}`} fill="none" stroke="#d8e9f1" strokeWidth="13" strokeLinecap="round"/>
-            <path d={`M ${sx+24} ${sy} Q ${sx+54} ${sy} ${destination.x} ${destination.y}`} fill="none" stroke={colors[family]} strokeWidth="7" strokeLinecap="round"/>
-            <text x={sx+32} y={sy-13} fontSize="13" fontWeight="bold" fill="#fff" stroke="#173949" strokeWidth="2" paintOrder="stroke">PIGTAIL</text>
+            <path d={`M ${sx+25} ${sy} C ${sx+62} ${sy-30} ${destination.x-52} ${destination.y+24} ${destination.x} ${destination.y}`} fill="none" stroke="#d8e9f1" strokeWidth="13" strokeLinecap="round"/>
+            <path d={`M ${sx+25} ${sy} C ${sx+62} ${sy-30} ${destination.x-52} ${destination.y+24} ${destination.x} ${destination.y}`} fill="none" stroke={colors[family]} strokeWidth="7" strokeLinecap="round"/>
           </>}
           <WireConnector x={sx} y={sy} splice selected={Boolean(selected&&attached[selected]===`splice:${sp.id}`)}/>
           <title>{sp.members.length} conductors joined{sp.pigtailTerminal?` with pigtail to ${sp.pigtailTerminal}`:""}</title>
@@ -276,13 +298,33 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove,allCab
         <title>{t.label} — click to terminate selected conductor</title>
       </g>;})}
     </svg>
-    <div style={{fontSize:15,background:"#173f51",padding:"8px 10px",borderRadius:5,marginTop:8,border:"1px solid #417e98"}}>
-      <strong>Viewing box: {dev.name}</strong> · {splices.length} splice{splices.length===1?"":"s"} in this box.
-      {splices.length===0&&<div style={{color:"#b6dce9",marginTop:4}}>No pigtail saved in this box. If you made it at the other device, select <strong>{end==="to"?"Panel / starting device":"Destination device"}</strong> above to view that box.</div>}
-      {splices.map(sp=><div key={sp.id} style={{color:"#f6d59a",marginTop:5}}>{sp.members.length} wires joined{sp.pigtailTerminal?` → pigtail to ${terms.find(t=>t.id===sp.pigtailTerminal)?.label??sp.pigtailTerminal}`:" (no pigtail terminal assigned)"}</div>)}
+    <div style={{marginTop:12,fontSize:16,fontWeight:700,color:"#aeeaff"}}>Wire destinations & terminations</div>
+    <div style={{display:"grid",gap:8,margin:"8px 0 12px"}}>
+      {wireLabels.map(item=><div key={item.color} style={{border:"1px solid #52869d",background:"#173a4b",borderRadius:6,padding:"9px 10px"}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,fontWeight:700,fontSize:15}}>
+          <span style={{display:"inline-block",width:24,height:8,borderRadius:4,background:colors[item.color],border:"1px solid #8da5b1"}}/>
+          {item.color.toUpperCase()} · {item.source} → {item.target}
+        </div>
+        <div style={{fontSize:14,color:"#d5eaf4",marginTop:4}}>
+          <strong>{deviceLabel(cable[end],end==="from"?cable.fromName:cable.toName)}:</strong> {terminalLabel(item.current)}
+          {item.currentSplice?.pigtailTerminal?` → pigtail to ${terminalLabel(item.currentSplice.pigtailTerminal)}`:""}
+        </div>
+        <div style={{fontSize:14,color:"#b5d5e5",marginTop:3}}>
+          <strong>{deviceLabel(cable[otherEnd],otherEnd==="from"?cable.fromName:cable.toName)}:</strong> {item.opposite?item.opposite==="cap"?"Individually capped":item.opposite.startsWith("splice:")?"Wire-nut splice":item.opposite.replaceAll("-"," "):"Not connected"}
+        </div>
+      </div>)}
+      {splices.filter(sp=>sp.pigtailTerminal).map(sp=><div key={sp.id} style={{border:"1px solid #bd8743",background:"#3a3024",borderRadius:6,padding:"9px 10px",fontSize:14}}>
+        <strong style={{color:"#ffcf82"}}>PIGTAIL · {dev.name} → {terminalLabel(sp.pigtailTerminal)}</strong>
+        <div style={{color:"#f4e2c7",marginTop:4}}>
+          Joined wires: {sp.members.map(m=>{
+            const record=(allCables??[cable]).find(c=>c.id===m.cableId);
+            const origin=record?deviceLabel(record.from,record.fromName):"Cable";
+            const dest=record?deviceLabel(record.to,record.toName):"Device";
+            return `${m.conductor.toUpperCase()} (${origin} → ${dest})`;
+          }).join(" + ")}
+        </div>
+      </div>)}
     </div>
-    <div style={{fontSize:15,color:"#b9d7e5",margin:"8px 0"}}>{view==="front"?"Front view is for identifying the device. Select Rear · Terminals to connect wires.":selected?`Selected ${selected.toUpperCase()} — click the actual screw or splice in the diagram.`:"Select a conductor, then click the matching terminal or splice."}</div>
-    {view==="rear"&&<div style={{fontSize:14,color:"#a8cfe0",marginBottom:8}}>Select a conductor, then click a terminal. Orange cap = isolated wire; orange splice = joined conductors.</div>}
     <details style={{margin:"6px 0 10px",fontSize:14,color:"#a7c9da"}}>
       <summary style={{cursor:"pointer"}}>Show terminal names</summary>
       {terms.map(t=><div key={t.id} style={{margin:"3px 0"}}>{t.label}</div>)}

@@ -1833,6 +1833,7 @@ function Workspace(
                 </select>
               </label>}
               {selectedCable && <CableWiringPanel key={selectedCable.id} cable={selectedCable} devices={devices}
+                allCables={cables} onChangeCables={saveCables}
                 onChange={next=>saveCables(cables.map(c=>c.id===next.id?next:c))}
                 onRemove={()=>{
                   if(!window.confirm("Remove this cable and its conductor terminations?"))return;

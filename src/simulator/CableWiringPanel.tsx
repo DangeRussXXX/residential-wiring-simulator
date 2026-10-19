@@ -4,11 +4,14 @@ import type { ElectricalDevice } from "../electrical/types";
 export type CableKind = "14/2 NM-B"|"14/3 NM-B"|"12/2 NM-B"|"12/3 NM-B"|"14/2 MC"|"12/2 MC"|"12/3 MC";
 export type CableEnd = "from"|"to";
 export const PANEL_SOURCE_ID="__panel_p1__";
+export type SpliceMember = {cableId:string;end:CableEnd;conductor:string};
+export type SpliceRecord = {id:string;deviceId:string;members:SpliceMember[];connector:string;pigtailTerminal?:string};
 export type CableRecord = {
   id:string; from:string; to:string; type:CableKind;
   areaId?:string; wall?:"NORTH"|"SOUTH"|"EAST"|"WEST"; breakerSlot?:number;
   fromName?:string; toName?:string; fromSymbol?:string; toSymbol?:string;
   ends:Record<CableEnd,Record<string,string|null>>;
+  splices?:SpliceRecord[];
 };
 export const cableKinds:CableKind[]=["14/2 NM-B","14/3 NM-B","12/2 NM-B","12/3 NM-B","14/2 MC","12/2 MC","12/3 MC"];
 export function conductors(type:CableKind) {return type.includes("/3")?["black","red","white","ground"]:["black","white","ground"];}
@@ -113,12 +116,16 @@ function kindFor(device:ElectricalDevice|undefined,fromPanel:boolean){
   if(sym.startsWith("light")||/light/i.test(device?.name??"")||/light/i.test(device?.type??""))return "light";
   return "outlet";
 }
-export default function CableWiringPanel({cable,devices,onChange,onRemove}:{
+export default function CableWiringPanel({cable,devices,onChange,onRemove,allCables,onChangeCables}:{
   cable:CableRecord;devices:ElectricalDevice[];onChange:(c:CableRecord)=>void;onRemove:()=>void;
+  allCables?:CableRecord[];onChangeCables?:(cables:CableRecord[])=>void;
 }) {
   const [end,setEnd]=useState<CableEnd>("from");
   const [selected,setSelected]=useState<string|null>(null);
   const [view,setView]=useState<"rear"|"front">("rear");
+  const [spliceSelection,setSpliceSelection]=useState<string[]>([]);
+  const [connector,setConnector]=useState("Listed twist-on connector");
+  const [pigtailTerminal,setPigtailTerminal]=useState("");
   const fromPanel=cable[end]===PANEL_SOURCE_ID;
   const dev=devices.find(d=>d.id===cable[end])??(fromPanel?
     ({id:PANEL_SOURCE_ID,name:"Panel P1",type:"Distribution Panel",symbol:"breaker-panel"} as ElectricalDevice):
@@ -132,8 +139,50 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove}:{
   const points=positions(kind,terms);
   const colorsList=conductors(cable.type);
   const attached=cable.ends[end]||{};
+  const boxId=cable[end];
+  const available=(allCables??[cable]).flatMap(c=>(["from","to"] as CableEnd[]).flatMap(e=>c[e]===boxId?
+    conductors(c.type).map(conductor=>({key:`${c.id}|${e}|${conductor}`,cableId:c.id,end:e,conductor,cable:c})):[]));
+  const splices=(allCables??[cable]).flatMap(c=>c.splices??[]).filter(sp=>sp.deviceId===boxId);
+  const saveAll=(next:CableRecord[])=>{
+    if(onChangeCables)onChangeCables(next);
+    else {const updated=next.find(c=>c.id===cable.id);if(updated)onChange(updated);}
+  };
+  const changeConnection=(cableId:string,side:CableEnd,conductor:string,value:string|null)=>{
+    saveAll((allCables??[cable]).map(c=>c.id===cableId?{...c,ends:{...c.ends,[side]:{...c.ends[side],[conductor]:value}}}:c));
+  };
+  const createSplice=()=>{
+    const members=available.filter(a=>spliceSelection.includes(a.key));
+    if(members.length<2)return;
+    if(members.some(m=>m.cable.ends[m.end]?.[m.conductor]))return;
+    // Keep neutral, equipment ground, and ungrounded conductors in separate splice groups.
+    const families=new Set(members.map(m=>m.conductor==="ground"?"ground":m.conductor==="white"?"neutral":"hot"));
+    if(families.size!==1)return;
+    const family=[...families][0];
+    if(pigtailTerminal){
+      const allowed=family==="ground"?["ground","ground-bar"]:family==="neutral"?["silver","neutral-bar","load-neutral","fixture-neutral"]:["line","load","common","traveler-1","traveler-2","brass","breaker-hot","load-hot","fixture-hot"];
+      if(!allowed.includes(pigtailTerminal))return;
+    }
+    const id=`splice-${Date.now()}-${Math.random().toString(36).slice(2,7)}`;
+    const splice:SpliceRecord={id,deviceId:boxId,connector,members:members.map(({cableId,end,conductor})=>({cableId,end,conductor})),...(pigtailTerminal?{pigtailTerminal}: {})};
+    saveAll((allCables??[cable]).map(c=>{
+      const entries=members.filter(m=>m.cableId===c.id);
+      let next={...c,ends:{from:{...c.ends.from},to:{...c.ends.to}}};
+      for(const m of entries)next.ends[m.end][m.conductor]=`splice:${id}`;
+      if(c.id===cable.id)next={...next,splices:[...(c.splices??[]),splice]};
+      return next;
+    }));
+    setSpliceSelection([]);setPigtailTerminal("");
+  };
+  const removeSplice=(id:string)=>{
+    saveAll((allCables??[cable]).map(c=>({
+      ...c,splices:(c.splices??[]).filter(sp=>sp.id!==id),
+      ends:{from:Object.fromEntries(Object.entries(c.ends.from??{}).map(([k,v])=>[k,v===`splice:${id}`?null:v])),
+        to:Object.fromEntries(Object.entries(c.ends.to??{}).map(([k,v])=>[k,v===`splice:${id}`?null:v]))}
+    })));
+  };
   const choose=(terminal:string)=>{
     if(!selected)return;
+    if((attached[selected]??"").startsWith("splice:")||attached[selected]==="cap")return;
     const ground=selected==="ground", groundTerminal=terminal==="ground"||terminal==="ground-bar";
     if(ground!==groundTerminal)return;
     if(selected==="white"&&["line","load","common","traveler-1","traveler-2","brass","breaker-hot","load-hot","fixture-hot","hot-splice"].includes(terminal))return;
@@ -161,11 +210,15 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove}:{
       {view==="rear"&&colorsList.map((c,i)=>{
         const y=45+i*(colorsList.length===4?48:65),assigned=attached[c];
         const t=assigned?points[assigned]:undefined;
+        const isCapped=assigned==="cap";
+        const splice=assigned?.startsWith("splice:")?splices.find(sp=>`splice:${sp.id}`===assigned):undefined;
         const targetX=t?.x??201,targetY=t?.y??y;
         return <g key={c} onClick={()=>setSelected(c)} style={{cursor:"pointer"}}>
           <path d={`M 76 124 Q 115 124 132 ${y} L ${targetX} ${targetY}`} fill="none" stroke={c==="white"?"#61737d":"#06131d"} strokeWidth="11" strokeLinecap="round"/>
           <path d={`M 76 124 Q 115 124 132 ${y} L ${targetX} ${targetY}`} fill="none" stroke={colors[c]} strokeWidth="7" strokeLinecap="round"/>
           <circle cx={targetX} cy={targetY} r="7" fill={colors[c]} stroke={selected===c?"#24e6ff":"#7895a4"} strokeWidth={selected===c?4:2}/>
+          {isCapped&&<path d={`M ${targetX-4} ${targetY-12} L ${targetX+9} ${targetY-12} L ${targetX+12} ${targetY+4} L ${targetX-7} ${targetY+4} Z`} fill="#e49a35" stroke="#f8d59c" strokeWidth="2"/>}
+          {splice&&<path d={`M ${targetX-5} ${targetY-12} L ${targetX+8} ${targetY-12} L ${targetX+12} ${targetY+4} L ${targetX-8} ${targetY+4} Z`} fill="#e49a35" stroke="#f8d59c" strokeWidth="2"/>}
           <text x="120" y={Math.max(14,y-11)} fontSize="12" fontWeight="bold" fill="#bce7f5">{c.toUpperCase()}</text>
         </g>;
       })}
@@ -183,10 +236,39 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove}:{
     {terms.map(t=><div key={t.id} style={{fontSize:14,color:"#a7c9da",margin:"2px 0"}}>• {t.label}</div>)}
     {colorsList.map(c=><div key={c} style={{display:"flex",gap:7,alignItems:"center",padding:"5px 0"}}>
       <span style={{width:12,height:12,borderRadius:10,background:colors[c],border:"1px solid #8a9ea8"}}/>
-      <span style={{flex:1,fontSize:15}}>{c.toUpperCase()} · {terms.find(t=>t.id===attached[c])?.label||"Loose"}</span>
+      <span style={{flex:1,fontSize:15}}>{c.toUpperCase()} · {attached[c]==="cap"?"Capped individually":attached[c]?.startsWith("splice:")?"Wire-nut splice":terms.find(t=>t.id===attached[c])?.label||"Loose"}</span>
       <button type="button" onClick={()=>setSelected(c)} style={{padding:"5px 7px"}}>Select</button>
-      <button type="button" onClick={()=>onChange({...cable,ends:{...cable.ends,[end]:{...attached,[c]:null}}})} style={{padding:"5px 7px"}}>Remove</button>
+      <button type="button" onClick={()=>{const value=attached[c];if(value?.startsWith("splice:"))removeSplice(value.slice(7));else changeConnection(cable.id,end,c,null);}} style={{padding:"5px 7px"}}>Remove</button>
+      <button type="button" disabled={Boolean(attached[c])} onClick={()=>changeConnection(cable.id,end,c,"cap")} style={{padding:"5px 7px"}}>Cap</button>
     </div>)}
+    {!fromPanel&&<div style={{marginTop:14,padding:10,border:"1px solid #38667b",borderRadius:6}}>
+      <strong style={{color:"#83e5ff"}}>Wire Nuts, Splices & Pigtails</strong>
+      <p style={{fontSize:14,margin:"6px 0"}}>Select loose conductors from cables entering this same box. Each wire nut joins only the selected conductor ends.</p>
+      <div style={{maxHeight:190,overflowY:"auto"}}>{available.map(a=>{
+        const val=a.cable.ends[a.end]?.[a.conductor];
+        return <label key={a.key} style={{display:"flex",gap:8,alignItems:"center",fontSize:15,margin:"5px 0",opacity:val?0.55:1}}>
+          <input type="checkbox" disabled={Boolean(val)} checked={spliceSelection.includes(a.key)} onChange={e=>setSpliceSelection(prev=>e.target.checked?[...prev,a.key]:prev.filter(k=>k!==a.key))}/>
+          <span style={{display:"inline-block",width:12,height:12,borderRadius:8,background:colors[a.conductor]}}/>
+          {a.conductor.toUpperCase()} · {a.cable.type} · {a.end==="from"?"Start":"End"} {val?`(${val==="cap"?"capped":"connected"})`:""}
+        </label>;
+      })}</div>
+      <label style={{display:"block",fontSize:14,marginTop:8}}>Connector type
+        <select value={connector} onChange={e=>setConnector(e.target.value)} style={{display:"block",width:"100%",padding:7,background:"#173d50",color:"white"}}>
+          <option>Listed twist-on connector</option><option>Listed lever connector</option>
+        </select>
+      </label>
+      <label style={{display:"block",fontSize:14,marginTop:8}}>Optional pigtail destination
+        <select value={pigtailTerminal} onChange={e=>setPigtailTerminal(e.target.value)} style={{display:"block",width:"100%",padding:7,background:"#173d50",color:"white"}}>
+          <option value="">No pigtail</option>{terms.filter(t=>!t.id.includes("splice")).map(t=><option key={t.id} value={t.id}>{t.label}</option>)}
+        </select>
+      </label>
+      <button type="button" disabled={spliceSelection.length<2} onClick={createSplice} style={{marginTop:8,padding:9,background:"#155c7c",color:"white",border:"1px solid #4b9fbc",borderRadius:5}}>Join selected conductors</button>
+      {splices.map(sp=><div key={sp.id} style={{padding:"8px 0",borderBottom:"1px solid #35566a",fontSize:14}}>
+        🟠 {sp.connector} · {sp.members.length} conductors{sp.pigtailTerminal?` · Pigtail to ${terms.find(t=>t.id===sp.pigtailTerminal)?.label??sp.pigtailTerminal}`:""}
+        <button type="button" onClick={()=>removeSplice(sp.id)} style={{marginLeft:8,padding:5}}>Remove splice</button>
+      </div>)}
+      <p style={{fontSize:13,color:"#b7cbd5"}}>Training model: connector suitability, box fill, conductor preparation, and bonding must be checked against the actual connector/device listing. Pigtails here represent a splice-to-terminal link, not an added physical conductor in the wall view.</p>
+    </div>}
     <button type="button" onClick={onRemove} style={{marginTop:8,padding:8,background:"#5d2b37",color:"#fff",border:"1px solid #a85c69",borderRadius:5}}>Remove this cable</button>
   </section>;
 }

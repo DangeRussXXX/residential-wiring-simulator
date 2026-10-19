@@ -187,6 +187,7 @@ export default function ServiceOverview({ project, onChange, onOpenDestination }
           </select>
         </label>
         {activeUnifiedCable&&<CableWiringPanel key={activeUnifiedCable.id} cable={activeUnifiedCable} devices={[]}
+          allCables={project.wallCables??[]} onChangeCables={next=>onChange({...project,wallCables:next})}
           onChange={next=>onChange({...project,wallCables:(project.wallCables??[]).map(c=>c.id===next.id?next:c)})}
           onRemove={()=>{
             if(!window.confirm("Remove this home run from the wall and panel?"))return;

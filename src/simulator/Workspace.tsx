@@ -175,6 +175,7 @@ function Workspace(
   const [cableSource,setCableSource]=useState<string|null>(null);
   const [cableType,setCableType]=useState<CableKind>("14/2 NM-B");
   const [selectedCableId,setSelectedCableId]=useState<string|null>(null);
+  const [blueprintMode,setBlueprintMode]=useState(false);
   useEffect(()=>{
     try {setCables(JSON.parse(localStorage.getItem(`rws-cables-v1:${workspaceScope}`)||"[]"));}catch{setCables([]);}
     setCableSource(null);setSelectedCableId(null);setWireMode(false);
@@ -1685,7 +1686,14 @@ function Workspace(
     <div>
 
       {rightPanelTarget && createPortal(
-        <div style={{color:"#d9edf5",fontSize:12}}>
+        <div className="nova-wall-controls" style={{color:"#d9edf5",fontSize:22}}>
+          <details open style={{border:"1px solid #346b85",borderRadius:7,padding:10,marginBottom:8}}>
+            <summary style={{cursor:"pointer",fontWeight:700,color:"#8ee7ff"}}>Wall View · Show/Hide</summary>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:10}}>
+              <button type="button" aria-pressed={!blueprintMode} onClick={()=>setBlueprintMode(false)}>Framed Wall</button>
+              <button type="button" aria-pressed={blueprintMode} onClick={()=>setBlueprintMode(true)}>Blueprint Mode</button>
+            </div>
+          </details>
           <details open style={{border:"1px solid #346b85",borderRadius:7,padding:8,marginBottom:8}}>
             <summary style={{cursor:"pointer",fontWeight:700,color:"#8ee7ff"}}>Device Installation · Show/Hide</summary>
             <div style={{display:"flex",flexDirection:"column",gap:8,paddingTop:8}}>
@@ -1911,10 +1919,10 @@ function Workspace(
               "1200px",
 
             position: "relative",
-            backgroundImage: "linear-gradient(90deg,transparent 0px,transparent 5px,#bd8d57 5px,#bd8d57 21px,#80552d 22px,#80552d 24px,transparent 24px),linear-gradient(0deg,transparent 0px,transparent 1150px,#ae7b45 1150px,#ae7b45 1180px,transparent 1180px)",
-            backgroundSize: `${studSpacing * 8}px 1200px,2000px 1200px`,
+            backgroundImage: blueprintMode ? "linear-gradient(#376a8d55 1px,transparent 1px),linear-gradient(90deg,#376a8d55 1px,transparent 1px)" : "linear-gradient(90deg,transparent 0px,transparent 5px,#bd8d57 5px,#bd8d57 21px,#80552d 22px,#80552d 24px,transparent 24px),linear-gradient(0deg,transparent 0px,transparent 1150px,#ae7b45 1150px,#ae7b45 1180px,transparent 1180px)",
+            backgroundSize: blueprintMode ? "40px 40px,40px 40px" : `${studSpacing * 8}px 1200px,2000px 1200px`,
             backgroundRepeat: "repeat-x,no-repeat",
-            backgroundColor: "#d6d2c8"
+            backgroundColor: blueprintMode ? "#102c48" : "#d6d2c8"
           }}
 
 
@@ -2034,15 +2042,31 @@ function Workspace(
               const x1=a?a.x+75:26,y1=a?a.y+70:0,x2=b.x+75,y2=b.y+70;
               const middle=c.from===PANEL_SOURCE_ID?Math.max(24,y2-115):Math.max(22,Math.min(y1,y2)-90);
               const d=`M ${x1} ${y1} L ${x1} ${middle} L ${x2} ${middle} L ${x2} ${y2}`;
+              const homeRun=c.from===PANEL_SOURCE_ID;
+              const wireColors:Record<string,string>={black:"#161c26",white:"#f8fafc",red:"#d73333",ground:"#b87343"};
+              const endDevices=[{device:a,side:"from" as const,x:x1,y:y1},{device:b,side:"to" as const,x:x2,y:y2}];
               return <g key={c.id}>
-                <path d={d} fill="none" stroke="#6c7b84" strokeWidth="16" strokeLinejoin="round"/>
-                <path d={d} fill="none" stroke={c.type.includes("MC")?"#a5afb7":"#f4f0e6"} strokeWidth="12" strokeLinejoin="round"
+                <path d={d} fill="none" stroke={homeRun?"#000000":"#6c7b84"} strokeWidth="17" strokeLinejoin="round"/>
+                <path d={d} fill="none" stroke={homeRun?"#191b20":c.type.includes("MC")?"#a5afb7":"#f4f0e6"} strokeWidth="12" strokeLinejoin="round"
                   strokeDasharray={c.type.includes("MC")?"8 3":undefined}/>
+                {endDevices.map(({device,side,x,y})=>device && <g key={side}>
+                  {(c.type.includes("/3")?["black","red","white","ground"]:["black","white","ground"]).map((wire,i)=>{
+                    const assigned=c.ends?.[side]?.[wire];
+                    const targetX=x+24+(assigned?22:0);
+                    const targetY=y-23+i*15;
+                    return <g key={wire}>
+                      <path d={`M ${x} ${y} Q ${x+14} ${targetY} ${targetX} ${targetY}`} fill="none" stroke={wire==="white"?"#4b5963":"#19262e"} strokeWidth="9" strokeLinecap="round"/>
+                      <path d={`M ${x} ${y} Q ${x+14} ${targetY} ${targetX} ${targetY}`} fill="none" stroke={wireColors[wire]} strokeWidth="5" strokeLinecap="round"/>
+                      <circle cx={targetX} cy={targetY} r="5" fill={wireColors[wire]} stroke={assigned?"#25d7ed":"#778c98"} strokeWidth="2"/>
+                      {assigned && <path d={`M ${targetX} ${targetY} L ${x+57} ${y-10+i*11}`} stroke={wireColors[wire]} strokeWidth="3" fill="none"/>}
+                    </g>;
+                  })}
+                </g>)}
               </g>;
             })}
           </svg>
           {/* Select a stud before installation. */}
-          {Array.from({length:Math.ceil(2000/(studSpacing*8))},(_,index)=>{
+          {!blueprintMode && Array.from({length:Math.ceil(2000/(studSpacing*8))},(_,index)=>{
             const x=index*studSpacing*8+13;
             return <button key={`stud-${index}`} type="button"
               title={`Stud ${index+1} • ${Math.round(index*studSpacing*10)/10}" from left • click to select`}
@@ -2058,8 +2082,20 @@ function Workspace(
               DEVICES
               ================================================= */}
 
+          {blueprintMode && <svg viewBox="0 0 2000 1200" width="2000" height="1200" style={{position:"absolute",inset:0,pointerEvents:"none",zIndex:9}}>
+            {devices.map(d=>{
+              const x=d.x+50,y=d.y+55;
+              const isLight=/light/i.test(d.type),isSwitch=/switch|dimmer/i.test(d.type);
+              return <g key={d.id} transform={`translate(${x} ${y})`}>
+                <circle r="24" fill="#102c48" stroke="#f5fbff" strokeWidth="3"/>
+                {isLight?<path d="M -15 -15 L 15 15 M 15 -15 L -15 15" stroke="#fff" strokeWidth="3"/>:
+                  <text x="0" y="8" fill="#fff" fontSize="23" textAnchor="middle" fontWeight="bold">{isSwitch?"S":"R"}</text>}
+                <text x="0" y="46" fill="#fff" fontSize="22" fontWeight="bold" textAnchor="middle">{d.name}</text>
+              </g>;
+            })}
+          </svg>}
           {
-            devices.map(
+            !blueprintMode && devices.map(
               device => (
 
                 <Device

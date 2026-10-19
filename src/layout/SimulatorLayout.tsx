@@ -1,6 +1,6 @@
-import SwitchedLightLab from "../simulator/SwitchedLightLab";
+import WallCircuitInspector from "../simulator/WallCircuitInspector";
 import ElectricalServiceWorkspace from "../simulator/ElectricalServiceWorkspace";
-import EndToEndCircuitLab from "../simulator/EndToEndCircuitLab";
+
 // Residential Wiring Simulator v2.5
 // Main simulator layout
 
@@ -744,8 +744,7 @@ export default function SimulatorLayout() {
               {project.circuitAssignments?.flatMap(a => (a.destinations ?? []).filter(d => d.areaId === project.activeAreaId && d.wall === activeWall).map(d => ({...d, slot:a.slot, name:a.name}))).map(d => <span key={`${d.slot}-${d.areaId}-${d.wall}`} style={{border:"1px solid #37778d",padding:"5px 8px",borderRadius:6}}>Circuit #{d.slot}: {d.name || "Unnamed"} · {d.cable} (planned)</span>)}
             </div>
             <Workspace key={workspaceScope} ref={workspaceRef} onSelectDevice={setSelectedDevice} onCircuitPathsChange={setCircuitPaths} />
-            <EndToEndCircuitLab project={project} onChange={changeProject} location={{areaId:project.activeAreaId,wall:activeWall,devices}} />
-            <SwitchedLightLab project={project} onChange={changeProject} areaId={project.activeAreaId} wall={activeWall} devices={devices} />
+            <WallCircuitInspector project={project} areaId={project.activeAreaId} wall={activeWall} devices={devices} connections={connections} />
 
           </>}
           {project && !showService && !project.activeAreaId && <div style={{ padding: 24 }}>Add a room from the Project Explorer to begin.</div>}

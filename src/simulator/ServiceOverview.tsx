@@ -1,3 +1,4 @@
+import RealisticPanel from "./RealisticPanel";
 import ServiceConnectionView from "./ServiceConnectionView";
 import PanelWiringLab from "./PanelWiringLab";
 import { useState } from "react";
@@ -16,6 +17,7 @@ export default function ServiceOverview({ project, onChange, onOpenDestination }
   const toggle = (id: SectionId) => setExpanded(p => ({...p, [id]: !p[id]}));
   const sectionHeader = (id: SectionId, label: string) => <button type="button" aria-expanded={expanded[id]} onClick={() => toggle(id)} style={{...button, width:"100%", textAlign:"left", display:"flex", justifyContent:"space-between", alignItems:"center", background:"#12283a", padding:"12px 14px", fontWeight:700, fontSize:17, color:"#7fe3ff"}}><span>{label}</span><span aria-hidden="true">{expanded[id] ? "▾" : "▸"}</span></button>;
   const accordion = (id: SectionId, label: string, content: React.ReactNode) => <section style={{...frame,padding:10}}>{sectionHeader(id,label)}{expanded[id] && <div style={{padding:"14px 6px 4px"}}>{content}</div>}</section>;
+  const [panelView, setPanelView] = useState<"realistic" | "schematic">("realistic");
   const [slot, setSlot] = useState(1);
   const [draggedBreaker, setDraggedBreaker] = useState<{ amps: number; poles: 1 | 2; kind: BreakerType } | null>(null);
   const [amps, setAmps] = useState(15);
@@ -63,12 +65,27 @@ export default function ServiceOverview({ project, onChange, onOpenDestination }
   return <div style={{ color: "#e9f7ff", width: "100%", minWidth: 0, boxSizing: "border-box" }}>
     <div style={{display:"flex",gap:8,alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",marginBottom:14}}>
       <h2 style={{margin:0,color:"#79e2ff"}}>⚡ Service & Panel Workspace</h2>
-
+      <div role="group" aria-label="Panel view" style={{display:"flex",gap:8}}>
+        <button type="button" aria-pressed={panelView==="schematic"} style={{...button,background:panelView==="schematic"?"#17658b":"#142c3b"}} onClick={()=>setPanelView("schematic")}>Schematic View</button>
+        <button type="button" aria-pressed={panelView==="realistic"} style={{...button,background:panelView==="realistic"?"#17658b":"#142c3b"}} onClick={()=>setPanelView("realistic")}>Realistic Panel View</button>
+      </div>
     </div>
     <div style={{display:"grid",gridTemplateColumns:"minmax(300px, 1fr) minmax(370px, 1.15fr)",gap:16,alignItems:"start",width:"100%"}} className="nova-service-grid">
       <div style={{minWidth:0,alignSelf:"start"}}>
         <h3 style={{color:"#79e2ff",margin:"0 0 10px"}}>Main Distribution Panel</h3>
-        <div style={{ background: "#25313b", padding: 14, border: "3px solid #63717c", borderRadius: 10 }}>
+        {panelView === "realistic" ? <RealisticPanel
+          slots={slots}
+          selected={selected}
+          assignments={assignments}
+          onSelect={setSelected}
+          onDropBreaker={(position) => {
+            if (draggedBreaker) {
+              installAt(position, draggedBreaker.amps, draggedBreaker.poles, draggedBreaker.kind);
+              setDraggedBreaker(null);
+            }
+          }}
+          canDrop={!!draggedBreaker}
+        /> :         <div style={{ background: "#25313b", padding: 14, border: "3px solid #63717c", borderRadius: 10 }}>
           <div style={{ background: "#151e28", padding: 12, textAlign: "center", marginBottom: 10, borderRadius: 6 }}><strong>MAIN DISTRIBUTION</strong><div style={{ fontSize: 12, color: "#8cb8cb" }}>Feeder: L1 · L2 · Neutral · Equipment Ground</div></div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}>
             {slots.map(s => <button key={s.slot} onClick={() => setSelected(s.occupiedBy ? (slots.find(x => x.breaker?.id === s.occupiedBy)?.slot ?? s.slot) : s.slot)} onDragOver={e => { if (draggedBreaker) e.preventDefault(); }}
@@ -80,7 +97,8 @@ export default function ServiceOverview({ project, onChange, onOpenDestination }
             </button>)}
           </div>
           <div style={{ display: "flex", gap: 8, marginTop: 12 }}><div style={{ ...button, flex: 1, textAlign: "center" }}>NEUTRAL BAR (isolated)</div><div style={{ ...button, flex: 1, textAlign: "center" }}>GROUND BAR</div></div>
-        </div>
+        </div>}
+
       </div>
       <div style={{minWidth:0,display:"flex",flexDirection:"column",gap:8}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:6}}>

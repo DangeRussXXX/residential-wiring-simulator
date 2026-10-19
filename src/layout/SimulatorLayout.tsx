@@ -96,7 +96,6 @@ export default function SimulatorLayout() {
     devices,
     setDevices,
     connections,
-    setConnections,
     selectedDevice,
     setSelectedDevice,
     workspaceScope, setWorkspaceScope, clearWorkspaceScopes

@@ -1,0 +1,266 @@
+/* Global reset */
+
+* {
+  box-sizing: border-box;
+}
+
+
+html,
+body,
+#root {
+
+  margin:0;
+
+  padding:0;
+
+  width:100%;
+
+  height:100%;
+
+  overflow:hidden;
+
+  font-family:
+
+  "Segoe UI",
+  Arial,
+  sans-serif;
+
+  background:#202124;
+
+  color:white;
+
+}
+
+
+
+
+
+/* Application buttons */
+
+button {
+
+  background:#2d2f33;
+
+  color:white;
+
+  border:1px solid #555;
+
+  border-radius:6px;
+
+  padding:8px 14px;
+
+  cursor:pointer;
+
+  font-size:14px;
+
+  transition:.15s;
+
+}
+
+
+
+button:hover {
+
+  background:#3d4148;
+
+  border-color:#888;
+
+}
+
+
+
+button:active {
+
+  transform:scale(.97);
+
+}
+
+
+
+
+
+
+
+/* Dropdowns */
+
+select {
+
+  background:#2d2f33;
+
+  color:white;
+
+  border:1px solid #555;
+
+  border-radius:6px;
+
+  padding:8px;
+
+}
+
+
+
+
+
+
+
+/* Main simulator panels */
+
+.panel {
+
+  background:#252526;
+
+  border-color:#444;
+
+}
+
+
+
+
+
+
+
+/* CAD workspace scrollbar */
+
+.training-board::-webkit-scrollbar {
+
+  width:12px;
+
+  height:12px;
+
+}
+
+
+
+.training-board::-webkit-scrollbar-track {
+
+  background:#202124;
+
+}
+
+
+
+.training-board::-webkit-scrollbar-thumb {
+
+  background:#555;
+
+  border-radius:8px;
+
+}
+
+
+
+.training-board::-webkit-scrollbar-thumb:hover {
+
+  background:#777;
+
+}
+
+
+
+
+
+
+
+/* Component library buttons */
+
+.library-button {
+
+  width:100%;
+
+  text-align:left;
+
+  margin-bottom:8px;
+
+}
+
+
+
+
+
+
+
+/* Device selection glow (ready for next upgrade) */
+
+.device-selected {
+
+  box-shadow:
+
+  0 0 12px #00aaff,
+
+  0 0 25px rgba(0,170,255,.5);
+
+}
+
+
+
+
+
+
+
+/* Top toolbar */
+
+.toolbar {
+
+  height:55px;
+
+  background:#111;
+
+  display:flex;
+
+  align-items:center;
+
+  padding:0 20px;
+
+  border-bottom:1px solid #444;
+
+}
+
+
+
+
+
+
+
+/* Properties panel */
+
+.properties {
+
+  background:#252526;
+
+  padding:15px;
+
+  color:#ddd;
+
+}
+
+
+
+
+
+
+
+h2,
+h3 {
+
+  margin-top:0;
+
+  color:#fff;
+
+}
+
+
+
+
+
+
+
+hr {
+
+  border:none;
+
+  border-top:1px solid #555;
+
+}
+/* Update 35: readable workspace controls */
+.nova-wall-controls, .nova-wall-controls *:not(svg):not(path):not(circle):not(rect):not(text):not(g) { font-size: 22px !important; line-height: 1.35; }
+.nova-wall-controls button, .nova-wall-controls select, .nova-wall-controls input { min-height: 42px; }

@@ -1,3 +1,5 @@
+export const BREAKER_DRAG_EVENT = "rws-breaker-drag";
+export const BREAKER_DRAG_END_EVENT = "rws-breaker-drag-end";
 // Residential Wiring Simulator v2.6
 // Component Library
 //
@@ -66,7 +68,7 @@ type ComponentItem = {
 
 const components:ComponentItem[] =
 
-componentCatalog.filter(c => c.category !== "Breakers" && !["Service Entrance", "Breaker Panel", "Sub Panel"].includes(c.name)).map(c=>({
+componentCatalog.filter(c => String(c.category) !== "Breakers" && !["Service Entrance", "Breaker Panel", "Sub Panel"].includes(c.name)).map(c=>({
 
   name:c.name,
 
@@ -74,7 +76,7 @@ componentCatalog.filter(c => c.category !== "Breakers" && !["Service Entrance", 
 
   category:c.category,
 
-  description:c.description,
+  description:("description" in c ? String(c.description??"") : ""),
 
   symbol:c.symbol,
 
@@ -86,7 +88,7 @@ componentCatalog.filter(c => c.category !== "Breakers" && !["Service Entrance", 
 
   isBreaker:
 
-  c.category==="Breakers"
+  String(c.category)==="Breakers"
 
 }));
 
@@ -97,7 +99,7 @@ componentCatalog.filter(c => c.category !== "Breakers" && !["Service Entrance", 
 const categories = [
 
   ...new Set(
-    componentCatalog.filter(c => c.category !== "Breakers" && !["Service Entrance", "Breaker Panel", "Sub Panel"].includes(c.name)).map(c=>c.category)
+    componentCatalog.filter(c => String(c.category) !== "Breakers" && !["Service Entrance", "Breaker Panel", "Sub Panel"].includes(c.name)).map(c=>c.category)
   )
 
 ];

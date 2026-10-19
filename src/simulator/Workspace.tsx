@@ -2132,59 +2132,67 @@ function Workspace(
               </g>;
             })}
           </svg>
-          {/* Device-local wiring: direct terminals, upright wire nuts, and isolated caps.
-              Rendered in the wall itself, without a detached callout or pop-up. */}
+          {/* Open-box wiring: render beside the installed device, inside the wall plane.
+              Terminations, individual caps and splices come from saved cable records. */}
           {!blueprintMode&&<svg viewBox="0 0 2000 1200" width="2000" height="1200"
             style={{position:"absolute",inset:0,pointerEvents:"none",zIndex:16,overflow:"visible"}}>
             {devices.map(device=>{
               const related=cables.filter(c=>c.from===device.id||c.to===device.id);
+              const ends=related.map(c=>({c,side:(c.from===device.id?"from":"to") as "from"|"to"}));
               const splices=related.flatMap(c=>c.splices??[]).filter((sp,index,all)=>
                 sp.deviceId===device.id&&all.findIndex(other=>other.id===sp.id)===index);
-              const ends=related.map(c=>({c,side:(c.from===device.id?"from":"to") as "from"|"to"}));
               const capped=ends.flatMap(({c,side})=>Object.entries(c.ends?.[side]??{})
-                .filter(([,terminal])=>terminal==="cap")
-                .map(([wire])=>({c,wire})));
+                .filter(([,terminal])=>terminal==="cap").map(([name])=>({c,name})));
               if(!splices.length&&!capped.length)return null;
-              const cx=device.x+75,cy=device.y+70;
-              const color=(name:string)=>name==="white"?"#f6f9fc":name==="ground"?"#b87845":name==="red"?"#e34848":"#101820";
-              const wire=(d:string,name:string,width=5)=><g>
-                <path d={d} fill="none" stroke={name==="white"?"#596c76":"#c5d5df"} strokeWidth={width+3} strokeLinecap="round"/>
-                <path d={d} fill="none" stroke={color(name)} strokeWidth={width} strokeLinecap="round"/>
+              // A built-in open junction-box area extends from the device's mounting position.
+              // No detached card, tooltip, or floating callout is created.
+              const bx=device.x+110,by=device.y+12;
+              const boxWidth=152,boxHeight=Math.max(135,42+splices.length*62+capped.length*26);
+              const color=(name:string)=>name==="white"?"#f9fcff":name==="ground"?"#b77a48":name==="red"?"#df4747":"#111820";
+              const strokeWire=(path:string,name:string,key:string)=><g key={key}>
+                <path d={path} stroke="#6a8392" strokeWidth="9" strokeLinecap="round" fill="none"/>
+                <path d={path} stroke={color(name)} strokeWidth="5" strokeLinecap="round" fill="none"/>
               </g>;
-              const nut=(x:number,y:number)=><g>
-                <path d={`M ${x-12} ${y+12} L ${x-11} ${y-3} Q ${x} ${y-19} ${x+11} ${y-3} L ${x+12} ${y+12} Z`} fill="#f1a033" stroke="#ffdc91" strokeWidth="2"/>
-                {[0,1,2].map(i=><path key={i} d={`M ${x-9} ${y-2+i*5} Q ${x} ${y+2+i*5} ${x+9} ${y-2+i*5}`} fill="none" stroke="#b86b20" strokeWidth="1.6"/>)}
+              const cap=(x:number,y:number,key:string)=><g key={key}>
+                <path d={`M ${x-9} ${y+10} L ${x-8} ${y-3} Q ${x} ${y-17} ${x+8} ${y-3} L ${x+9} ${y+10} Z`}
+                  fill="#f2a43b" stroke="#ffe1a3" strokeWidth="1.7"/>
+                {[0,1,2].map(i=><path key={i} d={`M ${x-7} ${y+i*4} Q ${x} ${y+4+i*4} ${x+7} ${y+i*4}`}
+                  fill="none" stroke="#a96624" strokeWidth="1.3"/>)}
               </g>;
-              return <g key={`inline-wiring-${device.id}`}>
-                {splices.slice(0,4).map((sp,i)=>{
-                  const nx=cx-34+i*30,ny=cy-99-(i%2)*17;
-                  const members=sp.members.slice(0,5);
-                  const family=members[0]?.conductor??"black";
-                  const target=sp.pigtailTerminal;
+              return <g key={`open-box-${device.id}`}>
+                <rect x={bx} y={by} width={boxWidth} height={boxHeight} rx="12"
+                  fill="#9aa8ac" fillOpacity=".92" stroke="#4b6572" strokeWidth="4"/>
+                <rect x={bx+9} y={by+10} width={boxWidth-18} height={boxHeight-20} rx="7"
+                  fill="#d1d2c9" stroke="#657985" strokeWidth="2"/>
+                <circle cx={bx+14} cy={by+18} r="3.5" fill="#4c626b"/>
+                <circle cx={bx+boxWidth-14} cy={by+18} r="3.5" fill="#4c626b"/>
+                {splices.slice(0,5).map((sp,i)=>{
+                  const nx=bx+49+(i%2)*53,ny=by+35+Math.floor(i/2)*72;
+                  const family=sp.members[0]?.conductor??"black";
                   return <g key={sp.id}>
-                    {members.map((m,j)=>{
-                      const sx=cx-68+j*13+i*6,sy=cy-9+(j%2)*7;
-                      const tx=nx-9+j*(18/Math.max(1,members.length-1));
-                      return <g key={`${m.cableId}-${m.end}-${m.conductor}`}>
-                        {wire(`M ${sx} ${sy} C ${sx-7} ${cy-49} ${tx} ${ny+42} ${tx} ${ny+12}`,m.conductor,5)}
-                        <title>{m.conductor.toUpperCase()} · {related.find(c=>c.id===m.cableId)?.fromName??"Source"} → {related.find(c=>c.id===m.cableId)?.toName??"Device"} · wire-nut splice</title>
+                    {sp.members.slice(0,5).map((member,j)=>{
+                      const originX=bx+15+j*13;
+                      const originY=by+boxHeight-16;
+                      const targetX=nx-8+j*16/Math.max(1,sp.members.length-1);
+                      return <g key={`${member.cableId}-${member.end}-${member.conductor}-${j}`}>
+                        {strokeWire(`M ${originX} ${originY} C ${originX} ${ny+37+j*3} ${targetX} ${ny+32} ${targetX} ${ny+9}`,member.conductor,`wire-${j}`)}
+                        <title>{member.conductor.toUpperCase()} · saved splice in {device.name}</title>
                       </g>;
                     })}
-                    {target&&<g>
-                      {wire(`M ${nx+9} ${ny+12} C ${nx+45} ${ny+45} ${cx+43} ${cy-55} ${cx+24} ${cy-21}`,family,5)}
-                      <circle cx={cx+24} cy={cy-21} r="5" fill={color(family)} stroke="#26d9f0" strokeWidth="2"/>
-                      <title>{family.toUpperCase()} pigtail → ${target}</title>
+                    {sp.pigtailTerminal&&<g>
+                      {strokeWire(`M ${nx+8} ${ny+10} C ${nx+32} ${ny+30} ${bx-4} ${by+64+i*12} ${device.x+86} ${device.y+53+i*8}`,family,`pigtail-${sp.id}`)}
+                      <circle cx={device.x+86} cy={device.y+53+i*8} r="4.5" fill={color(family)} stroke="#22d7ee" strokeWidth="1.5"/>
+                      <title>{family.toUpperCase()} pigtail → {sp.pigtailTerminal} on {device.name}</title>
                     </g>}
-                    {nut(nx,ny)}
-                    <title>{device.name}: ${members.length} conductors joined${target?` with pigtail to ${target}`:""}</title>
+                    {cap(nx,ny,`splice-nut-${sp.id}`)}
                   </g>;
                 })}
-                {capped.slice(0,6).map(({c,wire:wireName},i)=>{
-                  const x=cx+38+i*13,y=cy-68-(i%2)*20;
-                  return <g key={`cap-${c.id}-${wireName}`}>
-                    {wire(`M ${cx+6+i*5} ${cy-7} Q ${x-13} ${cy-36} ${x} ${y+12}`,wireName,5)}
-                    {nut(x,y)}
-                    <title>{wireName.toUpperCase()} capped individually · ${c.fromName??"Panel"} → ${c.toName??device.name}</title>
+                {capped.slice(0,6).map(({c,name},i)=>{
+                  const x=bx+29+(i%3)*42,y=by+45+splices.length*65+Math.floor(i/3)*28;
+                  return <g key={`cap-${c.id}-${name}`}>
+                    {strokeWire(`M ${bx+12+i*12} ${by+boxHeight-12} Q ${x-8} ${y+25} ${x} ${y+10}`,name,`capped-wire-${i}`)}
+                    {cap(x,y,`cap-nut-${i}`)}
+                    <title>{name.toUpperCase()} · individually capped · {device.name}</title>
                   </g>;
                 })}
               </g>;

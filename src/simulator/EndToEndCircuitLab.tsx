@@ -142,7 +142,7 @@ export default function EndToEndCircuitLab({project,onChange,location}:Props) {
       </div>
       <label style={{display:"block",fontSize:12,marginBottom:8}}>Home-run starting device{" "}
         <select style={{...input,maxWidth:"100%"}} value={receptacleId}
-          onChange={e=>{const id=e.target.value;setChosen(id);setInspection(null);setSelectedWire(null);save({...circuit,receptacleId:id,roomHot:null,roomNeutral:null,roomGround:null});}}>
+          onChange={e=>{const id=e.target.value;setChosen(id);setInspection(null);setSelectedWire(null);}}>
           {receptacles.length===0?<option value="">No devices on this wall</option>:
             receptacles.map(d=><option key={d.id} value={d.id}>{d.name} · {d.type} ({d.id.slice(0,8)})</option>)}
         </select>
@@ -158,6 +158,9 @@ export default function EndToEndCircuitLab({project,onChange,location}:Props) {
             onChange({...project,endToEndCircuits:(project.endToEndCircuits??[]).filter(c=>!(c.slot===activeSlot&&c.areaId===areaId&&c.wall===wall&&c.receptacleId===receptacleId))});
             setChosen("");setInspection(null);
           }}>Remove Home Run</button>
+      </div>
+      <div style={{fontSize:11,color:"#b8d9e8",marginBottom:8}}>
+        Select a destination, then click Add Home Run. Each saved destination keeps its own terminations.
       </div>
       <div style={{fontSize:11,color:"#b8d9e8",marginBottom:8}}>
         Home runs on this wall: {(project.endToEndCircuits??[]).filter(c=>c.areaId===areaId&&c.wall===wall).length}

@@ -166,6 +166,7 @@ function Workspace(
 
 
   const [routeEdit, setRouteEdit] = useState(false);
+  const [activeHomeRun,setActiveHomeRun] = useState<string>("");
   const [homeRunRoutes, setHomeRunRoutes] = useState<Record<string, {entryX:number;points:{x:number;y:number}[]}>>(() => {
     try { return JSON.parse(localStorage.getItem(`rws-home-run-routes:${workspaceScope}`) || "{}"); }
     catch { return {}; }
@@ -182,6 +183,7 @@ function Workspace(
     const h=mountingHeights[device.id] ?? (/switch/i.test(device.type)?48:/light/i.test(device.type)?84:12);
     setDevices(prev => prev.map(d => d.id === device.id ? {...d,x:studX-6,y:heightToY(h)} : d));
     setNailedDevices(prev => ({...prev,[device.id]:true}));
+    setDragging(null);
   };
   const [studSpacing, setStudSpacing] = useState(16);
   const [snapToStuds, setSnapToStuds] = useState(true);
@@ -1238,7 +1240,8 @@ function Workspace(
     e: MouseEvent<HTMLDivElement>
   ) {
 
-    if (!dragging) {
+    if (!dragging || nailedDevices[dragging]) {
+      if (dragging && nailedDevices[dragging]) setDragging(null);
       return;
     }
 
@@ -1670,6 +1673,18 @@ function Workspace(
           style={{fontSize:12,color:"#10394e",background:"#d8f5ff",padding:6,borderRadius:4}}>
           {selectedStud===null?"Select a stud":`Stud #${selectedStud+1} selected`}
         </span>
+        {liveProject && liveAreaId && liveWall && (liveProject.endToEndCircuits??[]).filter(c=>c.areaId===liveAreaId&&c.wall===liveWall).length>0 && (
+          <select aria-label="Home run to route" title="Select which independent home run to route"
+            value={activeHomeRun}
+            onChange={e=>setActiveHomeRun(e.target.value)}
+            style={{background:"#e7f6ff",color:"#133c52",maxWidth:200}}>
+            <option value="">Choose home run</option>
+            {(liveProject.endToEndCircuits??[]).filter(c=>c.areaId===liveAreaId&&c.wall===liveWall).map(c=>
+              <option key={`${c.slot}:${c.receptacleId}`} value={`${c.slot}:${c.receptacleId}`}>
+                Circuit #{c.slot} → {devices.find(d=>d.id===c.receptacleId)?.name??"Device"}
+              </option>)}
+          </select>
+        )}
         <button type="button" onClick={()=>setRouteEdit(v=>!v)}
           style={{background:routeEdit?"#9bd8ef":"#edf4f8",color:"#193747",border:"1px solid #478aa8",borderRadius:5,padding:"5px 8px"}}>
           {routeEdit?"✓ Finish Home-Run Route":"↪ Route Home Run"}
@@ -1855,8 +1870,8 @@ function Workspace(
           onClick={e=>{
             if(!routeEdit || !liveProject || !liveAreaId || !liveWall) return;
             if ((e.target as HTMLElement).closest(".device-component,button,input")) return;
-            const c=(liveProject.endToEndCircuits??[]).find(c=>c.areaId===liveAreaId && c.wall===liveWall);
-            if(!c) return;
+            const c=(liveProject.endToEndCircuits??[]).find(c=>c.areaId===liveAreaId && c.wall===liveWall && `${c.slot}:${c.receptacleId}`===activeHomeRun);
+            if(!c) {window.alert("Choose the home run to route first.");return;}
             const key=`${c.slot}:${c.receptacleId}`;
             const rect=e.currentTarget.getBoundingClientRect();
             const x=e.clientX-rect.left+e.currentTarget.parentElement!.scrollLeft;
@@ -2117,13 +2132,14 @@ function Workspace(
                     <text x={cableX+14} y={Math.max(16,entryY-35)} fontSize="13"
                       fontWeight="bold" fill="#1b3949" stroke="#e9f0f3" strokeWidth="3"
                       paintOrder="stroke">HR #{c.slot} · 14/2 NM-B</text>
-                    {ends.filter(w=>isReceptacle && w.terminal).map(w=>{
-                      const t=target(w.terminal!);
+                    {ends.filter(()=>isReceptacle).map(w=>{
+                      const t=w.terminal?target(w.terminal):{x:w.sourceX+(w.key==="hot"?32:w.key==="neutral"?0:-32),y:entryY+58};
                       const d=`M ${w.sourceX} ${entryY} C ${w.sourceX} ${entryY+32}, ${t.x} ${t.y-35}, ${t.x} ${t.y}`;
                       return <g key={w.key}>
                         <path d={d} fill="none" stroke={w.outline} strokeWidth="9" strokeLinecap="round"/>
                         <path d={d} fill="none" stroke={w.color} strokeWidth="6" strokeLinecap="round"/>
                         <circle cx={t.x} cy={t.y} r="8" fill={w.color} stroke={w.outline} strokeWidth="2"/>
+                        {!w.terminal && <text x={t.x+10} y={t.y+4} fontSize="11" fill="#203747" fontWeight="bold">{w.key} · not connected</text>}
                       </g>;
                     })}
                   </g>;

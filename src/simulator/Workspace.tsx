@@ -1971,6 +1971,7 @@ function Workspace(
                 .filter(c => c.areaId === liveAreaId && c.wall === liveWall)
                 .map(c => {
                   const device = devices.find(d => d.id === c.receptacleId);
+                  const isReceptacle = !!device && /receptacle/i.test(device.type);
                   if (!device) return null;
                   const cx = device.x + 75;
                   const boxTop = device.y + 20;
@@ -1993,7 +1994,7 @@ function Workspace(
                     <text x={cableX+14} y={Math.max(16,entryY-35)} fontSize="13"
                       fontWeight="bold" fill="#1b3949" stroke="#e9f0f3" strokeWidth="3"
                       paintOrder="stroke">HR #{c.slot} · 14/2 NM-B</text>
-                    {ends.filter(w=>w.terminal).map(w=>{
+                    {ends.filter(w=>isReceptacle && w.terminal).map(w=>{
                       const t=target(w.terminal!);
                       const d=`M ${w.sourceX} ${entryY} C ${w.sourceX} ${entryY+32}, ${t.x} ${t.y-35}, ${t.x} ${t.y}`;
                       return <g key={w.key}>

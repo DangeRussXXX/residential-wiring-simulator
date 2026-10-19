@@ -24,7 +24,8 @@ function inspect(project: ServiceProject, circuit: EndToEndCircuit): Check[] {
   const conductors = (project.panelWires??[]).filter(w=>w.slot===circuit.slot);
   const find = (color:string)=>conductors.find(w=>w.conductor===color);
   const devices = scopedDevices(project,circuit.areaId,circuit.wall);
-  const target = devices.find(d=>d.id===circuit.receptacleId && /receptacle/i.test(d.type));
+  const target = devices.find(d=>d.id===circuit.receptacleId);
+  const isReceptacle = !!target && /receptacle/i.test(target.type);
   const otherTerminations = (project.panelWires??[]).filter(w=>w.slot!==circuit.slot);
   const unique = ["black","white","bare"].every(color=>{
     const terminal=find(color)?.terminal;
@@ -39,12 +40,12 @@ function inspect(project: ServiceProject, circuit: EndToEndCircuit): Check[] {
     {ok:!!find("white") && !!find("white")?.terminal?.startsWith("neutral-"),label:"White conductor terminated at panel neutral bar"},
     {ok:!!find("bare") && !!find("bare")?.terminal?.startsWith("ground-"),label:"Bare conductor terminated at equipment-ground bar"},
     {ok:unique,label:"Panel terminal connections do not conflict with another circuit"},
-    {ok:!!target,label:"Selected receptacle exists in the actual room-wall workspace"},
-    {ok:!!target && !!circuit.receptacleId,label:"A specific room receptacle is selected for this home run"},
+    {ok:!!target,label:"Selected home-run device exists in the actual room-wall workspace"},
+    {ok:!!target && !!circuit.receptacleId,label:"A specific device is selected for this home run"},
     {ok:breaker?.poles===1 && breaker.amperage===15,label:"Breaker and 14 AWG cable are modeled as a 15A branch circuit"},
-    {ok:circuit.roomHot==="brass",label:"Black conductor terminated at receptacle brass terminal"},
-    {ok:circuit.roomNeutral==="silver",label:"White conductor terminated at receptacle silver terminal"},
-    {ok:circuit.roomGround==="green",label:"Bare conductor terminated at receptacle green terminal"}
+    {ok:isReceptacle && circuit.roomHot==="brass",label:"Black conductor terminated at receptacle brass terminal"},
+    {ok:isReceptacle && circuit.roomNeutral==="silver",label:"White conductor terminated at receptacle silver terminal"},
+    {ok:isReceptacle && circuit.roomGround==="green",label:"Bare conductor terminated at receptacle green terminal"}
   ];
 }
 
@@ -74,12 +75,14 @@ export default function EndToEndCircuitLab({project,onChange,location}:Props) {
     .map(d=>({slot:a.slot,cable:d.cable})));
   const activeSlot=routes.find(r=>r.slot===slot)?.slot??routes[0]?.slot??slot??1;
   const devices=location?.devices??scopedDevices(project,areaId,wall);
-  const receptacles=devices.filter(d=>/receptacle/i.test(d.type));
+  const receptacles=devices; // All wall devices can receive a planned home run.
   const stored=(project.endToEndCircuits??[]).find(c=>c.slot===activeSlot&&c.areaId===areaId&&c.wall===wall);
   const receptacleId=receptacles.some(d=>d.id===chosen)?chosen:
     receptacles.some(d=>d.id===stored?.receptacleId)?stored!.receptacleId:receptacles[0]?.id??"";
   // A different selected device must not inherit a previous device's terminals.
   const sameDevice=stored?.receptacleId===receptacleId;
+  const selectedDevice=devices.find(d=>d.id===receptacleId);
+  const supportsTerminals=!!selectedDevice && /receptacle/i.test(selectedDevice.type);
   const circuit:EndToEndCircuit=sameDevice?stored!:{
     slot:activeSlot,areaId,wall,receptacleId,cable:"14/2 NM-B",
     roomHot:null,roomNeutral:null,roomGround:null
@@ -122,7 +125,7 @@ export default function EndToEndCircuitLab({project,onChange,location}:Props) {
     </button>
     {expanded&&<>
       <p style={{fontSize:11,color:"#bdd1dc",lineHeight:1.5}}>
-        Interactive receptacle wiring. Select a conductor and then its terminal, or drag a conductor end onto a screw.
+        Choose which wall device receives this circuit’s home run. Receptacles support conductor-to-screw wiring; other devices show the cable entry until their terminal models are added.
         Terminations save to this project. Panel terminations are still made in Wire / Edit.
       </p>
       <label style={{fontSize:12}}>Breaker{" "}
@@ -136,14 +139,14 @@ export default function EndToEndCircuitLab({project,onChange,location}:Props) {
         {noRoute?"No home run assigned to this wall yet. Assign it in Circuit Routing & Wiring.":
           `Panel route: ${routes.find(r=>r.slot===activeSlot)?.cable??"not assigned"} (planned)`}
       </div>
-      <label style={{display:"block",fontSize:12,marginBottom:8}}>Wall receptacle{" "}
+      <label style={{display:"block",fontSize:12,marginBottom:8}}>Home-run starting device{" "}
         <select style={{...input,maxWidth:"100%"}} value={receptacleId}
-          onChange={e=>{setChosen(e.target.value);setInspection(null);setSelectedWire(null);}}>
-          {receptacles.length===0?<option value="">No receptacle on this wall</option>:
-            receptacles.map(d=><option key={d.id} value={d.id}>{d.name} ({d.id.slice(0,8)})</option>)}
+          onChange={e=>{const id=e.target.value;setChosen(id);setInspection(null);setSelectedWire(null);save({...circuit,receptacleId:id,roomHot:null,roomNeutral:null,roomGround:null});}}>
+          {receptacles.length===0?<option value="">No devices on this wall</option>:
+            receptacles.map(d=><option key={d.id} value={d.id}>{d.name} · {d.type} ({d.id.slice(0,8)})</option>)}
         </select>
       </label>
-      {receptacleId&&<>
+      {receptacleId&&<>{!supportsTerminals && <div style={{padding:10,border:"1px solid #6d7f94",borderRadius:6,marginBottom:10,fontSize:12,color:"#e8cba5"}}>Home run is assigned to <strong>{selectedDevice?.name ?? "this device"}</strong>. Its white NM-B jacket appears on the wall layout. This device type needs a dedicated terminal/splice wiring model; the receptacle screw diagram is intentionally hidden.</div>}{supportsTerminals&&<>
         <div style={{fontSize:11,color:"#aacbdc",marginBottom:6}}>
           {selectedWire?`Selected ${selectedWire.toUpperCase()}: choose a terminal screw →`:"Select or drag a conductor end to a terminal screw."}
         </div>
@@ -232,7 +235,7 @@ export default function EndToEndCircuitLab({project,onChange,location}:Props) {
             conductor continuity, real-world safety, or code compliance.
           </p>
         </div>}
-      </>}
+      </>}</>}
     </>}
   </section>;
 }

@@ -1,3 +1,4 @@
+import SwitchedLightLab from "../simulator/SwitchedLightLab";
 import ElectricalServiceWorkspace from "../simulator/ElectricalServiceWorkspace";
 import EndToEndCircuitLab from "../simulator/EndToEndCircuitLab";
 // Residential Wiring Simulator v2.5
@@ -744,6 +745,7 @@ export default function SimulatorLayout() {
             </div>
             <Workspace key={workspaceScope} ref={workspaceRef} onSelectDevice={setSelectedDevice} onCircuitPathsChange={setCircuitPaths} />
             <EndToEndCircuitLab project={project} onChange={changeProject} location={{areaId:project.activeAreaId,wall:activeWall,devices}} />
+            <SwitchedLightLab project={project} onChange={changeProject} areaId={project.activeAreaId} wall={activeWall} devices={devices} />
 
           </>}
           {project && !showService && !project.activeAreaId && <div style={{ padding: 24 }}>Add a room from the Project Explorer to begin.</div>}

@@ -1,3 +1,4 @@
+import type { SwitchLightConnection } from "./SwitchedLightLab";
 export type ServiceRoute = "UNDERGROUND" | "OVERHEAD";
 export type DisconnectArrangement = "SEPARATE" | "MAIN_BREAKER";
 export type ProjectArea = { id: string; name: string; buildingId: string; kind: "ROOM" | "AREA" };
@@ -20,6 +21,7 @@ export type ServiceProject = {
   circuitAssignments?: CircuitAssignment[];
   panelWires?: PanelWire[];
   endToEndCircuits?: EndToEndCircuit[];
+  switchedLightCircuits?: SwitchLightConnection[];
   distributionMain?: { installed: boolean; amperage: number; closed: boolean };
   id: string;
   name: string;

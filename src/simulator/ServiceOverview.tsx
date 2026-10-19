@@ -71,7 +71,7 @@ export default function ServiceOverview({ project, onChange, onOpenDestination }
     {accordion("directory", "Main Distribution Panel · Breaker Positions", <>
       <h2 style={{ marginTop: 0, color: "#65dbff" }}>Main Distribution Panel — Breaker Directory</h2>
       <p style={{ color: "#a8c6d3" }}>Install breakers here, not on bedroom walls. Circuit names and room assignments are saved with this project. Connections to actual wall conductors are a later phase.</p>
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(260px, 1fr) minmax(260px, 1fr)", gap: 18 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(260px, 1fr) minmax(340px, 1fr)", gap: 18 }}>
         <div style={{ background: "#25313b", padding: 14, border: "3px solid #63717c", borderRadius: 10 }}>
           <div style={{ background: "#151e28", padding: 12, textAlign: "center", marginBottom: 10, borderRadius: 6 }}><strong>MAIN DISTRIBUTION</strong><div style={{ fontSize: 12, color: "#8cb8cb" }}>Feeder: L1 · L2 · Neutral · Equipment Ground</div></div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}>
@@ -83,9 +83,7 @@ export default function ServiceOverview({ project, onChange, onOpenDestination }
           </div>
           <div style={{ display: "flex", gap: 8, marginTop: 12 }}><div style={{ ...button, flex: 1, textAlign: "center" }}>NEUTRAL BAR (isolated)</div><div style={{ ...button, flex: 1, textAlign: "center" }}>GROUND BAR</div></div>
         </div>
-        <div style={{alignSelf:"start",padding:14,border:"1px solid #36546a",borderRadius:8}}><strong style={{color:"#85e3ff"}}>Selected breaker #{selected}</strong><p>{active?.breaker ? `${active.breaker.amperage}A · ${active.breaker.poles}-pole` : "Empty position"}</p><p style={{fontSize:13,color:"#b6d3df"}}>Use the expandable sections below to install, configure, route, and wire the selected breaker.</p></div>
-      </div>
-    </>)}
+        <div style={{minWidth:0,alignSelf:"start",display:"flex",flexDirection:"column",gap:8}}>
     {accordion("install", "Install a Breaker", <>          <h3 style={{ color: "#86e1ff", marginTop: 0 }}>Install a breaker</h3>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
             <label>Position <select style={field} value={slot} onChange={e => setSlot(Number(e.target.value))}>{slots.filter(s => !s.installed).map(s => <option key={s.slot} value={s.slot}>{s.slot}</option>)}</select></label>
@@ -131,6 +129,9 @@ export default function ServiceOverview({ project, onChange, onOpenDestination }
       <p>Select a breaker, add a training cable in <strong>Wire to Breaker</strong>, then terminate each conductor on a simulated breaker, neutral or equipment-ground terminal. Run the inspection in that panel to check the exercise.</p>
       <p style={{fontSize:12,color:"#aac7d7"}}>Training-only: panel feeder and room wiring are not electrically connected to the solver yet. Never use this display as instructions for working on energized service equipment.</p>
       <button style={button} onClick={()=>setExpanded(p=>({...p,terminations:true}))}>Open Breaker Wiring Lab ↓</button>
+    </>)}
+        </div>
+      </div>
     </>)}
     {accordion("circuits", "Project Circuit Directory", <><h3 style={{ marginTop: 0, color: "#86e1ff" }}>Project Circuit Directory</h3>
       {slots.filter(s => s.breaker).length === 0 ? <p>No breakers installed yet.</p> : slots.filter(s => s.breaker).map(s => <div key={s.slot} style={{ padding: "9px 0", borderBottom: "1px solid #2e4b5c" }}><strong>#{s.slot} · {s.breaker?.amperage}A</strong> — {assignments.find(a => a.slot === s.slot)?.name || "Unassigned"}<div style={{ fontSize: 12, color: "#99b9c8" }}>{(assignments.find(a => a.slot === s.slot)?.areaIds ?? []).map(id => project.areas.find(a => a.id === id)?.name).filter(Boolean).join(", ") || "No rooms assigned"}</div></div>)}

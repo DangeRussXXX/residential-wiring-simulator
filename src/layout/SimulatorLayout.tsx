@@ -12,7 +12,6 @@ import {
 } from "react";
 
 import Workspace from "../simulator/Workspace";
-import SimulationPanel from "../simulator/SimulationPanel";
 import ComponentLibrary from "../components/ComponentLibrary";
 import BreakerPanel from "../components/BreakerPanel";
 import PropertiesPanel from "../components/PropertiesPanel";
@@ -61,6 +60,10 @@ export default function SimulatorLayout() {
   const [showRightColumn,setShowRightColumn]=useState(true);
   const [showExplorer,setShowExplorer]=useState(true);
   const [showLibrary,setShowLibrary]=useState(true);
+  const [showPanelControls,setShowPanelControls]=useState(false);
+  const [showProperties,setShowProperties]=useState(false);
+  const [showInspection,setShowInspection]=useState(false);
+  const [showWiring,setShowWiring]=useState(true);
   const [showBlueprint, setShowBlueprint] = useState(false);
   const [showElectricalService, setShowElectricalService] = useState(false);
   const [activeWall, setActiveWall] = useState<WallSide | null>(null);
@@ -393,24 +396,6 @@ export default function SimulatorLayout() {
 
     setCircuitStatus(
       "READY"
-    );
-
-  }
-
-
-  // ---------------------------------
-  // REFRESH SIMULATION
-  // ---------------------------------
-
-  function refreshSimulation() {
-
-    const currentConnections =
-      workspaceRef.current?.getConnections()
-      ?? [];
-
-
-    setConnections(
-      currentConnections
     );
 
   }
@@ -804,11 +789,18 @@ export default function SimulatorLayout() {
 
             {project && !showService && !showBlueprint && activeWall && project.activeAreaId && (
               <>
+                <details open={showWiring} onToggle={e=>setShowWiring(e.currentTarget.open)}
+                  style={{border:"1px solid #346b85",borderRadius:7,marginTop:8,padding:7}}>
+                  <summary style={{cursor:"pointer",color:"#a2eaff",fontWeight:700}}>Room Wiring & Home Runs · Show/Hide</summary>
                 <EndToEndCircuitLab
                   project={project}
                   onChange={changeProject}
                   location={{areaId:project.activeAreaId,wall:activeWall,devices}}
                 />
+                </details>
+                <details open={showInspection} onToggle={e=>setShowInspection(e.currentTarget.open)}
+                  style={{border:"1px solid #346b85",borderRadius:7,marginTop:8,padding:7}}>
+                  <summary style={{cursor:"pointer",color:"#a2eaff",fontWeight:700}}>Wall Circuit Inspector · Show/Hide</summary>
                 <WallCircuitInspector
                   project={project}
                   areaId={project.activeAreaId}
@@ -816,33 +808,20 @@ export default function SimulatorLayout() {
                   devices={devices}
                   connections={connections}
                 />
+                </details>
               </>
             )}
 
-            {/* =============================== */}
-            {/* UPDATE SIMULATION */}
-            {/* =============================== */}
-
-            <button
-              onClick={
-                refreshSimulation
-              }
-              style={{
-                padding:
-                  "12px",
-
-                width:
-                  "100%"
-              }}
-            >
-              Update Simulation
-            </button>
-
+            {/* A single inspector replaces the redundant Update Simulation button and
+                disconnected electrical graph/debug panel on room walls. */}
 
             {/* =============================== */}
             {/* PANEL SELECTOR */}
             {/* =============================== */}
 
+            {panelDevices.length > 0 && <details open={showPanelControls} onToggle={e=>setShowPanelControls(e.currentTarget.open)}
+              style={{border:"1px solid #346b85",borderRadius:7,marginTop:8,padding:7}}>
+              <summary style={{cursor:"pointer",color:"#a2eaff",fontWeight:700}}>Distribution Panel · Show/Hide</summary>
             {panelDevices.length > 0 && (
 
               <div
@@ -1065,34 +1044,15 @@ export default function SimulatorLayout() {
             </div>
 
 
-            {/* =============================== */}
-            {/* SIMULATION */}
-            {/* =============================== */}
-
-            <SimulationPanel
-              devices={
-                activePanelDevice
-                  ? devices
-                  : []
-              }
-
-              connections={
-                activePanelDevice
-                  ? connections
-                  : []
-              }
-
-              sourceId={
-                activePanelDevice?.id ??
-                ""
-              }
-            />
-
+            </details>}
 
             {/* =============================== */}
             {/* PROPERTIES */}
             {/* =============================== */}
 
+            {selectedDevice && <details open={showProperties} onToggle={e=>setShowProperties(e.currentTarget.open)}
+              style={{border:"1px solid #346b85",borderRadius:7,marginTop:8,padding:7}}>
+              <summary style={{cursor:"pointer",color:"#a2eaff",fontWeight:700}}>Selected Device Properties · Show/Hide</summary>
             <PropertiesPanel
               device={
                 selectedDevice
@@ -1127,6 +1087,7 @@ export default function SimulatorLayout() {
               }
 
             />
+            </details>}
 
           </div>
 

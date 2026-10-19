@@ -59,7 +59,7 @@ function positions(kind:string,terminals:Terminal[]):Record<string,{x:number;y:n
   const maps:Record<string,Record<string,{x:number;y:number}>>={
     panel:{"breaker-hot":{x:344,y:75},"neutral-bar":{x:344,y:155},"ground-bar":{x:344,y:231}},
     outlet:{brass:{x:358,y:95},silver:{x:260,y:95},ground:{x:309,y:243}},
-    gfci:{brass:{x:358,y:73},silver:{x:260,y:73},"load-hot":{x:358,y:183},"load-neutral":{x:260,y:183},ground:{x:309,y:243}},
+    gfci:{brass:{x:363,y:83},silver:{x:255,y:83},"load-hot":{x:363,y:177},"load-neutral":{x:255,y:177},ground:{x:309,y:243}},
     "switch-single":{line:{x:358,y:92},load:{x:358,y:177},ground:{x:260,y:233},"neutral-splice":{x:212,y:236}},
     dimmer:{line:{x:358,y:92},load:{x:358,y:177},ground:{x:260,y:233},"neutral-splice":{x:212,y:236}},
     "switch-three-way":{common:{x:260,y:93},"traveler-1":{x:358,y:93},"traveler-2":{x:358,y:178},ground:{x:309,y:243},"neutral-splice":{x:212,y:236}},
@@ -105,8 +105,19 @@ function DeviceArtwork({kind,breakerSlot,front}:{kind:string;breakerSlot?:number
     <circle cx="310" cy="242" r="4" fill="#778b95"/>
     {kind==="outlet"&&!front&&<><rect x="345" y="118" width="6" height="22" fill="#d5b36c" stroke="#886a2c"/>
       <rect x="268" y="118" width="6" height="22" fill="#d6dfe5" stroke="#6f8b9a"/></>}
-    {kind==="gfci"&&!front&&<><text x="349" y="56" fontSize="9" fill="#f7d79b">LINE</text>
-      <text x="349" y="167" fontSize="9" fill="#f7d79b">LOAD</text></>}
+    {kind==="gfci"&&!front&&<>
+      {/* Four independent side terminals: LINE top, LOAD bottom, neutral left, hot right. */}
+      <rect x="244" y="69" width="9" height="28" rx="2" fill="#cbd7df" stroke="#526e7d" strokeWidth="2"/>
+      <rect x="244" y="163" width="9" height="28" rx="2" fill="#cbd7df" stroke="#526e7d" strokeWidth="2"/>
+      <rect x="367" y="69" width="9" height="28" rx="2" fill="#d8a34c" stroke="#755528" strokeWidth="2"/>
+      <rect x="367" y="163" width="9" height="28" rx="2" fill="#d8a34c" stroke="#755528" strokeWidth="2"/>
+      <rect x="287" y="122" width="46" height="16" rx="3" fill="#a72d2b"/>
+      <text x="310" y="133" fontSize="9" fontWeight="bold" textAnchor="middle" fill="white">RESET</text>
+      <rect x="293" y="145" width="34" height="14" rx="2" fill="#202e38"/>
+      <text x="310" y="155" fontSize="8" fontWeight="bold" textAnchor="middle" fill="white">TEST</text>
+      <text x="309" y="66" fontSize="11" fontWeight="bold" textAnchor="middle" fill="#f4faff" stroke="#314b5c" strokeWidth="3" paintOrder="stroke">LINE</text>
+      <text x="309" y="176" fontSize="11" fontWeight="bold" textAnchor="middle" fill="#f4faff" stroke="#314b5c" strokeWidth="3" paintOrder="stroke">LOAD</text>
+      </>}
   </g>;
 }
 function WireConnector({x,y,splice=false,selected=false,upright=false}:{x:number;y:number;splice?:boolean;selected?:boolean;upright?:boolean}) {
@@ -283,7 +294,7 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove,allCab
         const family=sp.members[0]?.conductor==="ground"?"ground":sp.members[0]?.conductor==="white"?"white":"black";
         // The pigtail is a separate conductor, running down from the mouth,
         // then turning right to its actual device terminal.
-        const path=destination?`M ${sx+8} ${sy+15} C ${sx+35} ${sy+52} ${destination.x-52} ${destination.y+40} ${destination.x} ${destination.y}`:"";
+        const path=destination?`M ${sx+10} ${sy+15} L ${sx+32} ${sy+39} Q ${sx+40} ${sy+48} ${sx+52} ${sy+42} L ${destination.x-27} ${destination.y+24} Q ${destination.x-15} ${destination.y+24} ${destination.x} ${destination.y}`:"";
         return <g key={sp.id}>
           {destination&&<>
             <path d={path} fill="none" stroke={family==="white"?"#263c49":"#d2e5ee"} strokeWidth="12" strokeLinecap="round"/>
@@ -302,6 +313,7 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove,allCab
         <title>{t.label} — click to terminate selected conductor</title>
       </g>;})}
     </svg>
+    {kind==="gfci"&&view==="rear"&&<div style={{fontSize:14,color:"#e0f3fa",marginTop:7}}>GFCI rear: top pair = LINE, lower pair = LOAD; left silver = neutral, right brass = hot. Ground is green. Follow the actual device markings when installing.</div>}
     <div style={{marginTop:12,fontSize:16,fontWeight:700,color:"#aeeaff"}}>Wire destinations & terminations</div>
     <div style={{display:"grid",gap:8,margin:"8px 0 12px"}}>
       {wireLabels.map(item=><div key={item.color} style={{border:"1px solid #52869d",background:"#173a4b",borderRadius:6,padding:"9px 10px"}}>

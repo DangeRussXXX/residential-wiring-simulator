@@ -1,3 +1,4 @@
+import WholeHouseBlueprint from "../simulator/WholeHouseBlueprint";
 import WallCircuitInspector from "../simulator/WallCircuitInspector";
 import ElectricalServiceWorkspace from "../simulator/ElectricalServiceWorkspace";
 
@@ -55,6 +56,7 @@ export default function SimulatorLayout() {
 
   const [project, setProject] = useState<ServiceProject | null>(() => loadServiceProject());
   const [showService, setShowService] = useState(true);
+  const [showBlueprint, setShowBlueprint] = useState(false);
   const [showElectricalService, setShowElectricalService] = useState(false);
   const [activeWall, setActiveWall] = useState<WallSide | null>(null);
   const [configureService, setConfigureService] = useState(false);
@@ -66,7 +68,7 @@ export default function SimulatorLayout() {
     changeProject({ ...project, areas: [...project.areas, area], activeAreaId: area.id });
     setActiveWall(null);
     setWorkspaceScope(`${project.id}:${area.id}:OVERVIEW`);
-    setShowService(false);
+    setShowBlueprint(false); setShowService(false);
   }
   function addBuilding() {
     const name = window.prompt("Detached building name (e.g. Workshop):");
@@ -643,17 +645,18 @@ export default function SimulatorLayout() {
         {project && <aside style={{ width: 205, flexShrink: 0, background: "#101a25", padding: 10, overflowY: "auto", borderRight: "1px solid #29627b", fontSize: 13 }}>
           <strong style={{ color: "#72dcff" }}>PROJECT EXPLORER</strong>
           <div style={{ margin: "8px 0", overflowWrap: "anywhere" }}>{project.name}</div>
+          <button onClick={() => { setShowBlueprint(true); setShowService(false); setShowElectricalService(false); setActiveWall(null); setWorkspaceScope("BLUEPRINT"); }} style={{width:"100%",margin:"6px 0 12px",padding:10,background:showBlueprint?"#087f9f":"#24475a",border:"1px solid #3585a2",color:"white",borderRadius:5,fontWeight:700,textAlign:"left"}}>▦ Whole-House Blueprint</button>
           <div style={{borderTop:"1px solid #2c4553",paddingTop:8,marginBottom:12}}>
             <strong style={{color:"#72dcff"}}>⚡ Electrical Service</strong>
-            <button onClick={() => { setShowElectricalService(true); setShowService(true); setWorkspaceScope("SERVICE_SETUP"); setActiveWall(null); }} style={{width:"100%",marginTop:7,marginBottom:5,background:showElectricalService?"#146d8d":"#243c4b",textAlign:"left"}}>▸ Service Setup & Simulation</button>
-            <button onClick={() => { setShowElectricalService(false); setShowService(true); setWorkspaceScope("SERVICE"); setActiveWall(null); }} style={{ width: "100%", marginTop: 7, marginBottom: 5, background: showService&&!showElectricalService ? "#146d8d" : "#243c4b", textAlign:"left" }}>▸ Main Distribution Panel</button>
+            <button onClick={() => { setShowBlueprint(false); setShowElectricalService(true); setShowService(true); setWorkspaceScope("SERVICE_SETUP"); setActiveWall(null); }} style={{width:"100%",marginTop:7,marginBottom:5,background:showElectricalService?"#146d8d":"#243c4b",textAlign:"left"}}>▸ Service Setup & Simulation</button>
+            <button onClick={() => { setShowBlueprint(false); setShowElectricalService(false); setShowService(true); setWorkspaceScope("SERVICE"); setActiveWall(null); }} style={{ width: "100%", marginTop: 7, marginBottom: 5, background: showService&&!showElectricalService ? "#146d8d" : "#243c4b", textAlign:"left" }}>▸ Main Distribution Panel</button>
             <div style={{fontSize:11,color:"#a4c8d8",paddingLeft:6}}>{project.service.route === "UNDERGROUND" ? "Underground" : "Overhead"} · {project.service.amperage}A</div>
             <div style={{fontSize:11,color:"#a4c8d8",paddingLeft:6}}>Distribution main: {project.distributionMain?.installed ? `${project.distributionMain.amperage}A` : "Main lugs"}</div>
           </div>
           {project.buildings.map(building => <div key={building.id} style={{ marginBottom: 12, borderTop: "1px solid #2c4553", paddingTop: 8 }}>
             <strong>{building.kind === "MAIN" ? "🏠" : "🏗"} {building.name}</strong>
             {building.kind === "DETACHED" && <div style={{ color: "#f1b96e", fontSize: 11 }}>Subpanel / feeder: not yet configured</div>}
-            {project.areas.filter(area => area.buildingId === building.id).map(area => <button key={area.id} onClick={() => { changeProject({ ...project, activeAreaId: area.id }); setWorkspaceScope(`${project.id}:${area.id}:OVERVIEW`); setActiveWall(null); setShowService(false); setShowElectricalService(false); }} style={{ display: "block", width: "100%", marginTop: 5, textAlign: "left", background: !showService && project.activeAreaId === area.id ? "#146d8d" : "#243442" }}>▸ {area.name}</button>)}
+            {project.areas.filter(area => area.buildingId === building.id).map(area => <button key={area.id} onClick={() => { changeProject({ ...project, activeAreaId: area.id }); setWorkspaceScope(`${project.id}:${area.id}:OVERVIEW`); setActiveWall(null); setShowBlueprint(false); setShowService(false); setShowElectricalService(false); }} style={{ display: "block", width: "100%", marginTop: 5, textAlign: "left", background: !showService && project.activeAreaId === area.id ? "#146d8d" : "#243442" }}>▸ {area.name}</button>)}
             <button onClick={() => addArea(building.id)} style={{ marginTop: 6, width: "100%" }}>+ Add Room / Area</button>
           </div>)}
           <button onClick={addBuilding} style={{ width: "100%" }}>+ Detached Building</button>
@@ -733,10 +736,11 @@ export default function SimulatorLayout() {
           }}
         >
 
-          {project && showService && showElectricalService && <ElectricalServiceWorkspace project={project} onChange={changeProject} />}
-          {project && showService && !showElectricalService && <ServiceOverview project={project} onChange={changeProject} onOpenDestination={(areaId, wall) => { changeProject({...project, activeAreaId: areaId}); setWorkspaceScope(`${project.id}:${areaId}:${wall}`); setActiveWall(wall); setShowService(false); }} />}
-          {project && !showService && project.activeAreaId && !activeWall && <RoomLayout area={project.areas.find(a => a.id === project.activeAreaId)!} onOpenWall={wall => { setWorkspaceScope(`${project.id}:${project.activeAreaId}:${wall}`); setActiveWall(wall); }} />}
-          {project && !showService && project.activeAreaId && activeWall && <>
+          {project && showBlueprint && <WholeHouseBlueprint project={project} onChange={changeProject} onOpenRoom={areaId=>{changeProject({...project,activeAreaId:areaId});setShowBlueprint(false);setShowService(false);setWorkspaceScope(`${project.id}:${areaId}:OVERVIEW`);setActiveWall(null);}} onOpenPanel={()=>{setShowBlueprint(false);setShowService(true);setShowElectricalService(false);setWorkspaceScope("SERVICE");setActiveWall(null);}} />}
+          {project && !showBlueprint && showService && showElectricalService && <ElectricalServiceWorkspace project={project} onChange={changeProject} />}
+          {project && !showBlueprint && showService && !showElectricalService && <ServiceOverview project={project} onChange={changeProject} onOpenDestination={(areaId, wall) => { changeProject({...project, activeAreaId: areaId}); setWorkspaceScope(`${project.id}:${areaId}:${wall}`); setActiveWall(wall); setShowService(false); }} />}
+          {project && !showBlueprint && !showService && project.activeAreaId && !activeWall && <RoomLayout area={project.areas.find(a => a.id === project.activeAreaId)!} onOpenWall={wall => { setWorkspaceScope(`${project.id}:${project.activeAreaId}:${wall}`); setActiveWall(wall); }} />}
+          {project && !showBlueprint && !showService && project.activeAreaId && activeWall && <>
             <div style={{ display: "flex", gap: 12, alignItems: "center", padding: "5px 8px 12px", color: "#90e7ff", fontSize: 13 }}>
               <button onClick={() => setActiveWall(null)}>← Four-Wall Room</button>
               <strong>{project.areas.find(a => a.id === project.activeAreaId)?.name} / {activeWall} Wall</strong>
@@ -747,7 +751,7 @@ export default function SimulatorLayout() {
             <WallCircuitInspector project={project} areaId={project.activeAreaId} wall={activeWall} devices={devices} connections={connections} />
 
           </>}
-          {project && !showService && !project.activeAreaId && <div style={{ padding: 24 }}>Add a room from the Project Explorer to begin.</div>}
+          {project && !showBlueprint && !showService && !project.activeAreaId && <div style={{ padding: 24 }}>Add a room from the Project Explorer to begin.</div>}
 
         </div>
 

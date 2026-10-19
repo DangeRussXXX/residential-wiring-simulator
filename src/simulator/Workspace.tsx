@@ -174,10 +174,13 @@ function Workspace(
     try { localStorage.setItem(`rws-home-run-routes:${workspaceScope}`, JSON.stringify(homeRunRoutes)); } catch {}
   }, [homeRunRoutes, workspaceScope]);
   const heightToY = (height:number) => 1150 - height * 8 - 45;
+  const [selectedStud, setSelectedStud] = useState<number|null>(null);
   const nailToStud = (device:ElectricalDevice) => {
+    if(selectedStud === null) { window.alert("Select a highlighted stud before installing."); return; }
     const pitch = studSpacing * 8;
-    const studX = Math.round((device.x + 6) / pitch) * pitch;
-    setDevices(prev => prev.map(d => d.id === device.id ? {...d,x:studX-6} : d));
+    const studX = selectedStud * pitch + 13;
+    const h=mountingHeights[device.id] ?? (/switch/i.test(device.type)?48:/light/i.test(device.type)?84:12);
+    setDevices(prev => prev.map(d => d.id === device.id ? {...d,x:studX-6,y:heightToY(h)} : d));
     setNailedDevices(prev => ({...prev,[device.id]:true}));
   };
   const [studSpacing, setStudSpacing] = useState(16);
@@ -1663,6 +1666,10 @@ function Workspace(
           </div>
         )}
 
+        <span title="Click a stud on the wall to highlight it before installing a device"
+          style={{fontSize:12,color:"#10394e",background:"#d8f5ff",padding:6,borderRadius:4}}>
+          {selectedStud===null?"Select a stud":`Stud #${selectedStud+1} selected`}
+        </span>
         <button type="button" onClick={()=>setRouteEdit(v=>!v)}
           style={{background:routeEdit?"#9bd8ef":"#edf4f8",color:"#193747",border:"1px solid #478aa8",borderRadius:5,padding:"5px 8px"}}>
           {routeEdit?"✓ Finish Home-Run Route":"↪ Route Home Run"}
@@ -1967,6 +1974,19 @@ function Workspace(
           </svg>
 
 
+          {/* Select a stud before installation. */}
+          {Array.from({length:Math.ceil(2000/(studSpacing*8))},(_,index)=>{
+            const x=index*studSpacing*8+13;
+            return <button key={`stud-${index}`} type="button"
+              title={`Stud ${index+1} • ${Math.round(index*studSpacing*10)/10}" from left • click to select`}
+              aria-label={`Select stud ${index+1}`}
+              onMouseDown={e=>e.stopPropagation()}
+              onClick={e=>{e.stopPropagation();setSelectedStud(index);}}
+              style={{position:"absolute",left:x-12,top:110,width:25,height:1030,
+                border:selectedStud===index?"3px solid #20d8ff":"1px solid transparent",
+                background:selectedStud===index?"rgba(17,212,255,.19)":"transparent",
+                cursor:"pointer",zIndex:2,padding:0}}/>;
+          })}
           {/* =================================================
               DEVICES
               ================================================= */}
@@ -2039,9 +2059,20 @@ function Workspace(
               <button type="button" title={nailed?"Already fastened":"Nail device to stud"} aria-label="Nail device to stud" disabled={nailed}
                 onClick={e=>{e.stopPropagation();nailToStud(device);}}
                 style={{border:"1px solid #8a6b36",borderRadius:5,padding:"4px 7px",background:nailed?"#ddd":"#fff0c9",cursor:nailed?"default":"pointer"}}>🔨</button>
-              <button type="button" title={nailed?"Remove fastener and release device":"Device is not fastened"} aria-label="Remove device with crowbar" disabled={!nailed}
-                onClick={e=>{e.stopPropagation();setNailedDevices(prev=>({...prev,[device.id]:false}));}}
-                style={{border:"1px solid #53768a",borderRadius:5,padding:"4px 7px",background:nailed?"#d8f0ff":"#eee",cursor:nailed?"pointer":"default"}}>🪛</button>
+              <button type="button" title="Crowbar: remove only this component from the wall" aria-label="Remove selected component with crowbar"
+                onClick={e=>{
+                  e.stopPropagation();
+                  const attached=connections.some(c=>c.from.deviceId===device.id||c.to.deviceId===device.id)||
+                    wires.some(w=>w.from.deviceId===device.id||w.to.deviceId===device.id);
+                  if(!window.confirm(`Remove ${device.name||device.type} from this wall${attached?" and delete its connected wires":""}?`))return;
+                  setDevices(prev=>prev.filter(d=>d.id!==device.id));
+                  setConnections(prev=>prev.filter(c=>c.from.deviceId!==device.id&&c.to.deviceId!==device.id));
+                  setWires(prev=>prev.filter(w=>w.from.deviceId!==device.id&&w.to.deviceId!==device.id));
+                  setMountingHeights(prev=>{const n={...prev};delete n[device.id];return n;});
+                  setNailedDevices(prev=>{const n={...prev};delete n[device.id];return n;});
+                  setSelectedDevice(null);onSelectDevice?.(null);
+                }}
+                style={{border:"1px solid #53768a",borderRadius:5,padding:"4px 7px",background:"#d8f0ff",cursor:"pointer"}}>🪛</button>
             </div>;
           })}
 

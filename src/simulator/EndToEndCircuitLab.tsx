@@ -76,7 +76,8 @@ export default function EndToEndCircuitLab({project,onChange,location}:Props) {
   const activeSlot=routes.find(r=>r.slot===slot)?.slot??routes[0]?.slot??slot??1;
   const devices=location?.devices??scopedDevices(project,areaId,wall);
   const receptacles=devices; // All wall devices can receive a planned home run.
-  const stored=(project.endToEndCircuits??[]).find(c=>c.slot===activeSlot&&c.areaId===areaId&&c.wall===wall);
+  const stored=(project.endToEndCircuits??[]).find(c=>c.slot===activeSlot&&c.areaId===areaId&&c.wall===wall&&c.receptacleId===chosen)
+    ?? (chosen ? undefined : (project.endToEndCircuits??[]).find(c=>c.slot===activeSlot&&c.areaId===areaId&&c.wall===wall));
   const receptacleId=receptacles.some(d=>d.id===chosen)?chosen:
     receptacles.some(d=>d.id===stored?.receptacleId)?stored!.receptacleId:receptacles[0]?.id??"";
   // A different selected device must not inherit a previous device's terminals.
@@ -103,7 +104,7 @@ export default function EndToEndCircuitLab({project,onChange,location}:Props) {
   ];
   function save(next:EndToEndCircuit) {
     onChange({...project,endToEndCircuits:[
-      ...(project.endToEndCircuits??[]).filter(c=>!(c.slot===next.slot&&c.areaId===next.areaId&&c.wall===next.wall)),
+      ...(project.endToEndCircuits??[]).filter(c=>!(c.slot===next.slot&&c.areaId===next.areaId&&c.wall===next.wall&&c.receptacleId===next.receptacleId)),
       next
     ]});
     setInspection(null);
@@ -146,6 +147,21 @@ export default function EndToEndCircuitLab({project,onChange,location}:Props) {
             receptacles.map(d=><option key={d.id} value={d.id}>{d.name} · {d.type} ({d.id.slice(0,8)})</option>)}
         </select>
       </label>
+      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:9}}>
+        <button type="button" style={btn} title="Add an independent home-run destination for this breaker and wall"
+          disabled={!receptacleId}
+          onClick={()=>save({...circuit,receptacleId})}>＋ Add Home Run</button>
+        <button type="button" style={{...btn,background:"#593044"}} title="Remove only this selected home-run destination"
+          disabled={!(project.endToEndCircuits??[]).some(c=>c.slot===activeSlot&&c.areaId===areaId&&c.wall===wall&&c.receptacleId===receptacleId)}
+          onClick={()=>{
+            if(!window.confirm("Remove this home run?"))return;
+            onChange({...project,endToEndCircuits:(project.endToEndCircuits??[]).filter(c=>!(c.slot===activeSlot&&c.areaId===areaId&&c.wall===wall&&c.receptacleId===receptacleId))});
+            setChosen("");setInspection(null);
+          }}>Remove Home Run</button>
+      </div>
+      <div style={{fontSize:11,color:"#b8d9e8",marginBottom:8}}>
+        Home runs on this wall: {(project.endToEndCircuits??[]).filter(c=>c.areaId===areaId&&c.wall===wall).length}
+      </div>
       {receptacleId&&<>{!supportsTerminals && <div style={{padding:10,border:"1px solid #6d7f94",borderRadius:6,marginBottom:10,fontSize:12,color:"#e8cba5"}}>Home run is assigned to <strong>{selectedDevice?.name ?? "this device"}</strong>. Its white NM-B jacket appears on the wall layout. This device type needs a dedicated terminal/splice wiring model; the receptacle screw diagram is intentionally hidden.</div>}{supportsTerminals&&<>
         <div style={{fontSize:11,color:"#aacbdc",marginBottom:6}}>
           {selectedWire?`Selected ${selectedWire.toUpperCase()}: choose a terminal screw →`:"Select or drag a conductor end to a terminal screw."}

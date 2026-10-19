@@ -143,6 +143,7 @@ function Workspace(
 
 
   const [studSpacing, setStudSpacing] = useState(16);
+  const [snapToStuds, setSnapToStuds] = useState(true);
 
   const [
     wireColor,
@@ -324,7 +325,7 @@ function Workspace(
         ) as Voltage,
 
       x:
-        dropX,
+        snapToStuds && ["outlet", "gfci", "switch-single", "switch-three-way", "dimmer"].includes(definition.symbol) ? Math.round((dropX + 6) / (studSpacing * 8)) * (studSpacing * 8) - 6 : dropX,
 
       y:
         dropY,
@@ -1217,9 +1218,9 @@ function Workspace(
               ...device,
 
               x:
-                e.clientX -
-                rect.left -
-                75,
+                snapToStuds && ["outlet", "gfci", "switch-single", "switch-three-way", "dimmer"].includes(device.symbol)
+                  ? Math.round((e.clientX - rect.left - 69) / (studSpacing * 8)) * (studSpacing * 8) - 6
+                  : e.clientX - rect.left - 75,
 
               y:
                 e.clientY -
@@ -1665,6 +1666,8 @@ function Workspace(
             <option value={24}>24" O.C.</option>
           </select>
         </label>
+
+        <label style={{display:"flex",alignItems:"center",gap:5,fontSize:12}}><input type="checkbox" checked={snapToStuds} onChange={e=>setSnapToStuds(e.target.checked)}/>Snap boxes to studs</label>
 
         <button
           onClick={

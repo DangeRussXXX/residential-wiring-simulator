@@ -69,57 +69,6 @@ function DeviceFace({ device }: { device: ElectricalDevice }) {
 }
 
 
-/** First-pass simple wiring: one 14/2 cable, one standard receptacle, no splice.
- * All endpoints come from the saved cable end. No connection is invented. */
-function SimpleReceptacleWiring({device,cable}:{device:ElectricalDevice;cable:CableRecord}) {
-  const side=cable.from===device.id?"from":"to";
-  const assignments=cable.ends?.[side]??{};
-  const endpoints=[
-    {wire:"black",x:120,y:52,color:"#111820",label:"HOT · brass"},
-    {wire:"white",x:31,y:52,color:"#ffffff",label:"NEUTRAL · silver"},
-    {wire:"ground",x:77,y:102,color:"#b97943",label:"GROUND · green"}
-  ];
-  const isAttached=(wire:string)=>{
-    const terminal=String(assignments[wire]??"").toLowerCase();
-    if(!terminal||terminal==="cap"||terminal.startsWith("splice:"))return false;
-    if(wire==="ground")return terminal.includes("ground");
-    if(wire==="white")return terminal.includes("neutral")||terminal.includes("silver");
-    return terminal.includes("hot")||terminal.includes("brass")||terminal==="line";
-  };
-  return <svg viewBox="0 0 150 122" width="150" height="122" role="img" aria-label={`${device.name}: one cable enters at top, conductors visible to saved receptacle terminals`}>
-    <rect x="3" y="3" width="144" height="116" rx="10" fill="#aebbc2" stroke="#4d6877" strokeWidth="3"/>
-    <rect x="10" y="10" width="130" height="102" rx="6" fill="#dce4e5" stroke="#78909a" strokeWidth="1.5"/>
-    <rect x="61" y="13" width="28" height="13" rx="3" fill="#697e87" stroke="#3c5968" strokeWidth="2"/>
-    <path d="M 75 -2 V 23" stroke="#111820" strokeWidth="13"/>
-    <path d="M 75 -2 V 23" stroke="#c8c9c5" strokeWidth="9"/>
-    <rect x="48" y="35" width="54" height="70" rx="8" fill="#f2f1e9" stroke="#7f949e" strokeWidth="2.5"/>
-    <rect x="62" y="48" width="5" height="13" rx="1" fill="#343e44"/>
-    <rect x="84" y="48" width="5" height="13" rx="1" fill="#343e44"/>
-    <path d="M 70 66 L 80 66 L 75 60 Z" fill="#343e44"/>
-    <rect x="62" y="76" width="5" height="13" rx="1" fill="#343e44"/>
-    <rect x="84" y="76" width="5" height="13" rx="1" fill="#343e44"/>
-    <path d="M 70 95 L 80 95 L 75 89 Z" fill="#343e44"/>
-    {endpoints.map(({wire,x,y,color,label})=>{
-      const attached=isAttached(wire);
-      const capped=assignments[wire]==="cap";
-      const endX=attached?x:wire==="black"?109:wire==="white"?40:95;
-      const endY=attached?y:wire==="ground"?94:40;
-      const d=`M 75 23 C ${wire==="black"?116:wire==="white"?33:76} 40 ${endX} ${endY-16} ${endX} ${endY}`;
-      return <g key={wire}>
-        <path d={d} fill="none" stroke={wire==="white"?"#627a87":"#637d89"} strokeWidth="7" strokeLinecap="round"/>
-        <path d={d} fill="none" stroke={color} strokeWidth="4.7" strokeLinecap="round"/>
-        {capped&&<g transform={`translate(${endX} ${endY-7})`}><path d="M -6 5 L -6 -4 Q 0 -15 6 -4 L 6 5 Z" fill="#efa135" stroke="#a8641d" strokeWidth="1.5"/><path d="M -4 -1 H 4 M -4 2 H 4" stroke="#b46c25" strokeWidth="1"/></g>}
-        <title>{wire.toUpperCase()} — {attached?`connected to ${label}`:capped?"individually capped":"loose / not terminated"}</title>
-      </g>;
-    })}
-    {endpoints.map(({wire,x,y,label})=><g key={`terminal-${wire}`}>
-      <circle cx={x} cy={y} r="6.5" fill={wire==="black"?"#c99942":wire==="white"?"#c7d3d9":"#3cb681"} stroke="#385362" strokeWidth="1.8"/>
-      <path d={`M ${x-3} ${y} H ${x+3}`} stroke="#364750" strokeWidth="1.5"/>
-      <title>{label} · {isAttached(wire)?"connected":"not connected"}</title>
-    </g>)}
-  </svg>;
-}
-
 /** Integrated open box: all conductors and connectors are drawn INSIDE the same device. */
 function WiredBox({device,cables}:{device:ElectricalDevice;cables:CableRecord[]}) {
   const splices=cables.flatMap(c=>c.splices??[]).filter((sp,i,all)=>sp.deviceId===device.id&&all.findIndex(other=>other.id===sp.id)===i);
@@ -164,15 +113,24 @@ function WiredBox({device,cables}:{device:ElectricalDevice;cables:CableRecord[]}
     {isGfci&&<g><rect x="99" y="47" width="14" height="6" rx="2" fill="#b74640"/><rect x="99" y="55" width="14" height="6" rx="2" fill="#48545d"/></g>}
     {isSwitch&&<rect x="101" y="43" width="10" height="28" rx="2" fill="#85939c" stroke="#52616c"/>}
     {!isSwitch&&!isGfci&&<circle cx="106" cy="61" r="12" fill="#fff7d8" stroke="#aab3b7" strokeWidth="2"/>}
+    {/* Cable jacket ends at the TOP of the compact box; all conductor paths begin here. */}
+    {cables.slice(0,4).map((c,ci)=>{const x=44+(ci-(Math.min(cables.length,4)-1)/2)*20;return <g key={`entry-${c.id}`}>
+      <path d={`M ${x} -5 V 19`} stroke="#435562" strokeWidth="13" strokeLinecap="round"/>
+      <path d={`M ${x} -5 V 19`} stroke={c.type.includes("MC")?"#aabac2":"#e8e4d9"} strokeWidth="9" strokeLinecap="round"/>
+      <rect x={x-8} y="15" width="16" height="6" rx="2" fill="#8c9fa7" stroke="#516977" strokeWidth="1"/>
+    </g>})}
     {terminals.map(t=><g key={t.id}><circle cx={t.x} cy={t.y} r="5.3" fill={t.color} stroke="#4e626d" strokeWidth="1.2"/><path d={`M ${t.x-2.6} ${t.y} H ${t.x+2.6}`} stroke="#31424b" strokeWidth="1.3"/></g>)}
     {wires.map(({c,end,color,terminal},i)=>{
-      const entryX=16+(i%4)*9,entryY=106;
+      const ci=cables.findIndex(item=>item.id===c.id);
+      const conductorIndex=(c.type.includes("/3")?["black","red","white","ground"]:["black","white","ground"]).indexOf(color);
+      const entryX=44+(ci-(Math.min(cables.length,4)-1)/2)*20+(conductorIndex-1.5)*3;
+      const entryY=21;
       if(terminal?.startsWith("splice:"))return null;
       const t=terminal&&terminal!=="cap"?terminalPoint(terminal):null;
       const capped=terminal==="cap";
       const targetX=t?.x??(22+(i%4)*11),targetY=t?.y??(capped?35+(Math.floor(i/4)*24):32+(i%4)*13);
       return <g key={`${c.id}-${end}-${color}`}>
-        {trace(`M ${entryX} ${entryY} C ${entryX} ${entryY-36} ${targetX-22} ${targetY+23} ${targetX} ${targetY}`,color)}
+        {trace(`M ${entryX} ${entryY} C ${entryX} ${entryY+27} ${targetX-20} ${targetY-23} ${targetX} ${targetY}`,color)}
         {capped&&nut(targetX,targetY-8)}
         <title>{color.toUpperCase()} · {c.fromName??"Panel"} → {c.toName??device.name} · {terminal??"Loose"}</title>
       </g>;
@@ -181,9 +139,10 @@ function WiredBox({device,cables}:{device:ElectricalDevice;cables:CableRecord[]}
       const x=26+i*21,y=26+(i%2)*11;
       return <g key={sp.id}>
         {sp.members.slice(0,5).map((m,j)=>{
-          const startX=18+j*9;
+          const ci=cables.findIndex(c=>c.id===m.cableId);
+          const startX=44+(ci-(Math.min(cables.length,4)-1)/2)*20+(j-1.5)*3;
           return <g key={`${m.cableId}-${m.end}-${m.conductor}-${j}`}>
-            {trace(`M ${startX} 106 C ${startX-4} 69 ${x-8+j*4} ${y+26} ${x-7+j*4} ${y+8}`,m.conductor)}
+            {trace(`M ${startX} 21 C ${startX} 46 ${x-8+j*4} ${y-10} ${x-7+j*4} ${y+8}`,m.conductor)}
           </g>;
         })}
         {sp.pigtailTerminal&&(()=>{const t=terminalPoint(sp.pigtailTerminal);const family=sp.members[0]?.conductor??"black";return <g>{trace(`M ${x+6} ${y+8} C ${x+28} ${y+30} ${t.x-29} ${t.y-21} ${t.x} ${t.y}`,family)}<title>Pigtail → {sp.pigtailTerminal}</title></g>})()}
@@ -301,16 +260,14 @@ export default function Device({ device, wireMode, selectedTerminal, selected, o
   void selectedTerminal; void onTerminalClick;
   const [expanded,setExpanded]=useState(false);
   const showWiredBox=wiringCables.length>0;
-  const simpleReceptacle=device.symbol==="outlet"&&wiringCables.length===1&&
-    wiringCables[0].type.includes("14/2")&&
-    !(wiringCables[0].splices??[]).some(sp=>sp.deviceId===device.id);
+  // All compact device types share the same saved-termination rendering path.
   const isExpanded=expanded&&showWiredBox;
 
   const wallMounted = ["outlet", "gfci", "switch-single", "switch-three-way", "dimmer"].includes(device.symbol);
   return <div className="device-component" title={`${device.name} — ${device.type}. Select to inspect or install.`} onMouseDown={e => { e.stopPropagation(); onSelect(device.id); if (wireMode) onCableDestination(device.id); else if(!expanded) onStartDrag(device.id); }}
     style={{position:"absolute",left:device.x,top:device.y,width:isExpanded?530:150,height:isExpanded?430:150,boxSizing:"border-box",border:selected?"2px solid #00c9f3":"2px solid transparent",borderRadius:8,boxShadow:isExpanded?"0 14px 36px #0009, 0 0 0 3px #00c9f3":"none",background:isExpanded?"#c9d0d1":"transparent",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:wireMode?"crosshair":"grab",userSelect:"none",zIndex:isExpanded?45:10}}>
     {!showWiredBox&&wallMounted && <div title="Electrical device box" style={{position:"absolute",top:10,left:18,width:114,height:120,background:"#174e87",border:"4px solid #12375c",borderRadius:9,boxShadow:"inset 0 0 0 3px #4680ad, 2px 4px 7px #0005"}}/>}
-    <div style={{position:"relative",zIndex:1,transform:"none",filter:"drop-shadow(1px 3px 2px #0005)",pointerEvents:"none"}}>{isExpanded?<ExpandedDeviceWiring device={device} cables={wiringCables}/>:simpleReceptacle?<SimpleReceptacleWiring device={device} cable={wiringCables[0]}/>:showWiredBox?<WiredBox device={device} cables={wiringCables}/>:<DeviceFace device={device}/>}</div>
+    <div style={{position:"relative",zIndex:1,transform:"none",filter:"drop-shadow(1px 3px 2px #0005)",pointerEvents:"none"}}>{isExpanded?<ExpandedDeviceWiring device={device} cables={wiringCables}/>:showWiredBox?<WiredBox device={device} cables={wiringCables}/>:<DeviceFace device={device}/>}</div>
     {showWiredBox&&<button type="button" title={isExpanded?"Collapse wiring view":"Expand wiring on wall"} onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();setExpanded(v=>!v);onSelect(device.id);}} style={{position:"absolute",top:2,right:2,zIndex:50,background:"#13516c",color:"#fff",border:"2px solid #7edcf0",borderRadius:5,padding:"4px 8px",fontSize:isExpanded?16:12,cursor:"pointer"}}>{isExpanded?"− Close":"⤢"}</button>}
     {isExpanded&&<div style={{position:"absolute",bottom:5,left:12,right:12,textAlign:"center",fontSize:13,color:"#183c4c",fontWeight:700,pointerEvents:"none"}}>Only saved connections shown · Click − Close to return to wall</div>}
     <div style={{position:"absolute",top:isExpanded?383:130,left:isExpanded?12:-8,width:isExpanded?320:166,textAlign:"center",fontSize:12,fontWeight:700,color:"#17212c",textShadow:"0 1px #ffffff",pointerEvents:"none"}}>{device.name}</div>

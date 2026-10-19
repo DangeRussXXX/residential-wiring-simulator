@@ -15,7 +15,8 @@ import {
   useState,
   useImperativeHandle,
   forwardRef,
-  useRef
+  useRef,
+  useEffect
 } from "react";
 
 import type {
@@ -114,7 +115,8 @@ function Workspace(
     connections,
     setConnections,
     selectedDevice,
-    setSelectedDevice
+    setSelectedDevice,
+    workspaceScope
   } = useSimulator();
 
 
@@ -125,7 +127,13 @@ function Workspace(
   const [
     wires,
     setWires
-  ] = useState<Wire[]>([]);
+  ] = useState<Wire[]>(() => {
+    try { return JSON.parse(localStorage.getItem(`rws-visual-wires:${workspaceScope}`) || "[]") as Wire[]; }
+    catch { return []; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem(`rws-visual-wires:${workspaceScope}`, JSON.stringify(wires)); } catch { /* storage unavailable */ }
+  }, [workspaceScope, wires]);
 
 
   const [
@@ -133,6 +141,8 @@ function Workspace(
     setWireMode
   ] = useState(false);
 
+
+  const [studSpacing, setStudSpacing] = useState(16);
 
   const [
     wireColor,
@@ -1646,6 +1656,16 @@ function Workspace(
         </select>
 
 
+        <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12 }}>
+          Studs
+          <select value={studSpacing} onChange={e => setStudSpacing(Number(e.target.value))}>
+            <option value={12}>12" O.C.</option>
+            <option value={16}>16" O.C.</option>
+            <option value={19.2}>19.2" O.C.</option>
+            <option value={24}>24" O.C.</option>
+          </select>
+        </label>
+
         <button
           onClick={
             clearWorkspace
@@ -1756,9 +1776,11 @@ function Workspace(
             height:
               "1200px",
 
-            position:
-              "relative"
-
+            position: "relative",
+            backgroundImage: "linear-gradient(90deg,transparent 0px,transparent 5px,#bd8d57 5px,#bd8d57 21px,#80552d 22px,#80552d 24px,transparent 24px),linear-gradient(0deg,transparent 0px,transparent 1150px,#ae7b45 1150px,#ae7b45 1180px,transparent 1180px)",
+            backgroundSize: `${studSpacing * 8}px 1200px,2000px 1200px`,
+            backgroundRepeat: "repeat-x,no-repeat",
+            backgroundColor: "#d6d2c8"
           }}
 
         >

@@ -44,19 +44,24 @@ import type {
 
 
 import ServiceSetup from "../simulator/ServiceSetup";
+import RoomLayout, { type WallSide } from "../simulator/RoomLayout";
 import ServiceOverview from "../simulator/ServiceOverview";
-import { loadServiceProject, saveServiceProject, clearServiceProject, type ServiceProject } from "../simulator/projectWorkflow";
+import { loadServiceProject, saveServiceProject, clearServiceProject, createServiceProject, type ServiceProject } from "../simulator/projectWorkflow";
 
 export default function SimulatorLayout() {
 
   const [project, setProject] = useState<ServiceProject | null>(() => loadServiceProject());
   const [showService, setShowService] = useState(true);
+  const [activeWall, setActiveWall] = useState<WallSide | null>(null);
+  const [configureService, setConfigureService] = useState(false);
   function changeProject(next: ServiceProject) { setProject(next); saveServiceProject(next); }
   function addArea(buildingId: string) {
     const name = window.prompt("Room or area name (e.g. Bedroom 1):");
     if (!name?.trim() || !project) return;
     const area = { id: crypto.randomUUID(), name: name.trim(), buildingId, kind: "ROOM" as const };
     changeProject({ ...project, areas: [...project.areas, area], activeAreaId: area.id });
+    setActiveWall(null);
+    setWorkspaceScope(`${project.id}:${area.id}:OVERVIEW`);
     setShowService(false);
   }
   function addBuilding() {
@@ -81,7 +86,8 @@ export default function SimulatorLayout() {
     connections,
     setConnections,
     selectedDevice,
-    setSelectedDevice
+    setSelectedDevice,
+    workspaceScope, setWorkspaceScope, clearWorkspaceScopes
   } = useSimulator();
 
 
@@ -591,7 +597,15 @@ export default function SimulatorLayout() {
 
   return (
     <>
-    {!project && <ServiceSetup onCreate={changeProject} />}
+    {!project && (configureService ? <ServiceSetup onCreate={next => { changeProject(next); setConfigureService(false); setShowService(true); setWorkspaceScope("SERVICE"); }} /> :
+      <div style={{ position: "fixed", inset: 0, zIndex: 2000, background: "#0b1420", display: "grid", placeItems: "center", color: "white" }}>
+        <div style={{ maxWidth: 520, padding: 36, border: "1px solid #267e9c", borderRadius: 14, background: "#142332", textAlign: "center" }}>
+          <h1 style={{ color: "#65e2fa" }}>⚡ Residential Wiring Simulator</h1>
+          <p>Start with your project, then build rooms and framed walls. Service settings can be edited separately.</p>
+          <button onClick={() => { changeProject(createServiceProject("My Residential Project", "UNDERGROUND", 200, "SEPARATE")); setShowService(false); }} style={{ padding: 14, width: "100%", background: "#087eaa", marginBottom: 10 }}>Create Project — Default 200A Underground</button>
+          <button onClick={() => setConfigureService(true)} style={{ padding: 12, width: "100%" }}>Configure Service First (Optional)</button>
+        </div>
+      </div>)}
     <div
       style={{
         height: "100vh",
@@ -625,16 +639,16 @@ export default function SimulatorLayout() {
         {project && <aside style={{ width: 205, flexShrink: 0, background: "#101a25", padding: 10, overflowY: "auto", borderRight: "1px solid #29627b", fontSize: 13 }}>
           <strong style={{ color: "#72dcff" }}>PROJECT EXPLORER</strong>
           <div style={{ margin: "8px 0", overflowWrap: "anywhere" }}>{project.name}</div>
-          <button onClick={() => setShowService(true)} style={{ width: "100%", marginBottom: 10, background: showService ? "#146d8d" : "#243c4b" }}>⚡ Service & Panel</button>
+          <button onClick={() => { setShowService(true); setWorkspaceScope("SERVICE"); setActiveWall(null); }} style={{ width: "100%", marginBottom: 10, background: showService ? "#146d8d" : "#243c4b" }}>⚡ Service & Panel</button>
           {project.buildings.map(building => <div key={building.id} style={{ marginBottom: 12, borderTop: "1px solid #2c4553", paddingTop: 8 }}>
             <strong>{building.kind === "MAIN" ? "🏠" : "🏗"} {building.name}</strong>
             {building.kind === "DETACHED" && <div style={{ color: "#f1b96e", fontSize: 11 }}>Subpanel / feeder: not yet configured</div>}
-            {project.areas.filter(area => area.buildingId === building.id).map(area => <button key={area.id} onClick={() => { changeProject({ ...project, activeAreaId: area.id }); setShowService(false); }} style={{ display: "block", width: "100%", marginTop: 5, textAlign: "left", background: !showService && project.activeAreaId === area.id ? "#146d8d" : "#243442" }}>▸ {area.name}</button>)}
+            {project.areas.filter(area => area.buildingId === building.id).map(area => <button key={area.id} onClick={() => { changeProject({ ...project, activeAreaId: area.id }); setWorkspaceScope(`${project.id}:${area.id}:OVERVIEW`); setActiveWall(null); setShowService(false); }} style={{ display: "block", width: "100%", marginTop: 5, textAlign: "left", background: !showService && project.activeAreaId === area.id ? "#146d8d" : "#243442" }}>▸ {area.name}</button>)}
             <button onClick={() => addArea(building.id)} style={{ marginTop: 6, width: "100%" }}>+ Add Room / Area</button>
           </div>)}
           <button onClick={addBuilding} style={{ width: "100%" }}>+ Detached Building</button>
-          <button onClick={() => { if (window.confirm("Start a new service project? The current project navigation will be replaced.")) { clearServiceProject(); setProject(null); } }} style={{ width: "100%", marginTop: 24, color: "#ffc3ae" }}>New Service Project</button>
-          <p style={{ fontSize: 11, color: "#9caebb" }}>Rooms are organized here. Workspace devices are still shared globally until room-scoped wiring is implemented.</p>
+          <button onClick={() => { if (window.confirm("Start a new service project? The current project navigation will be replaced.")) { clearServiceProject(); clearWorkspaceScopes(); setProject(null); setActiveWall(null); } }} style={{ width: "100%", marginTop: 24, color: "#ffc3ae" }}>New Service Project</button>
+          <p style={{ fontSize: 11, color: "#9caebb" }}>Every wall has independent devices and connections. Service and rooms remain separate until feeder integration.</p>
         </aside>}
 
         {/* =============================== */}
@@ -708,20 +722,16 @@ export default function SimulatorLayout() {
         >
 
           {project && showService && <ServiceOverview project={project} onChange={changeProject} />}
-          {project && !showService && <div style={{ padding: "4px 8px", color: "#90e7ff", fontSize: 13 }}>Editing: {project.areas.find(a => a.id === project.activeAreaId)?.name ?? "Choose a room"}</div>}
-          <Workspace
-            ref={
-              workspaceRef
-            }
-
-            onSelectDevice={
-              setSelectedDevice
-            }
-
-            onCircuitPathsChange={
-              setCircuitPaths
-            }
-          />
+          {project && !showService && project.activeAreaId && !activeWall && <RoomLayout area={project.areas.find(a => a.id === project.activeAreaId)!} onOpenWall={wall => { setWorkspaceScope(`${project.id}:${project.activeAreaId}:${wall}`); setActiveWall(wall); }} />}
+          {project && !showService && project.activeAreaId && activeWall && <>
+            <div style={{ display: "flex", gap: 12, alignItems: "center", padding: "5px 8px 12px", color: "#90e7ff", fontSize: 13 }}>
+              <button onClick={() => setActiveWall(null)}>← Four-Wall Room</button>
+              <strong>{project.areas.find(a => a.id === project.activeAreaId)?.name} / {activeWall} Wall</strong>
+              <span style={{ color: "#a8bdc9" }}>2×4 studs · 16" O.C.</span>
+            </div>
+            <Workspace key={workspaceScope} ref={workspaceRef} onSelectDevice={setSelectedDevice} onCircuitPathsChange={setCircuitPaths} />
+          </>}
+          {project && !showService && !project.activeAreaId && <div style={{ padding: 24 }}>Add a room from the Project Explorer to begin.</div>}
 
         </div>
 

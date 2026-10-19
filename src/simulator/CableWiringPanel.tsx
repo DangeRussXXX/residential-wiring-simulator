@@ -109,6 +109,17 @@ function DeviceArtwork({kind,breakerSlot,front}:{kind:string;breakerSlot?:number
       <text x="349" y="167" fontSize="9" fill="#f7d79b">LOAD</text></>}
   </g>;
 }
+function WireConnector({x,y,splice=false,selected=false}:{x:number;y:number;splice?:boolean;selected?:boolean}) {
+  // Wire approaches from left; connector mouth is at x, closed tip at x+27.
+  return <g transform={`translate(${x} ${y})`} pointerEvents="none">
+    <path d="M -2 -10 L 9 -10 Q 14 -10 17 -8 L 26 -5 Q 30 0 26 5 L 17 8 Q 14 10 9 10 L -2 10 Z"
+      fill={splice?"#e69a2f":"#ecaa38"} stroke="#ffe1a3" strokeWidth="1.7"/>
+    <rect x="-2" y="-11" width="7" height="22" rx="2" fill="#bb7124" stroke="#ffe1a3" strokeWidth="1.3"/>
+    {[8,12,16,20].map((v,i)=><path key={v} d={`M ${v} ${-9+i*0.5} L ${v+2} ${9-i*0.5}`} stroke="#a65b1e" strokeWidth="1.7" opacity=".8"/>)}
+    <path d="M 22 -4 Q 27 0 22 4" fill="none" stroke="#ffd48b" strokeWidth="1.2"/>
+    {selected&&<path d="M -5 -15 H 30 V 15 H -5 Z" fill="none" stroke="#1ee8ff" strokeWidth="2" strokeDasharray="4 3"/>}
+  </g>;
+}
 function kindFor(device:ElectricalDevice|undefined,fromPanel:boolean){
   if(fromPanel)return "panel";
   const sym=device?.symbol??"";
@@ -212,16 +223,25 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove,allCab
         const t=assigned?points[assigned]:undefined;
         const isCapped=assigned==="cap";
         const splice=assigned?.startsWith("splice:")?splices.find(sp=>`splice:${sp.id}`===assigned):undefined;
-        const targetX=t?.x??201,targetY=t?.y??y;
+        const groupIndex=splice?splices.findIndex(sp=>sp.id===splice.id):-1;
+        // Every conductor in the same splice converges at one connector.
+        const targetX=t?.x??(splice?201:201);
+        const targetY=t?.y??(splice?60+Math.max(0,groupIndex)*62:y);
+        const endX=isCapped||splice?targetX-4:targetX;
+        const path=`M 76 124 Q 115 124 132 ${y} L ${endX} ${targetY}`;
         return <g key={c} onClick={()=>setSelected(c)} style={{cursor:"pointer"}}>
-          <path d={`M 76 124 Q 115 124 132 ${y} L ${targetX} ${targetY}`} fill="none" stroke={c==="white"?"#61737d":"#06131d"} strokeWidth="11" strokeLinecap="round"/>
-          <path d={`M 76 124 Q 115 124 132 ${y} L ${targetX} ${targetY}`} fill="none" stroke={colors[c]} strokeWidth="7" strokeLinecap="round"/>
-          <circle cx={targetX} cy={targetY} r="7" fill={colors[c]} stroke={selected===c?"#24e6ff":"#7895a4"} strokeWidth={selected===c?4:2}/>
-          {isCapped&&<path d={`M ${targetX-4} ${targetY-12} L ${targetX+9} ${targetY-12} L ${targetX+12} ${targetY+4} L ${targetX-7} ${targetY+4} Z`} fill="#e49a35" stroke="#f8d59c" strokeWidth="2"/>}
-          {splice&&<path d={`M ${targetX-5} ${targetY-12} L ${targetX+8} ${targetY-12} L ${targetX+12} ${targetY+4} L ${targetX-8} ${targetY+4} Z`} fill="#e49a35" stroke="#f8d59c" strokeWidth="2"/>}
+          <path d={path} fill="none" stroke={c==="white"?"#61737d":"#06131d"} strokeWidth="11" strokeLinecap="round"/>
+          <path d={path} fill="none" stroke={colors[c]} strokeWidth="7" strokeLinecap="round"/>
+          {!isCapped&&!splice&&<circle cx={targetX} cy={targetY} r="7" fill={colors[c]} stroke={selected===c?"#24e6ff":"#7895a4"} strokeWidth={selected===c?4:2}/>}
+          {isCapped&&<WireConnector x={targetX-4} y={targetY} selected={selected===c}/>}
+
           <text x="120" y={Math.max(14,y-11)} fontSize="12" fontWeight="bold" fill="#bce7f5">{c.toUpperCase()}</text>
         </g>;
       })}
+      {view==="rear"&&splices.map((sp,i)=>(
+        <WireConnector key={sp.id} x={197} y={60+i*62} splice
+          selected={Boolean(selected&&attached[selected]===`splice:${sp.id}`)}/>
+      ))}
       {view==="rear"&&terms.map(t=>{const pt=points[t.id];if(!pt)return null;const isSplice=t.id.includes("splice");const ground=t.id==="ground"||t.id==="ground-bar";return <g key={t.id} onClick={()=>choose(t.id)} style={{cursor:"pointer"}}>
         <circle cx={pt.x} cy={pt.y} r="20" fill="none" stroke={selected?"#16e4fa":"#4c7286"} strokeWidth={selected?3:1} strokeDasharray={selected?"4 3":undefined}/>
 
@@ -232,18 +252,21 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove,allCab
       </g>;})}
     </svg>
     <div style={{fontSize:15,color:"#b9d7e5",margin:"8px 0"}}>{view==="front"?"Front view is for identifying the device. Select Rear · Terminals to connect wires.":selected?`Selected ${selected.toUpperCase()} — click the actual screw or splice in the diagram.`:"Select a conductor, then click the matching terminal or splice."}</div>
-    {view==="rear"&&<div style={{fontSize:13,color:"#a8cfe0",marginBottom:6}}>Terminal screws and splice connectors are clickable. Brass = hot, silver = neutral, green = ground; a dark screw identifies the 3-way common.</div>}
-    {terms.map(t=><div key={t.id} style={{fontSize:14,color:"#a7c9da",margin:"2px 0"}}>• {t.label}</div>)}
+    {view==="rear"&&<div style={{fontSize:14,color:"#a8cfe0",marginBottom:8}}>Select a conductor, then click a terminal. Orange cap = isolated wire; orange splice = joined conductors.</div>}
+    <details style={{margin:"6px 0 10px",fontSize:14,color:"#a7c9da"}}>
+      <summary style={{cursor:"pointer"}}>Show terminal names</summary>
+      {terms.map(t=><div key={t.id} style={{margin:"3px 0"}}>{t.label}</div>)}
+    </details>
     {colorsList.map(c=><div key={c} style={{display:"flex",gap:7,alignItems:"center",padding:"5px 0"}}>
       <span style={{width:12,height:12,borderRadius:10,background:colors[c],border:"1px solid #8a9ea8"}}/>
-      <span style={{flex:1,fontSize:15}}>{c.toUpperCase()} · {attached[c]==="cap"?"Capped individually":attached[c]?.startsWith("splice:")?"Wire-nut splice":terms.find(t=>t.id===attached[c])?.label||"Loose"}</span>
+      <span style={{flex:1,fontSize:15}}>{c.toUpperCase()} · {attached[c]==="cap"?"Capped":attached[c]?.startsWith("splice:")?"Spliced":terms.find(t=>t.id===attached[c])?.label||"Loose"}</span>
       <button type="button" onClick={()=>setSelected(c)} style={{padding:"5px 7px"}}>Select</button>
       <button type="button" onClick={()=>{const value=attached[c];if(value?.startsWith("splice:"))removeSplice(value.slice(7));else changeConnection(cable.id,end,c,null);}} style={{padding:"5px 7px"}}>Remove</button>
       <button type="button" disabled={Boolean(attached[c])} onClick={()=>changeConnection(cable.id,end,c,"cap")} style={{padding:"5px 7px"}}>Cap</button>
     </div>)}
     {!fromPanel&&<div style={{marginTop:14,padding:10,border:"1px solid #38667b",borderRadius:6}}>
-      <strong style={{color:"#83e5ff"}}>Wire Nuts, Splices & Pigtails</strong>
-      <p style={{fontSize:14,margin:"6px 0"}}>Select loose conductors from cables entering this same box. Each wire nut joins only the selected conductor ends.</p>
+      <strong style={{color:"#83e5ff"}}>Splices & Pigtails</strong>
+      <p style={{fontSize:14,margin:"6px 0"}}>Select loose wires in this box to join them under one connector. Cap a single wire using its Cap button above.</p>
       <div style={{maxHeight:190,overflowY:"auto"}}>{available.map(a=>{
         const val=a.cable.ends[a.end]?.[a.conductor];
         return <label key={a.key} style={{display:"flex",gap:8,alignItems:"center",fontSize:15,margin:"5px 0",opacity:val?0.55:1}}>

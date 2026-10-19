@@ -41,6 +41,8 @@ function inspect(project: ServiceProject, circuit: EndToEndCircuit): Check[] {
     {ok:!!find("bare") && !!find("bare")?.terminal?.startsWith("ground-"),label:"Bare conductor terminated at equipment-ground bar"},
     {ok:unique,label:"Panel terminal connections do not conflict with another circuit"},
     {ok:!!target,label:"Selected receptacle exists in the actual room-wall workspace"},
+    {ok:!!target && !!circuit.receptacleId,label:"A specific room receptacle is selected for this home run"},
+    {ok:breaker?.poles===1 && breaker.amperage===15,label:"Breaker and 14 AWG cable are modeled as a 15A branch circuit"},
     {ok:circuit.roomHot==="brass",label:"Black conductor terminated at receptacle brass terminal"},
     {ok:circuit.roomNeutral==="silver",label:"White conductor terminated at receptacle silver terminal"},
     {ok:circuit.roomGround==="green",label:"Bare conductor terminated at receptacle green terminal"}
@@ -61,15 +63,17 @@ export default function EndToEndCircuitLab({project,onChange,location}:Props) {
   const [chosen,setChosen]=useState("");
   const receptacleId=receptacles.some(d=>d.id===(stored?.receptacleId??chosen))?(stored?.receptacleId??chosen):receptacles[0]?.id??"";
   const circuit:EndToEndCircuit=stored??{slot:activeSlot,areaId:currentArea,wall:currentWall,receptacleId,cable:"14/2 NM-B",roomHot:null,roomNeutral:null,roomGround:null};
+
   function save(next:EndToEndCircuit) {
     onChange({...project,endToEndCircuits:[...(project.endToEndCircuits??[]).filter(c=>!(c.slot===next.slot&&c.areaId===next.areaId&&c.wall===next.wall)),next]});
     setInspection(null);
   }
   const checks=inspection??[];
+  const noRoute=location && routes.length===0;
   const passed=checks.length>0&&checks.every(c=>c.ok);
   return <section style={{border:"1px solid #36728d",background:"#101f2d",borderRadius:10,padding:14,color:"#e5f6ff",margin:"12px 0"}}>
-    <h3 style={{color:"#77e0ff",margin:"0 0 8px"}}>⚡ End-to-End Circuit Lab — Exercise 01</h3>
-    <p style={{fontSize:12,color:"#bdd1dc"}}>One virtual 15A standard breaker → one 14/2 NM-B home run → one existing room receptacle. This lab checks saved terminations and room-device presence. It is separate from the older live circuit solver.</p>
+    <h3 style={{color:"#77e0ff",margin:"0 0 8px"}}>⚡ Room → Breaker Wiring — 15A / 14/2</h3>
+    <p style={{fontSize:12,color:"#bdd1dc"}}>Wire one receptacle from this actual wall workspace to its assigned panel breaker. Set up the breaker and route in Main Distribution Panel → Circuit Routing & Wiring; use Wire / Edit to terminate black, white and bare at the panel. Then choose the receptacle terminals below. This is a saved-termination exercise, not a live voltage solver.</p>
     <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center",marginBottom:10}}>
       <label>Breaker <select style={input} value={activeSlot} onChange={e=>{setSlot(Number(e.target.value));setInspection(null);}}>{(project.distributionPanel?.breakers??[]).filter(s=>s.breaker).map(s=><option key={s.slot} value={s.slot}>#{s.slot} · {s.breaker?.amperage}A</option>)}</select></label>
       {!location&&<>
@@ -77,6 +81,7 @@ export default function EndToEndCircuitLab({project,onChange,location}:Props) {
         <label>Wall <select style={input} value={currentWall} onChange={e=>{setWall(e.target.value as Wall);setInspection(null);}}>{(["NORTH","SOUTH","EAST","WEST"] as Wall[]).map(w=><option key={w}>{w}</option>)}</select></label>
       </>}
     </div>
+    {noRoute && <p style={{color:"#ffcb9b",fontSize:13}}>No home run assigned to this wall yet. Go to Main Distribution Panel, select a breaker, then add this room and wall in Circuit Routing & Wiring.</p>}
     <div style={{fontSize:12,marginBottom:10}}>Panel route: {routes.some(r=>r.slot===activeSlot&&r.cable==="14/2 NM-B")?"✓ 14/2 NM-B planned":"Not yet assigned. Use Circuit Destinations in Service & Panel."}</div>
     <label style={{display:"block",marginBottom:12}}>Actual wall receptacle
       <select style={{...input,marginLeft:8,maxWidth:"100%"}} value={receptacleId} onChange={e=>{setChosen(e.target.value);save({...circuit,receptacleId:e.target.value,roomHot:null,roomNeutral:null,roomGround:null});}}>
@@ -92,7 +97,7 @@ export default function EndToEndCircuitLab({project,onChange,location}:Props) {
         </select>
       </label>)}
     </div>}
-    <button style={btn} onClick={()=>setInspection(inspect(project,{...circuit,receptacleId}))}>TEST COMPLETE CIRCUIT</button>
+    <button style={btn} disabled={!!noRoute || !receptacleId} onClick={()=>setInspection(inspect(project,{...circuit,receptacleId}))}>INSPECT ROOM-TO-BREAKER CONNECTION</button>
     {inspection&&<div style={{marginTop:12,borderTop:"1px solid #355568",paddingTop:10}}>
       <strong style={{color:passed?"#8cf2ad":"#ffd09b"}}>{passed?"PASS — All modeled circuit checks complete":"INCOMPLETE / FAULT — Review the checks"}</strong>
       {checks.map((c,i)=><div key={i} style={{fontSize:12,marginTop:5,color:c.ok?"#a0ebbc":"#ffbbab"}}>{c.ok?"✓":"✕"} {c.label}</div>)}

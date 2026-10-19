@@ -33,6 +33,7 @@ import {
 } from "../electrical/componentCatalog";
 
 import Device from "../components/Device";
+import type { ServiceProject } from "./projectWorkflow";
 
 import type {
   ElectricalDevice,
@@ -75,6 +76,9 @@ export type WorkspaceHandle = {
 
 
 type WorkspaceProps = {
+  liveProject?: ServiceProject;
+  liveAreaId?: string;
+  liveWall?: "NORTH" | "SOUTH" | "EAST" | "WEST";
 
   onSelectDevice?:
   (
@@ -100,7 +104,10 @@ const Workspace = forwardRef<
 function Workspace(
   {
     onSelectDevice,
-    onCircuitPathsChange
+    onCircuitPathsChange,
+    liveProject,
+    liveAreaId,
+    liveWall
   },
   ref
 ) {
@@ -1953,6 +1960,52 @@ function Workspace(
               )
             )
           }
+
+          {/* Live home-run conductor overlay: reflects saved right-sidebar terminations.
+              Drawn independently of user-authored workspace wires. */}
+          {liveProject && liveAreaId && liveWall && (
+            <svg width="2000" height="1200" viewBox="0 0 2000 1200"
+              aria-label="Live room home-run terminations"
+              style={{position:"absolute",inset:0,pointerEvents:"none",zIndex:20,overflow:"visible"}}>
+              {(liveProject.endToEndCircuits ?? [])
+                .filter(c => c.areaId === liveAreaId && c.wall === liveWall)
+                .map(c => {
+                  const device = devices.find(d => d.id === c.receptacleId);
+                  if (!device) return null;
+                  const cx = device.x + 75;
+                  const boxTop = device.y + 20;
+                  const cableX = cx - 15;
+                  const entryY = Math.max(0, boxTop - 24);
+                  const ends = [
+                    {key:"hot",terminal:c.roomHot,color:"#171c23",outline:"#c8d4dc",sourceX:cableX-6},
+                    {key:"neutral",terminal:c.roomNeutral,color:"#f7f9fb",outline:"#526678",sourceX:cableX},
+                    {key:"ground",terminal:c.roomGround,color:"#bd7842",outline:"#5d361f",sourceX:cableX+6}
+                  ];
+                  const target = (terminal:string) => terminal === "brass"
+                    ? {x:cx+55,y:device.y+55}
+                    : terminal === "silver" ? {x:cx-55,y:device.y+55}
+                    : {x:cx-42,y:device.y+105};
+                  return <g key={`${c.slot}:${c.receptacleId}`}>
+                    <path d={`M ${cableX} 0 L ${cableX} ${entryY}`}
+                      stroke="#727e83" strokeWidth="20" fill="none" />
+                    <path d={`M ${cableX} 0 L ${cableX} ${entryY}`}
+                      stroke="#f2f0e8" strokeWidth="15" fill="none" />
+                    <text x={cableX+14} y={Math.max(16,entryY-35)} fontSize="13"
+                      fontWeight="bold" fill="#1b3949" stroke="#e9f0f3" strokeWidth="3"
+                      paintOrder="stroke">HR #{c.slot} · 14/2 NM-B</text>
+                    {ends.filter(w=>w.terminal).map(w=>{
+                      const t=target(w.terminal!);
+                      const d=`M ${w.sourceX} ${entryY} C ${w.sourceX} ${entryY+32}, ${t.x} ${t.y-35}, ${t.x} ${t.y}`;
+                      return <g key={w.key}>
+                        <path d={d} fill="none" stroke={w.outline} strokeWidth="9" strokeLinecap="round"/>
+                        <path d={d} fill="none" stroke={w.color} strokeWidth="6" strokeLinecap="round"/>
+                        <circle cx={t.x} cy={t.y} r="8" fill={w.color} stroke={w.outline} strokeWidth="2"/>
+                      </g>;
+                    })}
+                  </g>;
+                })}
+            </svg>
+          )}
 
         </div>
 

@@ -9,6 +9,7 @@ export type ServiceProject = {
   distributionPanel?: import("../electrical/breakerPanel").BreakerPanel;
   circuitAssignments?: CircuitAssignment[];
   panelWires?: PanelWire[];
+  distributionMain?: { installed: boolean; amperage: number; closed: boolean };
   id: string;
   name: string;
   service: { route: ServiceRoute; amperage: number; voltage: "120/240"; arrangement: DisconnectArrangement; mainDisconnectClosed: boolean; meterLocation: string };

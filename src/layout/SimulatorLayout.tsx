@@ -639,7 +639,12 @@ export default function SimulatorLayout() {
         {project && <aside style={{ width: 205, flexShrink: 0, background: "#101a25", padding: 10, overflowY: "auto", borderRight: "1px solid #29627b", fontSize: 13 }}>
           <strong style={{ color: "#72dcff" }}>PROJECT EXPLORER</strong>
           <div style={{ margin: "8px 0", overflowWrap: "anywhere" }}>{project.name}</div>
-          <button onClick={() => { setShowService(true); setWorkspaceScope("SERVICE"); setActiveWall(null); }} style={{ width: "100%", marginBottom: 10, background: showService ? "#146d8d" : "#243c4b" }}>⚡ Service & Panel</button>
+          <div style={{borderTop:"1px solid #2c4553",paddingTop:8,marginBottom:12}}>
+            <strong style={{color:"#72dcff"}}>⚡ Electrical Service</strong>
+            <button onClick={() => { setShowService(true); setWorkspaceScope("SERVICE"); setActiveWall(null); }} style={{ width: "100%", marginTop: 7, marginBottom: 5, background: showService ? "#146d8d" : "#243c4b", textAlign:"left" }}>▸ Service & Panel</button>
+            <div style={{fontSize:11,color:"#a4c8d8",paddingLeft:6}}>{project.service.route === "UNDERGROUND" ? "Underground" : "Overhead"} · {project.service.amperage}A</div>
+            <div style={{fontSize:11,color:"#a4c8d8",paddingLeft:6}}>Distribution main: {project.distributionMain?.installed ? `${project.distributionMain.amperage}A` : "Main lugs"}</div>
+          </div>
           {project.buildings.map(building => <div key={building.id} style={{ marginBottom: 12, borderTop: "1px solid #2c4553", paddingTop: 8 }}>
             <strong>{building.kind === "MAIN" ? "🏠" : "🏗"} {building.name}</strong>
             {building.kind === "DETACHED" && <div style={{ color: "#f1b96e", fontSize: 11 }}>Subpanel / feeder: not yet configured</div>}

@@ -26,6 +26,12 @@ export default function ServiceOverview({ project, onChange, onOpenDestination }
   const [selected, setSelected] = useState(1);
   const panel = project.distributionPanel ?? createBreakerPanel(`distribution-${project.id}`, "Main Distribution Panel", project.service.amperage, 24);
   const slots = panel.breakers;
+  const distributionMain = project.distributionMain;
+  const installMain = (rating: number) => {
+    if (rating > project.service.amperage) { window.alert("This training model does not allow a distribution main rating above the configured service rating."); return; }
+    onChange({...project, distributionMain: {installed:true, amperage:rating, closed:true}});
+  };
+  const removeMain = () => onChange({...project, distributionMain: undefined});
   const active = slots.find(s => s.slot === selected);
   const assignments = project.circuitAssignments ?? [];
   const assignment = assignments.find(a => a.slot === selected);
@@ -85,6 +91,8 @@ export default function ServiceOverview({ project, onChange, onOpenDestination }
             }
           }}
           canDrop={!!draggedBreaker}
+          mainBreaker={distributionMain}
+          onMainDrop={(rating) => installMain(rating)}
         /> :         <div style={{ background: "#25313b", padding: 14, border: "3px solid #63717c", borderRadius: 10 }}>
           <div style={{ background: "#151e28", padding: 12, textAlign: "center", marginBottom: 10, borderRadius: 6 }}><strong>MAIN DISTRIBUTION</strong><div style={{ fontSize: 12, color: "#8cb8cb" }}>Feeder: L1 · L2 · Neutral · Equipment Ground</div></div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}>
@@ -125,6 +133,14 @@ export default function ServiceOverview({ project, onChange, onOpenDestination }
         {accordion("connections", "Service Connections · Lugs & Feeder", <ServiceConnectionView project={project} />)}
 
     {accordion("install", "Breaker Library · Drag into Empty Slots", <>
+      <div style={{border:"1px solid #376a84",padding:12,borderRadius:8,marginBottom:12}}>
+        <strong style={{color:"#8be4ff"}}>Main Breaker Library — Dedicated Main Position</strong>
+        <p style={{fontSize:12,color:"#b6cfdd"}}>Optional distribution-panel main breaker. This is separate from your existing upstream 200A service disconnect. Select a rating or drag the main-breaker card to the dedicated MAIN position on the realistic panel.</p>
+        <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+          {[60,100,125,150,200].filter(r=>r<=project.service.amperage).map(r=><button key={r} type="button" draggable onDragStart={e=>{e.dataTransfer.setData("application/x-nova-main-breaker",String(r));e.dataTransfer.setData("text/plain",`Main breaker ${r}A`);}} onClick={()=>installMain(r)} style={button}>▣ {r}A · 2-pole MAIN</button>)}
+        </div>
+        {distributionMain?.installed && <div style={{marginTop:10,fontSize:12}}>Installed: {distributionMain.amperage}A · {distributionMain.closed?"CLOSED":"OPEN"} <button type="button" style={{...button,marginLeft:8}} onClick={()=>onChange({...project,distributionMain:{...distributionMain,closed:!distributionMain.closed}})}>Toggle simulated handle</button> <button type="button" style={{...button,marginLeft:8}} onClick={removeMain}>Remove main</button></div>}
+      </div>
       <p style={{fontSize:12,color:"#b2cbd8",marginTop:0}}>Drag a breaker onto an empty position at left. You can also select a breaker below, choose a position, and click Install (keyboard/touch alternative). These are generic training models; panel listing and physical bus compatibility are not yet verified.</p>
       <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10}}>
         <label>Position <select style={field} value={slot} onChange={e=>setSlot(Number(e.target.value))}>{slots.filter(s=>!s.installed).map(s=><option key={s.slot} value={s.slot}>{s.slot}</option>)}</select></label>

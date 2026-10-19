@@ -723,13 +723,14 @@ export default function SimulatorLayout() {
           }}
         >
 
-          {project && showService && <ServiceOverview project={project} onChange={changeProject} />}
+          {project && showService && <ServiceOverview project={project} onChange={changeProject} onOpenDestination={(areaId, wall) => { changeProject({...project, activeAreaId: areaId}); setWorkspaceScope(`${project.id}:${areaId}:${wall}`); setActiveWall(wall); setShowService(false); }} />}
           {project && !showService && project.activeAreaId && !activeWall && <RoomLayout area={project.areas.find(a => a.id === project.activeAreaId)!} onOpenWall={wall => { setWorkspaceScope(`${project.id}:${project.activeAreaId}:${wall}`); setActiveWall(wall); }} />}
           {project && !showService && project.activeAreaId && activeWall && <>
             <div style={{ display: "flex", gap: 12, alignItems: "center", padding: "5px 8px 12px", color: "#90e7ff", fontSize: 13 }}>
               <button onClick={() => setActiveWall(null)}>← Four-Wall Room</button>
               <strong>{project.areas.find(a => a.id === project.activeAreaId)?.name} / {activeWall} Wall</strong>
               <span style={{ color: "#a8bdc9" }}>2×4 studs · 16" O.C.</span>
+              {project.circuitAssignments?.flatMap(a => (a.destinations ?? []).filter(d => d.areaId === project.activeAreaId && d.wall === activeWall).map(d => ({...d, slot:a.slot, name:a.name}))).map(d => <span key={`${d.slot}-${d.areaId}-${d.wall}`} style={{border:"1px solid #37778d",padding:"5px 8px",borderRadius:6}}>Circuit #{d.slot}: {d.name || "Unnamed"} · {d.cable} (planned)</span>)}
             </div>
             <Workspace key={workspaceScope} ref={workspaceRef} onSelectDevice={setSelectedDevice} onCircuitPathsChange={setCircuitPaths} />
           </>}

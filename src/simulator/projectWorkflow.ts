@@ -2,7 +2,7 @@ export type ServiceRoute = "UNDERGROUND" | "OVERHEAD";
 export type DisconnectArrangement = "SEPARATE" | "MAIN_BREAKER";
 export type ProjectArea = { id: string; name: string; buildingId: string; kind: "ROOM" | "AREA" };
 export type ProjectBuilding = { id: string; name: string; kind: "MAIN" | "DETACHED"; panelId?: string };
-export type CircuitAssignment = { slot: number; name: string; areaIds: string[] };
+export type CircuitAssignment = { slot: number; name: string; areaIds: string[]; destinations?: { areaId: string; wall: "NORTH" | "SOUTH" | "EAST" | "WEST"; cable: "14/2 NM-B" | "12/2 NM-B" | "14/3 NM-B" | "12/3 NM-B" }[] };
 export type ServiceProject = {
   version: 1;
   distributionPanel?: import("../electrical/breakerPanel").BreakerPanel;

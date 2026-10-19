@@ -1,3 +1,4 @@
+import ServiceConnectionView from "./ServiceConnectionView";
 import { useState } from "react";
 import type { ServiceProject } from "./projectWorkflow";
 import { createBreakerPanel, installBreaker, removeBreaker } from "../electrical/breakerPanel";
@@ -7,7 +8,7 @@ const frame: React.CSSProperties = { background: "#101b27", border: "1px solid #
 const button: React.CSSProperties = { background: "#163c52", border: "1px solid #397b99", color: "#e7f7ff", borderRadius: 6, padding: "8px 12px", cursor: "pointer" };
 const field: React.CSSProperties = { background: "#0b1824", color: "white", border: "1px solid #397b99", borderRadius: 5, padding: 8, maxWidth: "100%" };
 
-export default function ServiceOverview({ project, onChange }: { project: ServiceProject; onChange: (next: ServiceProject) => void }) {
+export default function ServiceOverview({ project, onChange, onOpenDestination }: { project: ServiceProject; onChange: (next: ServiceProject) => void; onOpenDestination?: (areaId: string, wall: "NORTH" | "SOUTH" | "EAST" | "WEST") => void }) {
   const [slot, setSlot] = useState(1);
   const [amps, setAmps] = useState(15);
   const [poles, setPoles] = useState<1 | 2>(1);
@@ -18,7 +19,11 @@ export default function ServiceOverview({ project, onChange }: { project: Servic
   const active = slots.find(s => s.slot === selected);
   const assignments = project.circuitAssignments ?? [];
   const assignment = assignments.find(a => a.slot === selected);
-  const saveAssignment = (name: string, areaIds: string[] = assignment?.areaIds ?? []) => onChange({ ...project, distributionPanel: panel, circuitAssignments: [...assignments.filter(a => a.slot !== selected), { slot: selected, name, areaIds }] });
+  const saveAssignment = (name: string, areaIds: string[] = assignment?.areaIds ?? []) => onChange({ ...project, distributionPanel: panel, circuitAssignments: [...assignments.filter(a => a.slot !== selected), { ...assignment, slot: selected, name, areaIds }] });
+  const saveDestination = (areaId: string, wall: "NORTH" | "SOUTH" | "EAST" | "WEST", cable: "14/2 NM-B" | "12/2 NM-B" | "14/3 NM-B" | "12/3 NM-B") => {
+    const destinations = [...(assignment?.destinations ?? []).filter(d => !(d.areaId === areaId && d.wall === wall)), {areaId, wall, cable}];
+    onChange({...project, distributionPanel: panel, circuitAssignments: [...assignments.filter(a => a.slot !== selected), { ...assignment, slot: selected, name: assignment?.name ?? "", areaIds: [...new Set([...(assignment?.areaIds ?? []),areaId])], destinations }]});
+  };
   const install = () => {
     if (slots.find(s => s.slot === slot)?.installed) { window.alert("That breaker position is already occupied."); return; }
     if (poles === 2 && (slot >= slots.length || slots.find(s => s.slot === slot + 1)?.installed)) { window.alert("Select two available adjacent positions for this conceptual two-pole breaker."); return; }
@@ -50,6 +55,7 @@ export default function ServiceOverview({ project, onChange }: { project: Servic
       </div>
       <p style={{ fontSize: 12, color: "#b1c4ce" }}>Training model: the disconnect display does not yet control the circuit solver. Upstream service conductors may remain energized. This is separate service disconnect equipment; the downstream distribution panel is modeled with isolated neutral and ground bars.</p>
     </section>
+    <ServiceConnectionView project={project} />
     <section style={frame}>
       <h2 style={{ marginTop: 0, color: "#65dbff" }}>Main Distribution Panel — Breaker Directory</h2>
       <p style={{ color: "#a8c6d3" }}>Install breakers here, not on bedroom walls. Circuit names and room assignments are saved with this project. Connections to actual wall conductors are a later phase.</p>
@@ -81,6 +87,24 @@ export default function ServiceOverview({ project, onChange }: { project: Servic
             <label style={{ display: "block", marginBottom: 10 }}>Circuit name <input style={{ ...field, width: "100%", display: "block", marginTop: 5 }} value={assignment?.name ?? ""} placeholder="e.g. Bedroom 1 receptacles" onChange={e => saveAssignment(e.target.value)} /></label>
             <strong style={{ display: "block", marginBottom: 8 }}>Areas served (directory labels)</strong>
             {project.areas.length ? project.areas.map(area => <label key={area.id} style={{ display: "block", marginBottom: 8 }}><input type="checkbox" checked={assignment?.areaIds.includes(area.id) ?? false} onChange={e => saveAssignment(assignment?.name ?? "", e.target.checked ? [...(assignment?.areaIds ?? []), area.id] : (assignment?.areaIds ?? []).filter(id => id !== area.id))}/> {area.name}</label>) : <p style={{ color: "#9db5c3" }}>Add a room to assign an area to this breaker.</p>}
+            <div style={{borderTop:"1px solid #35566a",margin:"14px 0",paddingTop:12}}>
+              <strong style={{display:"block",color:"#81e5ff",marginBottom:8}}>Circuit destinations — room / wall</strong>
+              <p style={{fontSize:12,color:"#b3c9d5"}}>Create a routing destination. This records a planned home run; conductor termination comes in the next wiring-engine update.</p>
+              {project.areas.length ? project.areas.map(area => <div key={area.id} style={{border:"1px solid #2f4e62",padding:8,marginBottom:8,borderRadius:6}}>
+                <strong>{area.name}</strong>
+                {(["NORTH","SOUTH","EAST","WEST"] as const).map(wall => {
+                  const d=assignment?.destinations?.find(x=>x.areaId===area.id&&x.wall===wall);
+                  return <div key={wall} style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginTop:6,fontSize:12}}>
+                    <span style={{minWidth:56}}>{wall}</span>
+                    <select style={field} value={d?.cable ?? "14/2 NM-B"} onChange={e=>saveDestination(area.id,wall,e.target.value as "14/2 NM-B" | "12/2 NM-B" | "14/3 NM-B" | "12/3 NM-B")}>
+                      {["14/2 NM-B","12/2 NM-B","14/3 NM-B","12/3 NM-B"].map(c=><option key={c}>{c}</option>)}
+                    </select>
+                    <button style={button} onClick={()=>saveDestination(area.id,wall,d?.cable ?? "14/2 NM-B")}>{d?"Update route":"Add route"}</button>
+                    {d&&<button style={button} onClick={()=>onOpenDestination?.(area.id,wall)}>Open wall →</button>}
+                  </div>;
+                })}
+              </div>) : <p>Add a room in Project Explorer first.</p>}
+            </div>
             <button style={{ ...button, borderColor: "#a45d5d", color: "#ffc4c4" }} onClick={remove}>Remove breaker</button>
           </> : <p style={{ color: "#b3c5cf" }}>Select an installed breaker position to name its circuit and associate rooms.</p>}
         </div>

@@ -1,4 +1,5 @@
 import type { ElectricalDevice } from "../electrical/types";
+import type { CableRecord } from "../simulator/CableWiringPanel";
 
 type Props = {
   device: ElectricalDevice;
@@ -11,6 +12,7 @@ type Props = {
   onCableStart: (id: string) => void;
   onCableDestination: (id: string) => void;
   cableSource: boolean;
+  wiringCables?: CableRecord[];
 };
 
 /** Visual-only equipment drawings. Electrical behavior remains in the simulation engine. */
@@ -65,13 +67,88 @@ function DeviceFace({ device }: { device: ElectricalDevice }) {
   }
 }
 
-export default function Device({ device, wireMode, selectedTerminal, selected, onSelect, onTerminalClick, onStartDrag, onCableStart, onCableDestination, cableSource }: Props) {
+/** Integrated open box: all conductors and connectors are drawn INSIDE the same device. */
+function WiredBox({device,cables}:{device:ElectricalDevice;cables:CableRecord[]}) {
+  const splices=cables.flatMap(c=>c.splices??[]).filter((sp,i,all)=>sp.deviceId===device.id&&all.findIndex(other=>other.id===sp.id)===i);
+  const wires=cables.flatMap(c=>{
+    const end=c.from===device.id?"from":"to";
+    return (c.type.includes("/3")?["black","red","white","ground"]:["black","white","ground"]).map(color=>({c,end,color,terminal:c.ends?.[end]?.[color]??null}));
+  });
+  const colors:Record<string,string>={black:"#13191d",white:"#f7f9f8",red:"#e24343",ground:"#bc7843"};
+  const isGfci=device.symbol==="gfci";
+  const isSwitch=device.symbol.includes("switch")||device.symbol==="dimmer";
+  const terminals=isGfci?[
+    {id:"line-hot",x:121,y:36,color:"#d6a049"},{id:"line-neutral",x:97,y:36,color:"#cbd9e0"},
+    {id:"load-hot",x:121,y:66,color:"#d6a049"},{id:"load-neutral",x:97,y:66,color:"#cbd9e0"},
+    {id:"ground",x:110,y:98,color:"#34b783"}
+  ]:isSwitch?[
+    {id:"line",x:119,y:36,color:"#d6a049"},{id:"load",x:119,y:70,color:"#d6a049"},
+    {id:"common",x:119,y:36,color:"#373c40"},{id:"traveler-1",x:119,y:58,color:"#d6a049"},
+    {id:"traveler-2",x:119,y:81,color:"#d6a049"},{id:"ground",x:110,y:99,color:"#34b783"}
+  ]:[
+    {id:"hot",x:121,y:43,color:"#d6a049"},{id:"neutral",x:97,y:43,color:"#cbd9e0"},
+    {id:"ground",x:110,y:98,color:"#34b783"}
+  ];
+  const terminalPoint=(name:string)=>{
+    const lower=name.toLowerCase();
+    const t=terminals.find(t=>t.id===lower)||terminals.find(t=>lower.includes(t.id))||
+      terminals.find(t=>lower.includes("ground")?t.id==="ground":lower.includes("neutral")?t.id.includes("neutral"):t.id.includes("hot")||t.id==="line");
+    return t??terminals[0];
+  };
+  const nut=(x:number,y:number)=><g>
+    <path d={`M ${x-7} ${y+8} L ${x-7} ${y-2} Q ${x} ${y-14} ${x+7} ${y-2} L ${x+7} ${y+8} Z`} fill="#efa337" stroke="#ffda8b" strokeWidth="1.6"/>
+    <path d={`M ${x-5} ${y} H ${x+5} M ${x-5} ${y+4} H ${x+5}`} stroke="#a96323" strokeWidth="1.2"/>
+  </g>;
+  const trace=(path:string,color:string)=><g>
+    <path d={path} fill="none" stroke={color==="white"?"#647d8a":"#8099a5"} strokeWidth="5.7" strokeLinecap="round"/>
+    <path d={path} fill="none" stroke={colors[color]??"#202b34"} strokeWidth="3.4" strokeLinecap="round"/>
+  </g>;
+  return <svg viewBox="0 0 150 122" width="150" height="122" style={{display:"block",overflow:"visible"}} aria-label={`${device.name} with actual saved cable terminations`}>
+    <rect x="3" y="2" width="144" height="116" rx="9" fill="#a7b5bd" stroke="#4d6b7c" strokeWidth="3"/>
+    <rect x="10" y="9" width="130" height="102" rx="6" fill="#e1e1d8" stroke="#788f9b" strokeWidth="1.5"/>
+    <rect x="80" y="14" width="52" height="92" rx="8" fill="#d2d8da" stroke="#7e8c93" strokeWidth="2"/>
+    <rect x="88" y="21" width="36" height="78" rx="5" fill="#f5f3e9" stroke="#9ea9a9" strokeWidth="1.5"/>
+    {isGfci&&<g><rect x="99" y="47" width="14" height="6" rx="2" fill="#b74640"/><rect x="99" y="55" width="14" height="6" rx="2" fill="#48545d"/></g>}
+    {isSwitch&&<rect x="101" y="43" width="10" height="28" rx="2" fill="#85939c" stroke="#52616c"/>}
+    {!isSwitch&&!isGfci&&<circle cx="106" cy="61" r="12" fill="#fff7d8" stroke="#aab3b7" strokeWidth="2"/>}
+    {terminals.map(t=><g key={t.id}><circle cx={t.x} cy={t.y} r="5.3" fill={t.color} stroke="#4e626d" strokeWidth="1.2"/><path d={`M ${t.x-2.6} ${t.y} H ${t.x+2.6}`} stroke="#31424b" strokeWidth="1.3"/></g>)}
+    {wires.map(({c,end,color,terminal},i)=>{
+      const entryX=16+(i%4)*9,entryY=106;
+      if(terminal?.startsWith("splice:"))return null;
+      const t=terminal&&terminal!=="cap"?terminalPoint(terminal):null;
+      const capped=terminal==="cap";
+      const targetX=t?.x??(22+(i%4)*11),targetY=t?.y??(capped?35+(Math.floor(i/4)*24):32+(i%4)*13);
+      return <g key={`${c.id}-${end}-${color}`}>
+        {trace(`M ${entryX} ${entryY} C ${entryX} ${entryY-36} ${targetX-22} ${targetY+23} ${targetX} ${targetY}`,color)}
+        {capped&&nut(targetX,targetY-8)}
+        <title>{color.toUpperCase()} · {c.fromName??"Panel"} → {c.toName??device.name} · {terminal??"Loose"}</title>
+      </g>;
+    })}
+    {splices.slice(0,3).map((sp,i)=>{
+      const x=26+i*21,y=26+(i%2)*11;
+      return <g key={sp.id}>
+        {sp.members.slice(0,5).map((m,j)=>{
+          const startX=18+j*9;
+          return <g key={`${m.cableId}-${m.end}-${m.conductor}-${j}`}>
+            {trace(`M ${startX} 106 C ${startX-4} 69 ${x-8+j*4} ${y+26} ${x-7+j*4} ${y+8}`,m.conductor)}
+          </g>;
+        })}
+        {sp.pigtailTerminal&&(()=>{const t=terminalPoint(sp.pigtailTerminal);const family=sp.members[0]?.conductor??"black";return <g>{trace(`M ${x+6} ${y+8} C ${x+28} ${y+30} ${t.x-29} ${t.y-21} ${t.x} ${t.y}`,family)}<title>Pigtail → {sp.pigtailTerminal}</title></g>})()}
+        {nut(x,y)}
+        <title>Wire-nut splice · {sp.members.length} conductors{sp.pigtailTerminal?` · pigtail to ${sp.pigtailTerminal}`:""}</title>
+      </g>;
+    })}
+  </svg>;
+}
+
+export default function Device({ device, wireMode, selectedTerminal, selected, onSelect, onTerminalClick, onStartDrag, onCableStart, onCableDestination, cableSource, wiringCables=[] }: Props) {
   void selectedTerminal; void onTerminalClick;
+  const showWiredBox=wiringCables.length>0;
   const wallMounted = ["outlet", "gfci", "switch-single", "switch-three-way", "dimmer"].includes(device.symbol);
   return <div className="device-component" title={`${device.name} — ${device.type}. Select to inspect or install.`} onMouseDown={e => { e.stopPropagation(); onSelect(device.id); if (wireMode) onCableDestination(device.id); else onStartDrag(device.id); }}
     style={{position:"absolute",left:device.x,top:device.y,width:150,height:150,boxSizing:"border-box",border:selected?"2px solid #00c9f3":"2px solid transparent",borderRadius:8,boxShadow:selected?"0 0 0 3px #00c9f355":"none",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:wireMode?"crosshair":"grab",userSelect:"none",zIndex:10}}>
-    {wallMounted && <div title="Electrical device box" style={{position:"absolute",top:10,left:18,width:114,height:120,background:"#174e87",border:"4px solid #12375c",borderRadius:9,boxShadow:"inset 0 0 0 3px #4680ad, 2px 4px 7px #0005"}}/>}
-    <div style={{position:"relative",zIndex:1,filter:"drop-shadow(1px 3px 2px #0005)"}}><DeviceFace device={device}/></div>
+    {!showWiredBox&&wallMounted && <div title="Electrical device box" style={{position:"absolute",top:10,left:18,width:114,height:120,background:"#174e87",border:"4px solid #12375c",borderRadius:9,boxShadow:"inset 0 0 0 3px #4680ad, 2px 4px 7px #0005"}}/>}
+    <div style={{position:"relative",zIndex:1,filter:"drop-shadow(1px 3px 2px #0005)"}}>{showWiredBox?<WiredBox device={device} cables={wiringCables}/>:<DeviceFace device={device}/>}</div>
     <div style={{position:"absolute",top:130,left:-8,width:166,textAlign:"center",fontSize:12,fontWeight:700,color:"#17212c",textShadow:"0 1px #ffffff",pointerEvents:"none"}}>{device.name}</div>
     <button type="button" aria-label={`Start cable from ${device.name}`} title="Wire Tool: select cable source"
       onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();if(wireMode && !cableSource) onCableStart(device.id); else if(wireMode) onCableDestination(device.id); else onCableStart(device.id)}}

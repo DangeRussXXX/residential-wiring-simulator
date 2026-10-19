@@ -50,59 +50,60 @@ export function deviceTerminals(device?:ElectricalDevice):Terminal[] {
 }
 const colors:Record<string,string>={black:"#141820",red:"#d83e37",white:"#f9fbff",ground:"#bc7946"};
 const panelStyle:React.CSSProperties={background:"#102637",border:"1px solid #36728d",borderRadius:7,padding:10,color:"#e5f6ff",fontSize:18};
+// Coordinates are on the rear/terminal-side illustration, not the front plate.
 function positions(kind:string,terminals:Terminal[]):Record<string,{x:number;y:number}>{
   const coords:Record<string,{x:number;y:number}>={};
-  if(kind==="panel"){
-    const a=[[315,64],[315,127],[315,193]];
-    terminals.forEach((t,i)=>coords[t.id]={x:a[i]?.[0]??315,y:a[i]?.[1]??193});
-  }else if(kind==="switch-three-way"){
-    Object.assign(coords,{common:{x:299,y:65},"traveler-1":{x:350,y:94},"traveler-2":{x:350,y:155},ground:{x:299,y:204},"neutral-splice":{x:249,y:208}});
-  }else if(kind==="switch-single"||kind==="dimmer"){
-    Object.assign(coords,{line:{x:350,y:76},load:{x:350,y:151},ground:{x:300,y:204},"neutral-splice":{x:249,y:205}});
-  }else if(kind==="gfci"){
-    Object.assign(coords,{brass:{x:352,y:59},silver:{x:285,y:59},ground:{x:316,y:203},"load-hot":{x:352,y:170},"load-neutral":{x:285,y:170}});
-  }else if(kind==="outlet"){
-    Object.assign(coords,{brass:{x:350,y:73},silver:{x:283,y:73},ground:{x:317,y:205}});
-  }else if(kind==="light"){
-    Object.assign(coords,{"fixture-hot":{x:290,y:84},"fixture-neutral":{x:340,y:84},ground:{x:316,y:194}});
-  }else terminals.forEach((t,i)=>coords[t.id]={x:315,y:60+i*60});
+  const maps:Record<string,Record<string,{x:number;y:number}>>={
+    panel:{"breaker-hot":{x:344,y:75},"neutral-bar":{x:344,y:155},"ground-bar":{x:344,y:231}},
+    outlet:{brass:{x:358,y:95},silver:{x:260,y:95},ground:{x:309,y:243}},
+    gfci:{brass:{x:358,y:73},silver:{x:260,y:73},"load-hot":{x:358,y:183},"load-neutral":{x:260,y:183},ground:{x:309,y:243}},
+    "switch-single":{line:{x:358,y:92},load:{x:358,y:177},ground:{x:260,y:233},"neutral-splice":{x:212,y:236}},
+    dimmer:{line:{x:358,y:92},load:{x:358,y:177},ground:{x:260,y:233},"neutral-splice":{x:212,y:236}},
+    "switch-three-way":{common:{x:260,y:93},"traveler-1":{x:358,y:93},"traveler-2":{x:358,y:178},ground:{x:309,y:243},"neutral-splice":{x:212,y:236}},
+    light:{"fixture-hot":{x:268,y:100},"fixture-neutral":{x:351,y:100},ground:{x:309,y:230}}
+  };
+  terminals.forEach((t,i)=>{coords[t.id]=maps[kind]?.[t.id]??{x:310,y:70+i*40};});
   return coords;
 }
-function DeviceArtwork({kind,breakerSlot}:{kind:string;breakerSlot?:number}){
+function DeviceArtwork({kind,breakerSlot,front}:{kind:string;breakerSlot?:number;front:boolean}){
+  const isSwitch=kind==="switch-single"||kind==="switch-three-way"||kind==="dimmer";
   if(kind==="panel")return <g>
-    <rect x="240" y="15" width="142" height="214" rx="10" fill="#293e4d" stroke="#9aaeba" strokeWidth="4"/>
-    <rect x="250" y="28" width="121" height="188" rx="4" fill="#b1c0c6" stroke="#687e8b" strokeWidth="2"/>
-    <rect x="260" y="40" width="95" height="44" rx="5" fill="#1c2c37" stroke="#596e7b" strokeWidth="2"/>
-    <rect x="267" y="46" width="58" height="29" rx="3" fill="#334a57"/>
-    <rect x="325" y="46" width="24" height="29" rx="3" fill="#657e8a"/>
-    <text x="288" y="63" textAnchor="middle" fontSize="11" fill="#fff">{`#${breakerSlot??1}`}</text>
-    <text x="315" y="97" textAnchor="middle" fontSize="11" fill="#122c3c">BREAKER</text>
-    <rect x="260" y="114" width="95" height="28" rx="4" fill="#d4dadd" stroke="#687f89"/>
-    <text x="307" y="132" fontSize="11" textAnchor="middle" fill="#263943">NEUTRAL BAR</text>
-    <rect x="260" y="181" width="95" height="26" rx="4" fill="#bcdbd4" stroke="#678f86"/>
-    <text x="305" y="197" fontSize="11" textAnchor="middle" fill="#24453d">GROUND BAR</text>
+    <rect x="245" y="22" width="137" height="241" rx="10" fill="#243b4c" stroke="#94b0c1" strokeWidth="4"/>
+    <rect x="258" y="34" width="110" height="218" rx="5" fill="#b5c2c9" stroke="#627f8d" strokeWidth="2"/>
+    <rect x="271" y="52" width="83" height="42" rx="4" fill="#243844" stroke="#526a78" strokeWidth="2"/>
+    <text x="310" y="68" fontSize="11" textAnchor="middle" fill="#fff">BREAKER</text>
+    <text x="310" y="82" fontSize="12" textAnchor="middle" fill="#fff">#{breakerSlot??1}</text>
+    <rect x="272" y="137" width="80" height="31" rx="3" fill="#dbe3e8" stroke="#6d8390"/>
+    <text x="310" y="150" fontSize="9" textAnchor="middle" fill="#263e4c">NEUTRAL</text>
+    <text x="310" y="160" fontSize="9" textAnchor="middle" fill="#263e4c">BAR</text>
+    <rect x="272" y="212" width="80" height="31" rx="3" fill="#a7d5c1" stroke="#528778"/>
+    <text x="310" y="229" fontSize="10" textAnchor="middle" fill="#245448">GROUND</text>
   </g>;
   if(kind==="light")return <g>
-    <circle cx="316" cy="122" r="82" fill="#697b82" stroke="#d1d9dd" strokeWidth="5"/>
-    <circle cx="316" cy="122" r="66" fill="#f5f0d9" stroke="#bdc7c9" strokeWidth="3"/>
-    <circle cx="316" cy="122" r="37" fill="#e7d6a8" stroke="#bd9e65" strokeWidth="3"/>
-    <path d="M 302 121 Q 316 96 330 121 Q 317 146 302 121" fill="none" stroke="#c39048" strokeWidth="4"/>
-    <rect x="295" y="177" width="42" height="26" rx="5" fill="#65767d" stroke="#c8d3d5"/>
+    <circle cx="309" cy="143" r="99" fill="#667b85" stroke="#c6d4dc" strokeWidth="5"/>
+    <circle cx="309" cy="143" r="80" fill={front?"#f6eed7":"#2a485a"} stroke="#b6c9d3" strokeWidth="3"/>
+    {front?<circle cx="309" cy="143" r="46" fill="#f1d99d" stroke="#ad8a4a" strokeWidth="4"/>:
+      <><rect x="272" y="90" width="74" height="87" rx="8" fill="#e2e4dc" stroke="#9aa7aa" strokeWidth="3"/>
+      <text x="309" y="190" textAnchor="middle" fill="#e5f6ff" fontSize="11">FIXTURE BASE</text></>}
   </g>;
-  const isSwitch=kind==="switch-single"||kind==="switch-three-way"||kind==="dimmer";
   return <g>
-    <rect x="268" y="20" width="97" height="199" rx="13" fill="#d8dddf" stroke="#8ea3ae" strokeWidth="5"/>
-    <rect x="282" y="32" width="70" height="175" rx="7" fill="#f2f1e9" stroke="#b0b5b3" strokeWidth="2"/>
-    {isSwitch?<>
-      <rect x="296" y="68" width="42" height="104" rx="5" fill="#c6c8c3" stroke="#919d9c" strokeWidth="2"/>
-      <rect x="310" y="94" width="15" height="50" rx="3" fill="#4a5358" stroke="#7a858a"/>
-      <rect x="310" y="91" width="15" height="22" rx="3" fill="#e5e4dc"/>
-    </>:<>
-      {[75,148].map(y=><g key={y}><path d={`M 302 ${y-9} v16 M 330 ${y-9} v16`} stroke="#3c474c" strokeWidth="6" strokeLinecap="round"/><path d={`M 316 ${y+9} l-6 8 h12 z`} fill="#48575e"/></g>)}
-      {kind==="gfci"&&<><rect x="304" y="104" width="28" height="24" rx="3" fill="#b6bdbd" stroke="#8a989a"/><text x="318" y="119" textAnchor="middle" fontSize="9" fill="#26353b">TEST</text></>}
-    </>}
-    <circle cx="316" cy="31" r="4" fill="#929b9c"/>
-    <circle cx="316" cy="209" r="4" fill="#929b9c"/>
+    <rect x="267" y="24" width="86" height="234" rx="13" fill="#c8d0d4" stroke="#849baa" strokeWidth="5"/>
+    <rect x="278" y="36" width="64" height="209" rx="7" fill={front?"#efeee7":"#5b6972"} stroke="#a2adb3" strokeWidth="2"/>
+    {front?(isSwitch?<><rect x="290" y="95" width="40" height="89" rx="5" fill="#e4e4dd" stroke="#9ca7a9"/>
+      <rect x="301" y="116" width="18" height="43" rx="3" fill="#4a5358"/></>:
+      [95,176].map(y=><g key={y}><path d={`M 293 ${y-12} v20 M 326 ${y-12} v20`} stroke="#38444c" strokeWidth="6" strokeLinecap="round"/><path d={`M 309 ${y+8} l-7 10 h14 z`} fill="#38444c"/></g>)):
+      <><rect x="284" y="49" width="52" height="176" rx="5" fill={isSwitch?"#282f38":"#e6e5db"} stroke="#929ca1" strokeWidth="2"/>
+      {isSwitch?<><rect x="298" y="86" width="25" height="103" rx="5" fill="#b2bac0" stroke="#7e8992"/>
+        <rect x="306" y="118" width="9" height="32" fill="#46505a"/></>:
+        <><rect x="295" y="71" width="30" height="43" rx="4" fill="#cbd1d0" stroke="#929da0"/>
+          <rect x="295" y="156" width="30" height="43" rx="4" fill="#cbd1d0" stroke="#929da0"/></>}
+      </>}
+    <circle cx="310" cy="39" r="4" fill="#778b95"/>
+    <circle cx="310" cy="242" r="4" fill="#778b95"/>
+    {kind==="outlet"&&!front&&<><rect x="345" y="118" width="6" height="22" fill="#d5b36c" stroke="#886a2c"/>
+      <rect x="268" y="118" width="6" height="22" fill="#d6dfe5" stroke="#6f8b9a"/></>}
+    {kind==="gfci"&&!front&&<><text x="349" y="56" fontSize="9" fill="#f7d79b">LINE</text>
+      <text x="349" y="167" fontSize="9" fill="#f7d79b">LOAD</text></>}
   </g>;
 }
 function kindFor(device:ElectricalDevice|undefined,fromPanel:boolean){
@@ -117,6 +118,7 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove}:{
 }) {
   const [end,setEnd]=useState<CableEnd>("from");
   const [selected,setSelected]=useState<string|null>(null);
+  const [view,setView]=useState<"rear"|"front">("rear");
   const fromPanel=cable[end]===PANEL_SOURCE_ID;
   const dev=devices.find(d=>d.id===cable[end])??(fromPanel?
     ({id:PANEL_SOURCE_ID,name:"Panel P1",type:"Distribution Panel",symbol:"breaker-panel"} as ElectricalDevice):
@@ -146,11 +148,17 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove}:{
       {(["from","to"] as CableEnd[]).map(e=><button key={e} type="button" onClick={()=>{setEnd(e);setSelected(null)}} style={{flex:1,padding:7,border:"1px solid #368bab",background:end===e?"#167193":"#183d51",color:"white",borderRadius:5}}>{e==="from"?"Panel / starting device":"Destination device"}</button>)}
     </div>
     <div style={{marginBottom:7,fontWeight:700}}>{dev.name} · {kind==="panel"?`Breaker #${cable.breakerSlot??1}`:kind.replaceAll("-"," ")}</div>
-    <svg viewBox="0 0 390 245" width="100%" aria-label={`Interactive ${dev.name} wiring terminals`} style={{background:"#0b1b28",border:"1px solid #36687c",borderRadius:6}}>
+    <div style={{display:"flex",gap:8,marginBottom:8}}>
+      <button type="button" onClick={()=>setView("rear")} aria-pressed={view==="rear"}
+        style={{flex:1,padding:9,background:view==="rear"?"#167193":"#183d51",color:"white",border:"1px solid #368bab",borderRadius:5}}>Rear · Terminals</button>
+      <button type="button" onClick={()=>setView("front")} aria-pressed={view==="front"}
+        style={{flex:1,padding:9,background:view==="front"?"#167193":"#183d51",color:"white",border:"1px solid #368bab",borderRadius:5}}>Front · Identify</button>
+    </div>
+    <svg viewBox="0 0 390 280" width="100%" aria-label={`Interactive ${dev.name} wiring terminals`} style={{background:"#0b1b28",border:"1px solid #36687c",borderRadius:6}}>
       <path d="M 0 124 H 80" stroke={fromPanel?"#181b20":"#e9e7df"} strokeWidth="26" strokeLinecap="round"/>
       <path d="M 0 124 H 80" stroke="#9caeb9" strokeWidth="1"/>
-      <DeviceArtwork kind={kind} breakerSlot={cable.breakerSlot}/>
-      {colorsList.map((c,i)=>{
+      <DeviceArtwork kind={kind} breakerSlot={cable.breakerSlot} front={view==="front"}/>
+      {view==="rear"&&colorsList.map((c,i)=>{
         const y=45+i*(colorsList.length===4?48:65),assigned=attached[c];
         const t=assigned?points[assigned]:undefined;
         const targetX=t?.x??201,targetY=t?.y??y;
@@ -161,13 +169,17 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove}:{
           <text x="120" y={Math.max(14,y-11)} fontSize="12" fontWeight="bold" fill="#bce7f5">{c.toUpperCase()}</text>
         </g>;
       })}
-      {terms.map(t=>{const pt=points[t.id];if(!pt)return null;const isSplice=t.id.includes("splice");return <g key={t.id} onClick={()=>choose(t.id)} style={{cursor:selected?"pointer":"default"}}>
+      {view==="rear"&&terms.map(t=>{const pt=points[t.id];if(!pt)return null;const isSplice=t.id.includes("splice");const ground=t.id==="ground"||t.id==="ground-bar";return <g key={t.id} onClick={()=>choose(t.id)} style={{cursor:"pointer"}}>
+        <circle cx={pt.x} cy={pt.y} r="20" fill="none" stroke={selected?"#16e4fa":"#4c7286"} strokeWidth={selected?3:1} strokeDasharray={selected?"4 3":undefined}/>
+
         {isSplice?<rect x={pt.x-14} y={pt.y-10} width="28" height="20" rx="6" fill="#edbd5a" stroke="#5e4c2d" strokeWidth="3"/>:<circle cx={pt.x} cy={pt.y} r="13" fill={t.color} stroke="#324855" strokeWidth="3"/>}
         <path d={`M ${pt.x-7} ${pt.y} h14`} stroke="#354653" strokeWidth="3"/>
-        <title>{t.label}</title>
+        {!isSplice&&<path d={`M ${pt.x} ${pt.y-7} v14`} stroke="#354653" strokeWidth="2"/>}
+        <title>{t.label} — click to terminate selected conductor</title>
       </g>;})}
     </svg>
-    <div style={{fontSize:15,color:"#b9d7e5",margin:"8px 0"}}>{selected?`Selected ${selected.toUpperCase()} — click the actual screw or splice in the diagram.`:"Select a conductor, then click the matching terminal or splice."}</div>
+    <div style={{fontSize:15,color:"#b9d7e5",margin:"8px 0"}}>{view==="front"?"Front view is for identifying the device. Select Rear · Terminals to connect wires.":selected?`Selected ${selected.toUpperCase()} — click the actual screw or splice in the diagram.`:"Select a conductor, then click the matching terminal or splice."}</div>
+    {view==="rear"&&<div style={{fontSize:13,color:"#a8cfe0",marginBottom:6}}>Terminal screws and splice connectors are clickable. Brass = hot, silver = neutral, green = ground; a dark screw identifies the 3-way common.</div>}
     {terms.map(t=><div key={t.id} style={{fontSize:14,color:"#a7c9da",margin:"2px 0"}}>• {t.label}</div>)}
     {colorsList.map(c=><div key={c} style={{display:"flex",gap:7,alignItems:"center",padding:"5px 0"}}>
       <span style={{width:12,height:12,borderRadius:10,background:colors[c],border:"1px solid #8a9ea8"}}/>

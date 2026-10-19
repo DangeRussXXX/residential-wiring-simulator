@@ -1,4 +1,5 @@
 import ServiceConnectionView from "./ServiceConnectionView";
+import PanelWiringLab from "./PanelWiringLab";
 import { useState } from "react";
 import type { ServiceProject } from "./projectWorkflow";
 import { createBreakerPanel, installBreaker, removeBreaker } from "../electrical/breakerPanel";
@@ -37,7 +38,7 @@ export default function ServiceOverview({ project, onChange, onOpenDestination }
     if (!active?.breaker) return;
     let next = removeBreaker(panel, selected);
     next = { ...next, breakers: next.breakers.map(s => s.occupiedBy === active.breaker?.id ? { ...s, installed: false, occupiedBy: undefined, breaker: null } : s) };
-    onChange({ ...project, distributionPanel: next, circuitAssignments: assignments.filter(a => a.slot !== selected) });
+    onChange({ ...project, distributionPanel: next, circuitAssignments: assignments.filter(a => a.slot !== selected), panelWires: (project.panelWires ?? []).filter(w => w.slot !== selected) });
   };
   const node = (name: string, detail: string) => <div style={{ flex: 1, minWidth: 140, padding: 14, border: "1px solid #386b88", borderRadius: 8, textAlign: "center", background: "#0b1926" }}><strong>{name}</strong><div style={{ color: "#a4c7d7", fontSize: 12, marginTop: 6 }}>{detail}</div></div>;
   return <div style={{ color: "#e9f7ff", maxWidth: 1200, margin: "0 auto" }}>
@@ -110,6 +111,7 @@ export default function ServiceOverview({ project, onChange, onOpenDestination }
         </div>
       </div>
     </section>
+    <PanelWiringLab project={project} selectedSlot={selected} onChange={onChange} />
     <section style={frame}><h3 style={{ marginTop: 0, color: "#86e1ff" }}>Project Circuit Directory</h3>
       {slots.filter(s => s.breaker).length === 0 ? <p>No breakers installed yet.</p> : slots.filter(s => s.breaker).map(s => <div key={s.slot} style={{ padding: "9px 0", borderBottom: "1px solid #2e4b5c" }}><strong>#{s.slot} · {s.breaker?.amperage}A</strong> — {assignments.find(a => a.slot === s.slot)?.name || "Unassigned"}<div style={{ fontSize: 12, color: "#99b9c8" }}>{(assignments.find(a => a.slot === s.slot)?.areaIds ?? []).map(id => project.areas.find(a => a.id === id)?.name).filter(Boolean).join(", ") || "No rooms assigned"}</div></div>)}
     </section>

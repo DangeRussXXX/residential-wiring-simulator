@@ -3,10 +3,12 @@ export type DisconnectArrangement = "SEPARATE" | "MAIN_BREAKER";
 export type ProjectArea = { id: string; name: string; buildingId: string; kind: "ROOM" | "AREA" };
 export type ProjectBuilding = { id: string; name: string; kind: "MAIN" | "DETACHED"; panelId?: string };
 export type CircuitAssignment = { slot: number; name: string; areaIds: string[]; destinations?: { areaId: string; wall: "NORTH" | "SOUTH" | "EAST" | "WEST"; cable: "14/2 NM-B" | "12/2 NM-B" | "14/3 NM-B" | "12/3 NM-B" }[] };
+export type PanelWire = { id: string; slot: number; cable: "14/2 NM-B" | "14/3 NM-B" | "12/2 NM-B" | "12/3 NM-B"; conductor: "black" | "red" | "white" | "bare"; terminal: string | null; };
 export type ServiceProject = {
   version: 1;
   distributionPanel?: import("../electrical/breakerPanel").BreakerPanel;
   circuitAssignments?: CircuitAssignment[];
+  panelWires?: PanelWire[];
   id: string;
   name: string;
   service: { route: ServiceRoute; amperage: number; voltage: "120/240"; arrangement: DisconnectArrangement; mainDisconnectClosed: boolean; meterLocation: string };

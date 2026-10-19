@@ -1,3 +1,4 @@
+import ElectricalServiceWorkspace from "../simulator/ElectricalServiceWorkspace";
 import EndToEndCircuitLab from "../simulator/EndToEndCircuitLab";
 // Residential Wiring Simulator v2.5
 // Main simulator layout
@@ -53,6 +54,7 @@ export default function SimulatorLayout() {
 
   const [project, setProject] = useState<ServiceProject | null>(() => loadServiceProject());
   const [showService, setShowService] = useState(true);
+  const [showElectricalService, setShowElectricalService] = useState(false);
   const [activeWall, setActiveWall] = useState<WallSide | null>(null);
   const [configureService, setConfigureService] = useState(false);
   function changeProject(next: ServiceProject) { setProject(next); saveServiceProject(next); }
@@ -642,14 +644,15 @@ export default function SimulatorLayout() {
           <div style={{ margin: "8px 0", overflowWrap: "anywhere" }}>{project.name}</div>
           <div style={{borderTop:"1px solid #2c4553",paddingTop:8,marginBottom:12}}>
             <strong style={{color:"#72dcff"}}>⚡ Electrical Service</strong>
-            <button onClick={() => { setShowService(true); setWorkspaceScope("SERVICE"); setActiveWall(null); }} style={{ width: "100%", marginTop: 7, marginBottom: 5, background: showService ? "#146d8d" : "#243c4b", textAlign:"left" }}>▸ Service & Panel</button>
+            <button onClick={() => { setShowElectricalService(true); setShowService(true); setWorkspaceScope("SERVICE_SETUP"); setActiveWall(null); }} style={{width:"100%",marginTop:7,marginBottom:5,background:showElectricalService?"#146d8d":"#243c4b",textAlign:"left"}}>▸ Service Setup & Simulation</button>
+            <button onClick={() => { setShowElectricalService(false); setShowService(true); setWorkspaceScope("SERVICE"); setActiveWall(null); }} style={{ width: "100%", marginTop: 7, marginBottom: 5, background: showService&&!showElectricalService ? "#146d8d" : "#243c4b", textAlign:"left" }}>▸ Main Distribution Panel</button>
             <div style={{fontSize:11,color:"#a4c8d8",paddingLeft:6}}>{project.service.route === "UNDERGROUND" ? "Underground" : "Overhead"} · {project.service.amperage}A</div>
             <div style={{fontSize:11,color:"#a4c8d8",paddingLeft:6}}>Distribution main: {project.distributionMain?.installed ? `${project.distributionMain.amperage}A` : "Main lugs"}</div>
           </div>
           {project.buildings.map(building => <div key={building.id} style={{ marginBottom: 12, borderTop: "1px solid #2c4553", paddingTop: 8 }}>
             <strong>{building.kind === "MAIN" ? "🏠" : "🏗"} {building.name}</strong>
             {building.kind === "DETACHED" && <div style={{ color: "#f1b96e", fontSize: 11 }}>Subpanel / feeder: not yet configured</div>}
-            {project.areas.filter(area => area.buildingId === building.id).map(area => <button key={area.id} onClick={() => { changeProject({ ...project, activeAreaId: area.id }); setWorkspaceScope(`${project.id}:${area.id}:OVERVIEW`); setActiveWall(null); setShowService(false); }} style={{ display: "block", width: "100%", marginTop: 5, textAlign: "left", background: !showService && project.activeAreaId === area.id ? "#146d8d" : "#243442" }}>▸ {area.name}</button>)}
+            {project.areas.filter(area => area.buildingId === building.id).map(area => <button key={area.id} onClick={() => { changeProject({ ...project, activeAreaId: area.id }); setWorkspaceScope(`${project.id}:${area.id}:OVERVIEW`); setActiveWall(null); setShowService(false); setShowElectricalService(false); }} style={{ display: "block", width: "100%", marginTop: 5, textAlign: "left", background: !showService && project.activeAreaId === area.id ? "#146d8d" : "#243442" }}>▸ {area.name}</button>)}
             <button onClick={() => addArea(building.id)} style={{ marginTop: 6, width: "100%" }}>+ Add Room / Area</button>
           </div>)}
           <button onClick={addBuilding} style={{ width: "100%" }}>+ Detached Building</button>
@@ -729,7 +732,8 @@ export default function SimulatorLayout() {
           }}
         >
 
-          {project && showService && <ServiceOverview project={project} onChange={changeProject} onOpenDestination={(areaId, wall) => { changeProject({...project, activeAreaId: areaId}); setWorkspaceScope(`${project.id}:${areaId}:${wall}`); setActiveWall(wall); setShowService(false); }} />}
+          {project && showService && showElectricalService && <ElectricalServiceWorkspace project={project} onChange={changeProject} />}
+          {project && showService && !showElectricalService && <ServiceOverview project={project} onChange={changeProject} onOpenDestination={(areaId, wall) => { changeProject({...project, activeAreaId: areaId}); setWorkspaceScope(`${project.id}:${areaId}:${wall}`); setActiveWall(wall); setShowService(false); }} />}
           {project && !showService && project.activeAreaId && !activeWall && <RoomLayout area={project.areas.find(a => a.id === project.activeAreaId)!} onOpenWall={wall => { setWorkspaceScope(`${project.id}:${project.activeAreaId}:${wall}`); setActiveWall(wall); }} />}
           {project && !showService && project.activeAreaId && activeWall && <>
             <div style={{ display: "flex", gap: 12, alignItems: "center", padding: "5px 8px 12px", color: "#90e7ff", fontSize: 13 }}>

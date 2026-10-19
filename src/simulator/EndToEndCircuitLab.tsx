@@ -33,6 +33,7 @@ function inspect(project: ServiceProject, circuit: EndToEndCircuit): Check[] {
   });
   return [
     {ok:!!breaker && breaker.poles===1 && breaker.amperage===15 && breaker.breakerType==="STANDARD",label:"15A standard single-pole breaker installed"},
+    {ok:breaker?.status==="ON",label:`Branch breaker is ON (currently ${breaker?.status??"missing"})`},
     {ok:project.service.mainDisconnectClosed && (!project.distributionMain?.installed || project.distributionMain.closed),label:"Simulated upstream disconnect and distribution main closed"},
     {ok:!!route && route.cable==="14/2 NM-B",label:"14/2 NM-B route assigned to this room and wall"},
     {ok:!!find("black") && find("black")?.terminal===`breaker-${circuit.slot}-hot-a`,label:"Black conductor terminated at selected breaker load terminal"},

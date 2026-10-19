@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { BreakerSlot } from "../electrical/breakerPanel";
-import type { CircuitAssignment } from "./projectWorkflow";
+import type { CircuitAssignment, PanelWire } from "./projectWorkflow";
+import type { BreakerStatus } from "../electrical/breaker";
 
 type Props = {
   slots: BreakerSlot[];
@@ -9,6 +10,8 @@ type Props = {
   onSelect: (slot: number) => void;
   onDropBreaker: (slot: number) => void;
   canDrop: boolean;
+  panelWires: PanelWire[];
+  onBreakerState: (slot: number, status: BreakerStatus) => void;
   mainBreaker?: { installed: boolean; amperage: number; closed: boolean };
   onMainDrop: (rating: number) => void;
 };
@@ -30,7 +33,7 @@ const PARTS: Record<string, PartInfo> = {
 };
 
 /** Visual training model. Physical bus placement and manufacturer listing are not represented. */
-export default function RealisticPanel({ slots, selected, assignments, onSelect, onDropBreaker, canDrop, mainBreaker, onMainDrop }: Props) {
+export default function RealisticPanel({ slots, selected, assignments, onSelect, onDropBreaker, canDrop, mainBreaker, onMainDrop, panelWires, onBreakerState }: Props) {
   const [infoEnabled, setInfoEnabled] = useState(true);
   const [activeInfo, setActiveInfo] = useState<PartInfo | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -56,7 +59,7 @@ export default function RealisticPanel({ slots, selected, assignments, onSelect,
       </label>
     </div>
     <div style={{fontSize:11,color:"#9fb9c9",marginBottom:6}}>Hover over a component for 3 seconds, or tap it to learn more. Click a breaker to select it.</div>
-    <svg viewBox={`0 0 600 ${height}`} role="img" aria-label="Interactive simulated distribution panel with feeder terminals, breakers, neutral and ground bars" style={{width:"100%",height:"auto",minWidth:300,maxHeight:"80vh"}}>
+    <svg viewBox={`0 0 600 ${height}`} role="img" aria-label="Interactive simulated distribution panel with feeder terminals, breakers, neutral and ground bars" style={{width:"100%",height:"auto",minWidth:300}}>
       <defs>
         <linearGradient id="novaPanelSteel" x1="0" x2="1"><stop stopColor="#5a6269"/><stop offset=".15" stopColor="#303a42"/><stop offset=".85" stopColor="#252f37"/><stop offset="1" stopColor="#747d84"/></linearGradient>
         <linearGradient id="novaBreakerFace" x1="0" x2="1"><stop stopColor="#10151b"/><stop offset=".5" stopColor="#303941"/><stop offset="1" stopColor="#0a1016"/></linearGradient>
@@ -123,9 +126,36 @@ export default function RealisticPanel({ slots, selected, assignments, onSelect,
             <rect x={left?x+118:x+24} y={y+9} width="15" height="22" rx="3" fill="#6b7781" stroke="#a7b3bd"/>
             <rect x={left?x+7:x+147} y={y+5} width="5" height="33" fill="#2b4152"/>
           </>}
+          {installed&&item.breaker&&<g role="button" tabIndex={0} aria-label={`Operate breaker ${item.slot}, currently ${item.breaker.status}`} style={{cursor:"pointer"}}
+            onClick={e=>{e.stopPropagation();onBreakerState(item.slot,item.breaker!.status==="ON"?"OFF":item.breaker!.status==="OFF"?"ON":"OFF");}}
+            onKeyDown={e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();e.stopPropagation();onBreakerState(item.slot,item.breaker!.status==="ON"?"OFF":item.breaker!.status==="OFF"?"ON":"OFF");}}}>
+            <rect x={left?x+111:x+15} y={y+3} width="32" height="37" rx="3" fill="#101b25" stroke="#83a1b5"/>
+            <rect x={left?x+120:x+24} y={item.breaker.status==="ON"?y+7:item.breaker.status==="OFF"?y+23:y+15} width="14" height="12" rx="2" fill={item.breaker.status==="TRIPPED"?"#f7a55c":"#bbc9d2"} stroke="#d7e1e7"/>
+            <text x={left?x+127:x+31} y={y+39} fontSize="7" fill={item.breaker.status==="TRIPPED"?"#ffb57b":"#c9d9e2"} textAnchor="middle">{item.breaker.status==="TRIPPED"?"TRIP":item.breaker.status}</text>
+          </g>}
           <text x={left?x+15:x+57} y={y+17} fill={installed?"#f2f7fb":"#71899a"} fontSize="12" fontWeight="bold">{label}</text>
           <text x={left?x+15:x+57} y={y+32} fill="#a5bfcd" fontSize="10">POS {item.slot}</text>
           {installed&&breaker&&<title>{`Position ${item.slot}: ${label}, ${breaker.breakerType}. ${assignments.find(a=>a.slot===(owner?.slot??item.slot))?.name??"Unassigned"}`}</title>}
+        </g>;
+      })}
+      {/* Each saved panel termination is drawn on the same realistic panel as its breaker. */}
+      {panelWires.filter(w=>w.terminal && slots.some(s=>s.slot===w.slot&&s.breaker)).map(wire=>{
+        const index=wire.slot-1, left=index%2===0, row=Math.floor(index/2);
+        const y=285+row*49, startX=left?282:318, startY=y+36;
+        const neutral=wire.terminal?.startsWith("neutral-"),ground=wire.terminal?.startsWith("ground-");
+        const number=Number(wire.terminal?.split("-")[1]??1);
+        const endX=neutral?75:ground?525:startX;
+        const endY=neutral||ground?309+(Math.max(1,Math.min(rows,number))-1)*49:y+29;
+        const color=wire.conductor==="black"?"#090d12":wire.conductor==="red"?"#d64d4d":wire.conductor==="white"?"#f6f7f1":"#c69255";
+        const valid=wire.conductor==="white"?neutral:wire.conductor==="bare"?ground:wire.terminal===`breaker-${wire.slot}-hot-${wire.conductor==="red"?"b":"a"}`;
+        const channel=left?114:486;
+        const path=neutral||ground?`M ${startX} ${startY} L ${channel} ${startY+7} L ${channel} ${endY} L ${endX} ${endY}`:`M ${startX} ${startY} L ${endX} ${endY}`;
+        return <g key={wire.id} aria-label={`${wire.conductor} wire from breaker ${wire.slot} to ${wire.terminal}`}>
+          <path d={path} stroke="#111b24" strokeWidth="9" fill="none" strokeLinejoin="round" strokeLinecap="round" pointerEvents="none"/>
+          <path d={path} stroke={color} strokeWidth="5" fill="none" strokeLinejoin="round" strokeLinecap="round" pointerEvents="none"/>
+          <circle cx={endX} cy={endY} r="5" fill={valid?"#a5f3c2":"#ff805f"} stroke="#111c25" strokeWidth="2" pointerEvents="none"/>
+          {!valid&&<text x={startX+10} y={startY-7} fill="#ff997e" fontSize="11">⚠</text>}
+          <title>{`Breaker #${wire.slot}: ${wire.conductor} → ${wire.terminal}${valid?"":" (check termination)"}`}</title>
         </g>;
       })}
       <text x="300" y={height-18} textAnchor="middle" fill="#a9c8d9" fontSize="11">Select a position • Drag a training breaker into an empty slot</text>

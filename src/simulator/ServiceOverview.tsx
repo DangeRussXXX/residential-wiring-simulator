@@ -1,7 +1,7 @@
 import EndToEndCircuitLab from "./EndToEndCircuitLab";
 import RealisticPanel from "./RealisticPanel";
 import ServiceConnectionView from "./ServiceConnectionView";
-import PanelWiringLab from "./PanelWiringLab";
+import BreakerWiringPopup from "./BreakerWiringPopup";
 import { useState } from "react";
 import type { ServiceProject } from "./projectWorkflow";
 import { createBreakerPanel, installBreaker, removeBreaker } from "../electrical/breakerPanel";
@@ -25,6 +25,7 @@ export default function ServiceOverview({ project, onChange, onOpenDestination }
   const [poles, setPoles] = useState<1 | 2>(1);
   const [kind, setKind] = useState<BreakerType>("STANDARD");
   const [selected, setSelected] = useState(1);
+  const [wiringPopup, setWiringPopup] = useState<null | "wire" | "inspect">(null);
   const panel = project.distributionPanel ?? createBreakerPanel(`distribution-${project.id}`, "Main Distribution Panel", project.service.amperage, 24);
   const slots = panel.breakers;
   const distributionMain = project.distributionMain;
@@ -170,7 +171,7 @@ export default function ServiceOverview({ project, onChange, onOpenDestination }
     {accordion("routing", `Circuit Routing & Wiring · Breaker #${selected}`, <>
       {!active?.breaker ? <p>Select an installed breaker first.</p> : <>            <div style={{borderTop:"1px solid #35566a",margin:"14px 0",paddingTop:12}}>
               <strong style={{display:"block",color:"#81e5ff",marginBottom:8}}>Circuit destinations — room / wall</strong>
-              <p style={{fontSize:12,color:"#b3c9d5"}}>Assign a room and wall, then use the wiring lab below to terminate the conductors. The realistic panel will display saved connections.</p>
+              <p style={{fontSize:12,color:"#b3c9d5"}}>Assign a room and wall, then start initial wiring below. Once the cable exists, edit or troubleshoot it beside the route. The realistic panel will display saved connections.</p>
               {project.areas.length ? project.areas.map(area => <div key={area.id} style={{border:"1px solid #2f4e62",padding:8,marginBottom:8,borderRadius:6}}>
                 <strong>{area.name}</strong>
                 {(["NORTH","SOUTH","EAST","WEST"] as const).map(wall => {
@@ -182,18 +183,31 @@ export default function ServiceOverview({ project, onChange, onOpenDestination }
                     </select>
                     <button style={button} onClick={()=>saveDestination(area.id,wall,d?.cable ?? "14/2 NM-B")}>{d?"Update route":"Add route"}</button>
                     {d&&<button style={button} onClick={()=>onOpenDestination?.(area.id,wall)}>Open wall →</button>}
+                    {d&&(project.panelWires??[]).some(w=>w.slot===selected)&&<>
+                      <button style={button} onClick={()=>setWiringPopup("wire")}>Wire / Edit</button>
+                      <button style={button} onClick={()=>setWiringPopup("inspect")}>Troubleshoot</button>
+                    </>}
                   </div>;
                 })}
               </div>) : <p>Add a room in Project Explorer first.</p>}
             </div>
 </>}
-      <PanelWiringLab project={project} selectedSlot={selected} onChange={onChange} />
+      {active?.breaker && <div style={{borderTop:"1px solid #35566a",paddingTop:12}}>
+        <strong style={{color:"#81e5ff"}}>Breaker #{selected} · Virtual conductors</strong>
+        <p style={{fontSize:12,color:"#b3c9d5"}}>Start with a cable, then use Wire / Edit or Troubleshoot. No separate miniature panel.</p>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          {(project.panelWires??[]).some(w=>w.slot===selected)?<>
+            <button style={button} onClick={()=>setWiringPopup("wire")}>Wire / Edit</button>
+            <button style={button} onClick={()=>setWiringPopup("inspect")}>Troubleshoot</button>
+          </>:<button style={button} onClick={()=>setWiringPopup("wire")}>Start initial wiring</button>}
+        </div>
+      </div>}
     </>)}
 
     {accordion("labs", "Wiring Labs · Training Exercises", <>
       <EndToEndCircuitLab project={project} onChange={onChange} />
       <h3 style={{color:"#84e4ff",marginTop:0}}>Practice: 120V Branch Circuit</h3>
-      <p>Select a breaker, add a training cable in <strong>Circuit Routing & Wiring</strong>, then terminate each conductor on a simulated breaker, neutral or equipment-ground terminal. Run the inspection in that panel to check the exercise.</p>
+      <p>Select a breaker, add a training cable in <strong>Circuit Routing & Wiring</strong>, then open Wire / Edit to terminate each conductor. Use Troubleshoot to inspect the exercise.</p>
       <p style={{fontSize:12,color:"#aac7d7"}}>Training-only: panel feeder and room wiring are not electrically connected to the solver yet. Never use this display as instructions for working on energized service equipment.</p>
       <button style={button} onClick={()=>setExpanded(p=>({...p,routing:true}))}>Open Circuit Routing & Wiring ↓</button>
     </>)}
@@ -202,6 +216,7 @@ export default function ServiceOverview({ project, onChange, onOpenDestination }
     </>)}
       </div>
     </div>
+    {wiringPopup&&<BreakerWiringPopup key={`${selected}-${wiringPopup}`} project={project} slot={selected} mode={wiringPopup} onChange={onChange} onClose={()=>setWiringPopup(null)} />}
     <style>{`@media (max-width: 1050px) { .nova-service-grid { grid-template-columns: minmax(0,1fr) !important; } }`}</style>
   </div>;
 }

@@ -52,13 +52,6 @@ export default function RealisticPanel({ slots, selected, assignments, onSelect,
   const rows = Math.ceil(slots.length / 2);
   const height = 365 + rows * 49;
   return <div style={{position:"relative",background:"#0b141e",border:"2px solid #526879",borderRadius:12,padding:10,overflowX:"auto"}}>
-    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap",marginBottom:8}}>
-      <strong style={{color:"#9ce8ff",fontSize:13}}>DISTRIBUTION PANEL — INTERIOR TRAINING VIEW</strong>
-      <label style={{display:"flex",alignItems:"center",gap:6,color:"#d3e9f4",fontSize:12,cursor:"pointer"}}>
-        <input type="checkbox" checked={infoEnabled} onChange={e=>{setInfoEnabled(e.target.checked);hideInfo();}} /> Component Info {infoEnabled?"ON":"OFF"}
-      </label>
-    </div>
-    <div style={{fontSize:11,color:"#9fb9c9",marginBottom:6}}>Hover over a component for 3 seconds, or tap it to learn more. Click a breaker to select it.</div>
     <svg viewBox={`0 0 600 ${height}`} role="img" aria-label="Interactive simulated distribution panel with feeder terminals, breakers, neutral and ground bars" style={{width:"100%",height:"auto",minWidth:300}}>
       <defs>
         <linearGradient id="novaPanelSteel" x1="0" x2="1"><stop stopColor="#5a6269"/><stop offset=".15" stopColor="#303a42"/><stop offset=".85" stopColor="#252f37"/><stop offset="1" stopColor="#747d84"/></linearGradient>
@@ -90,6 +83,12 @@ export default function RealisticPanel({ slots, selected, assignments, onSelect,
         <text x="300" y="135" fill="#e9f6ff" fontSize="13" fontWeight="bold" textAnchor="middle">{mainBreaker?.installed?`${mainBreaker.amperage}A MAIN`:'MAIN POSITION'}</text>
         <rect x="279" y="145" width="42" height="32" rx="5" fill={mainBreaker?.installed?"#465968":"#1b2730"} stroke="#9eacb5"/>
         <text x="300" y="166" fill="white" fontSize="12" textAnchor="middle">{mainBreaker?.installed?(mainBreaker.closed?"ON":"OFF"):"EMPTY"}</text>
+      </g>
+      <g role="button" tabIndex={0} aria-label={`Component Info ${infoEnabled?"ON":"OFF"}. Activate to toggle.`} onClick={()=>{setInfoEnabled(v=>!v);hideInfo();}} onKeyDown={e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();setInfoEnabled(v=>!v);hideInfo();}}} style={{cursor:"pointer"}}>
+        <rect x="247" y="184" width="106" height="23" rx="5" fill="#142a39" stroke="#4c8da9"/>
+        <rect x="255" y="190" width="11" height="11" rx="2" fill={infoEnabled?"#57d7ff":"#1b2a34"} stroke="#9fd9ef"/>
+        {infoEnabled&&<path d="M257 195 l3 3 l5 -6" fill="none" stroke="#07222d" strokeWidth="2"/>}
+        <text x="272" y="199" fontSize="10" fill="#d7efff">Info {infoEnabled?"ON":"OFF"}</text>
       </g>
       <path d="M 205 162 V 215 H 248 V 294" fill="none" stroke="#a55b46" strokeWidth="14"/>
       <path d="M 395 162 V 215 H 352 V 294" fill="none" stroke="#718ac0" strokeWidth="14"/>
@@ -138,23 +137,34 @@ export default function RealisticPanel({ slots, selected, assignments, onSelect,
           {installed&&breaker&&<title>{`Position ${item.slot}: ${label}, ${breaker.breakerType}. ${assignments.find(a=>a.slot===(owner?.slot??item.slot))?.name??"Unassigned"}`}</title>}
         </g>;
       })}
-      {/* Each saved panel termination is drawn on the same realistic panel as its breaker. */}
+      {/* Branch cables enter via top knockouts, follow enclosure edges, and terminate at their saved destinations. */}
       {panelWires.filter(w=>w.terminal && slots.some(s=>s.slot===w.slot&&s.breaker)).map(wire=>{
         const index=wire.slot-1, left=index%2===0, row=Math.floor(index/2);
-        const y=285+row*49, startX=left?282:318, startY=y+36;
-        const neutral=wire.terminal?.startsWith("neutral-"),ground=wire.terminal?.startsWith("ground-");
-        const number=Number(wire.terminal?.split("-")[1]??1);
-        const endX=neutral?75:ground?525:startX;
-        const endY=neutral||ground?309+(Math.max(1,Math.min(rows,number))-1)*49:y+29;
-        const color=wire.conductor==="black"?"#090d12":wire.conductor==="red"?"#d64d4d":wire.conductor==="white"?"#f6f7f1":"#c69255";
+        const y=285+row*49;
+        const neutral=wire.terminal?.startsWith("neutral-"), ground=wire.terminal?.startsWith("ground-");
+        const hot=wire.terminal?.startsWith("breaker-");
+        const terminalNum=Number(wire.terminal?.split("-")[1]??1);
+        const terminalRow=Math.max(1,Math.min(rows,Number.isFinite(terminalNum)?terminalNum:1));
+        const endX=neutral?75:ground?525:left?282:318;
+        const endY=neutral||ground?309+(terminalRow-1)*49:y+22;
+        const color=wire.conductor==="black"?"#15191c":wire.conductor==="red"?"#df484e":wire.conductor==="white"?"#f0f1ed":"#b7804b";
         const valid=wire.conductor==="white"?neutral:wire.conductor==="bare"?ground:wire.terminal===`breaker-${wire.slot}-hot-${wire.conductor==="red"?"b":"a"}`;
-        const channel=left?114:486;
-        const path=neutral||ground?`M ${startX} ${startY} L ${channel} ${startY+7} L ${channel} ${endY} L ${endX} ${endY}`:`M ${startX} ${startY} L ${endX} ${endY}`;
-        return <g key={wire.id} aria-label={`${wire.conductor} wire from breaker ${wire.slot} to ${wire.terminal}`}>
-          <path d={path} stroke="#111b24" strokeWidth="9" fill="none" strokeLinejoin="round" strokeLinecap="round" pointerEvents="none"/>
-          <path d={path} stroke={color} strokeWidth="5" fill="none" strokeLinejoin="round" strokeLinecap="round" pointerEvents="none"/>
-          <circle cx={endX} cy={endY} r="5" fill={valid?"#a5f3c2":"#ff805f"} stroke="#111c25" strokeWidth="2" pointerEvents="none"/>
-          {!valid&&<text x={startX+10} y={startY-7} fill="#ff997e" fontSize="11">⚠</text>}
+        const circuitIndex=Math.floor(index/2);
+        const entryX=left?114:486;
+        const entryY=43;
+        const outerX=left?112+Math.min(15,circuitIndex*2):488-Math.min(15,circuitIndex*2);
+        const laneX=left?119+Math.min(14,circuitIndex*2):481-Math.min(14,circuitIndex*2);
+        const offset=wire.conductor==="black"?0:wire.conductor==="red"?4:wire.conductor==="white"?8:12;
+        const corridorX=left?laneX+offset:laneX-offset;
+        const approachY=hot?y+12:endY;
+        const targetX=hot?(left?282:318):endX;
+        const targetY=hot?y+22:endY;
+        const path=`M ${entryX} ${entryY} L ${outerX} 70 L ${corridorX} 94 L ${corridorX} ${approachY} Q ${corridorX} ${targetY} ${corridorX+(targetX>corridorX?9:-9)} ${targetY} L ${targetX} ${targetY}`;
+        return <g key={wire.id} aria-label={`${wire.conductor} wire from top entry for breaker ${wire.slot} to ${wire.terminal}`}>
+          <path d={path} stroke="#0c1318" strokeWidth="8" fill="none" strokeLinejoin="round" strokeLinecap="round" pointerEvents="none"/>
+          <path d={path} stroke={color} strokeWidth="4.5" fill="none" strokeLinejoin="round" strokeLinecap="round" pointerEvents="none"/>
+          <circle cx={targetX} cy={targetY} r="5" fill={valid?"#9df1c3":"#ff805f"} stroke="#17202a" strokeWidth="2" pointerEvents="none"/>
+          {!valid&&<text x={targetX+7} y={targetY-7} fill="#ff9a80" fontSize="12">!</text>}
           <title>{`Breaker #${wire.slot}: ${wire.conductor} → ${wire.terminal}${valid?"":" (check termination)"}`}</title>
         </g>;
       })}
@@ -166,6 +176,6 @@ export default function RealisticPanel({ slots, selected, assignments, onSelect,
       <p style={{margin:"5px 0"}}><b>What does it do?</b> {activeInfo.purpose}</p>
       <p style={{margin:"5px 0 0",color:"#b6e3f5"}}><b>Classroom tip:</b> {activeInfo.tip}</p>
     </div>}
-    <p style={{fontSize:12,color:"#b6cbd6",margin:"8px 0 0"}}>Incoming L1, L2, neutral, and equipment-ground conductors are illustrated. Optional main breaker is a training-only component. Illustrated practice view, not a manufacturer-accurate panel. The actual feeder and bus connections are not electrically simulated here. Select a breaker, then open “Wire to Breaker” for individual terminal practice.</p>
+    <p style={{fontSize:12,color:"#b6cbd6",margin:"8px 0 0"}}>Incoming L1, L2, neutral, and equipment-ground conductors are illustrated. Optional main breaker is a training-only component. Illustrated practice view, not a manufacturer-accurate panel. The actual feeder and bus connections are not electrically simulated here. Select a breaker, then use Circuit Routing & Wiring to open its wiring and troubleshooting tools.</p>
   </div>;
 }

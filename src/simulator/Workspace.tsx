@@ -34,6 +34,7 @@ import {
 
 import Device from "../components/Device";
 import type { ServiceProject } from "./projectWorkflow";
+import { createPortal } from "react-dom";
 
 import type {
   ElectricalDevice,
@@ -176,6 +177,10 @@ function Workspace(
   }, [homeRunRoutes, workspaceScope]);
   const heightToY = (height:number) => 1150 - height * 8 - 45;
   const [selectedStud, setSelectedStud] = useState<number|null>(null);
+  const [rightPanelTarget,setRightPanelTarget] = useState<HTMLElement|null>(null);
+  useEffect(() => {
+    setRightPanelTarget(document.getElementById("rws-wall-tools-panel-target"));
+  }, [liveAreaId,liveWall]);
   const nailToStud = (device:ElectricalDevice) => {
     if(selectedStud === null) { window.alert("Select a highlighted stud before installing."); return; }
     const pitch = studSpacing * 8;
@@ -1640,18 +1645,18 @@ function Workspace(
 
     <div>
 
-      {/* =====================================================
-          WORKSPACE TOOLBAR
-          ===================================================== */}
+      {rightPanelTarget && createPortal(
+        <div style={{color:"#d9edf5",fontSize:12}}>
+          <details open style={{border:"1px solid #346b85",borderRadius:7,padding:8,marginBottom:8}}>
+            <summary style={{cursor:"pointer",fontWeight:700,color:"#8ee7ff"}}>Device Installation · Show/Hide</summary>
+            <div style={{display:"flex",flexDirection:"column",gap:8,paddingTop:8}}>
+              <div>Selected: {selectedDevice ? selectedDevice.name || selectedDevice.type : "Choose a component on the wall"}</div>
+                      <span title="Click a stud on the wall to highlight it before installing a device"
+          style={{fontSize:12,color:"#10394e",background:"#d8f5ff",padding:6,borderRadius:4}}>
+          {selectedStud===null?"Select a stud":`Stud #${selectedStud+1} selected`}
+        </span>
 
-      <div
-        style={{
-          display: "flex",
-          gap: "10px",
-          marginBottom: "10px"
-        }}
-      >
-        {selectedDevice && (
+                      {selectedDevice && (
           <div style={{display:"flex",alignItems:"center",gap:6,padding:"4px 8px",border:"1px solid #7a9aab",borderRadius:6,background:"#f5f8fa",color:"#172b36",fontSize:12}}>
             <strong>{selectedDevice.name || selectedDevice.type}</strong>
             <label>Height (in)
@@ -1669,11 +1674,32 @@ function Workspace(
           </div>
         )}
 
-        <span title="Click a stud on the wall to highlight it before installing a device"
-          style={{fontSize:12,color:"#10394e",background:"#d8f5ff",padding:6,borderRadius:4}}>
-          {selectedStud===null?"Select a stud":`Stud #${selectedStud+1} selected`}
-        </span>
-        {liveProject && liveAreaId && liveWall && (liveProject.endToEndCircuits??[]).filter(c=>c.areaId===liveAreaId&&c.wall===liveWall).length>0 && (
+              {selectedDevice && <div style={{display:"flex",gap:8}}>
+                <button type="button" title="Install the selected device on the highlighted stud at its chosen height"
+                  disabled={!!nailedDevices[selectedDevice.id]}
+                  onClick={()=>nailToStud(selectedDevice)}>🔨 Hammer · Install</button>
+                <button type="button" title="Delete only the selected component from this wall"
+                                  onClick={e=>{
+                  e.stopPropagation();
+                  const attached=connections.some(c=>c.from.deviceId===selectedDevice.id||c.to.deviceId===selectedDevice.id)||
+                    wires.some(w=>w.from.deviceId===selectedDevice.id||w.to.deviceId===selectedDevice.id);
+                  if(!window.confirm(`Remove ${selectedDevice.name||selectedDevice.type} from this wall${attached?" and delete its connected wires":""}?`))return;
+                  setDevices(prev=>prev.filter(d=>d.id!==selectedDevice.id));
+                  setConnections(prev=>prev.filter(c=>c.from.deviceId!==selectedDevice.id&&c.to.deviceId!==selectedDevice.id));
+                  setWires(prev=>prev.filter(w=>w.from.deviceId!==selectedDevice.id&&w.to.deviceId!==selectedDevice.id));
+                  setMountingHeights(prev=>{const n={...prev};delete n[selectedDevice.id];return n;});
+                  setNailedDevices(prev=>{const n={...prev};delete n[selectedDevice.id];return n;});
+                  setSelectedDevice(null);onSelectDevice?.(null);
+                }}
+
+                  >🪛 Crowbar · Remove</button>
+              </div>}
+            </div>
+          </details>
+          <details style={{border:"1px solid #346b85",borderRadius:7,padding:8,marginBottom:8}}>
+            <summary style={{cursor:"pointer",fontWeight:700,color:"#8ee7ff"}}>Home-Run Routing · Show/Hide</summary>
+            <div style={{display:"flex",flexDirection:"column",gap:8,paddingTop:8}}>
+                      {liveProject && liveAreaId && liveWall && (liveProject.endToEndCircuits??[]).filter(c=>c.areaId===liveAreaId&&c.wall===liveWall).length>0 && (
           <select aria-label="Home run to route" title="Select which independent home run to route"
             value={activeHomeRun}
             onChange={e=>setActiveHomeRun(e.target.value)}
@@ -1692,7 +1718,13 @@ function Workspace(
         {routeEdit && <span style={{fontSize:12,color:"#17394a",background:"#eaf5f9",padding:6}}>
           Click wall to add cable bends for selected home run. Click a bend to remove it.
         </span>}
-        <button
+
+            </div>
+          </details>
+          <details style={{border:"1px solid #346b85",borderRadius:7,padding:8,marginBottom:8}}>
+            <summary style={{cursor:"pointer",fontWeight:700,color:"#8ee7ff"}}>Wall Tools · Show/Hide</summary>
+            <div style={{display:"flex",flexDirection:"column",gap:8,paddingTop:8}}>
+                      <button
           onClick={() =>
             setWireMode(
               !wireMode
@@ -1759,8 +1791,11 @@ function Workspace(
           Clear
         </button>
 
-      </div>
-
+            </div>
+          </details>
+        </div>,
+        rightPanelTarget
+      )}
 
       {/* =====================================================
           TRAINING BOARD
@@ -2063,34 +2098,6 @@ function Workspace(
             )
           }
 
-          {/* Mounting height and hammer/crowbar controls appear beside the selected device. */}
-          {devices.map(device => {
-            if (selectedDevice?.id !== device.id) return null;
-            const defaultHeight = /switch/i.test(device.type) ? 48 : /light/i.test(device.type) ? 84 : 12;
-            const height = mountingHeights[device.id] ?? defaultHeight;
-            const nailed = !!nailedDevices[device.id];
-            return <div key={`mount-tools-${device.id}`} style={{position:"absolute",left:device.x+145,top:device.y-10,zIndex:40,display:"flex",gap:5,alignItems:"center",background:"rgba(255,255,255,.96)",border:"1px solid #287b99",borderRadius:7,padding:"4px 6px",boxShadow:"0 2px 8px #0004"}}>
-              <span style={{fontSize:11,color:"#17394a",whiteSpace:"nowrap"}}>{height}" AFF</span>
-              <button type="button" title={nailed?"Already fastened":"Nail device to stud"} aria-label="Nail device to stud" disabled={nailed}
-                onClick={e=>{e.stopPropagation();nailToStud(device);}}
-                style={{border:"1px solid #8a6b36",borderRadius:5,padding:"4px 7px",background:nailed?"#ddd":"#fff0c9",cursor:nailed?"default":"pointer"}}>🔨</button>
-              <button type="button" title="Crowbar: remove only this component from the wall" aria-label="Remove selected component with crowbar"
-                onClick={e=>{
-                  e.stopPropagation();
-                  const attached=connections.some(c=>c.from.deviceId===device.id||c.to.deviceId===device.id)||
-                    wires.some(w=>w.from.deviceId===device.id||w.to.deviceId===device.id);
-                  if(!window.confirm(`Remove ${device.name||device.type} from this wall${attached?" and delete its connected wires":""}?`))return;
-                  setDevices(prev=>prev.filter(d=>d.id!==device.id));
-                  setConnections(prev=>prev.filter(c=>c.from.deviceId!==device.id&&c.to.deviceId!==device.id));
-                  setWires(prev=>prev.filter(w=>w.from.deviceId!==device.id&&w.to.deviceId!==device.id));
-                  setMountingHeights(prev=>{const n={...prev};delete n[device.id];return n;});
-                  setNailedDevices(prev=>{const n={...prev};delete n[device.id];return n;});
-                  setSelectedDevice(null);onSelectDevice?.(null);
-                }}
-                style={{border:"1px solid #53768a",borderRadius:5,padding:"4px 7px",background:"#d8f0ff",cursor:"pointer"}}>🪛</button>
-            </div>;
-          })}
-
           {/* Live home-run conductor overlay: reflects saved right-sidebar terminations.
               Drawn independently of user-authored workspace wires. */}
           {liveProject && liveAreaId && liveWall && (
@@ -2129,9 +2136,6 @@ function Workspace(
                     {routeEdit && (route?.points??[]).map((p,i)=><circle key={i} cx={p.x} cy={p.y} r="10"
                       fill="#ffb15c" stroke="#1b4055" strokeWidth="3" style={{pointerEvents:"all",cursor:"pointer"}}
                       onClick={e=>{e.stopPropagation();setHomeRunRoutes(prev=>({...prev,[routeKey]:{...route!,points:route!.points.filter((_,j)=>j!==i)}}));}}/>)}
-                    <text x={cableX+14} y={Math.max(16,entryY-35)} fontSize="13"
-                      fontWeight="bold" fill="#1b3949" stroke="#e9f0f3" strokeWidth="3"
-                      paintOrder="stroke">HR #{c.slot} · 14/2 NM-B</text>
                     {ends.filter(()=>isReceptacle).map(w=>{
                       const t=w.terminal?target(w.terminal):{x:w.sourceX+(w.key==="hot"?32:w.key==="neutral"?0:-32),y:entryY+58};
                       const d=`M ${w.sourceX} ${entryY} C ${w.sourceX} ${entryY+32}, ${t.x} ${t.y-35}, ${t.x} ${t.y}`;
@@ -2139,7 +2143,7 @@ function Workspace(
                         <path d={d} fill="none" stroke={w.outline} strokeWidth="9" strokeLinecap="round"/>
                         <path d={d} fill="none" stroke={w.color} strokeWidth="6" strokeLinecap="round"/>
                         <circle cx={t.x} cy={t.y} r="8" fill={w.color} stroke={w.outline} strokeWidth="2"/>
-                        {!w.terminal && <text x={t.x+10} y={t.y+4} fontSize="11" fill="#203747" fontWeight="bold">{w.key} · not connected</text>}
+
                       </g>;
                     })}
                   </g>;

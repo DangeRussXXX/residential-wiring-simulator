@@ -787,6 +787,8 @@ export default function SimulatorLayout() {
             }}
           >
 
+            {!showService && !!activeWall && <div id="rws-wall-tools-panel-target" />}
+
             {project && !showService && !showBlueprint && activeWall && project.activeAreaId && (
               <>
                 <details open={showWiring} onToggle={e=>setShowWiring(e.currentTarget.open)}

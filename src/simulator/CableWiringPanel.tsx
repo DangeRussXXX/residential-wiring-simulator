@@ -252,8 +252,10 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove,allCab
         style={{flex:1,padding:9,background:view==="front"?"#167193":"#183d51",color:"white",border:"1px solid #368bab",borderRadius:5}}>Front · Identify</button>
     </div>
     <svg viewBox="0 0 390 280" width="100%" aria-label={`Interactive ${dev.name} wiring terminals`} style={{background:"#587586",border:"2px solid #9fc4d6",borderRadius:6}}>
-      <path d="M 0 124 H 80" stroke={fromPanel?"#181b20":"#e9e7df"} strokeWidth="26" strokeLinecap="round"/>
-      <path d="M 0 124 H 80" stroke="#9caeb9" strokeWidth="1"/>
+      {/* Cable jacket comes down from above the box, never in from the left. */}
+      <path d="M 102 -4 V 38" stroke="#435762" strokeWidth="30" strokeLinecap="round"/>
+      <path d="M 102 -4 V 38" stroke={cable.type.includes("MC")?"#b9c4ca":fromPanel?"#181b20":"#e9e7df"} strokeWidth="22" strokeLinecap="round"/>
+      <rect x="86" y="30" width="32" height="12" rx="4" fill="#8299a6" stroke="#395668" strokeWidth="2"/>
       <DeviceArtwork kind={kind} breakerSlot={cable.breakerSlot} front={view==="front"}/>
       {view==="rear"&&colorsList.map((c,i)=>{
         const y=45+i*(colorsList.length===4?48:65),assigned=attached[c];
@@ -267,9 +269,10 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove,allCab
         const spread=(memberIndex-(spliceMembers.length-1)/2)*11;
         const targetX=splice?sx+spread:(t?.x??201);
         const targetY=splice?sy+15:(t?.y??y);
+        const startX=90+(i-(colorsList.length-1)/2)*10;
         const path=splice
-          ?`M 76 124 C 108 124 ${100+memberIndex*12} ${155+memberIndex*9} ${targetX} ${targetY}`
-          :`M 76 124 Q 115 124 132 ${y} L ${isCapped?targetX-4:targetX} ${targetY}`;
+          ?`M ${startX} 41 C ${startX} 78 ${targetX-32} ${targetY-33} ${targetX} ${targetY}`
+          :`M ${startX} 41 C ${startX} 82 ${targetX-38} ${targetY-36} ${isCapped?targetX-4:targetX} ${targetY}`;
         return <g key={c} onClick={()=>setSelected(c)} style={{cursor:"pointer"}}>
           <path d={path} fill="none" stroke={c==="white"?"#263c49":"#d2e5ee"} strokeWidth="12" strokeLinecap="round"/>
           <path d={path} fill="none" stroke={colors[c]} strokeWidth="7" strokeLinecap="round"/>
@@ -282,7 +285,7 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove,allCab
         const memberIndex=sp.members.findIndex(a=>a.cableId===m.cableId&&a.end===m.end&&a.conductor===m.conductor);
         const spread=(memberIndex-(sp.members.length-1)/2)*11;
         const startY=Math.min(260,175+i*18+j*22);
-        const path=`M 0 ${startY} C 90 ${startY} ${110+j*18} ${sy+60} ${sx+spread} ${sy+15}`;
+        const path=`M ${88+j*12} 41 C ${88+j*12} ${startY} ${110+j*18} ${sy+60} ${sx+spread} ${sy+15}`;
         return <g key={`${sp.id}-${m.cableId}-${m.end}-${m.conductor}`}>
           <path d={path} fill="none" stroke={m.conductor==="white"?"#263c49":"#d2e5ee"} strokeWidth="12" strokeLinecap="round"/>
           <path d={path} fill="none" stroke={colors[m.conductor]} strokeWidth="7" strokeLinecap="round"/>

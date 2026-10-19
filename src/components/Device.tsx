@@ -249,7 +249,7 @@ function ExpandedDeviceWiring({device,cables}:{device:ElectricalDevice;cables:Ca
       <title>{t.name}</title>
     </g>)}
     {cables.slice(0,4).map((c,i)=>{
-      const x=48+i*52;
+      const x=188+(i-(Math.min(cables.length,4)-1)/2)*38;
       return <g key={c.id}>
         <path d={`M ${x} -4 V 57`} stroke="#37444c" strokeWidth="23"/>
         <path d={`M ${x} -4 V 57`} stroke={c.type.includes("MC")?"#a8b5bd":"#eeeae0"} strokeWidth="17"/>
@@ -259,10 +259,10 @@ function ExpandedDeviceWiring({device,cables}:{device:ElectricalDevice;cables:Ca
     })}
     {entries.map(({c,color,terminal,ci,i})=>{
       if(ci>=4)return null;
-      const sx=48+ci*52,sy=59;
+      const sx=188+(ci-(Math.min(cables.length,4)-1)/2)*38,sy=59;
       const isSplice=!!terminal?.startsWith("splice:");
       const t=terminal&&!isSplice&&terminal!=="cap"?resolve(terminal):undefined;
-      const ex=t?.x??(46+ci*52+i*19),ey=t?.y??(terminal==="cap"?133+i*34:178+i*32);
+      const ex=t?.x??(105+ci*24+i*22),ey=t?.y??(terminal==="cap"?128+i*35:185+i*31);
       const path=`M ${sx} ${sy} C ${sx} ${sy+40} ${ex-36} ${ey-37} ${ex} ${ey}`;
       return <g key={`${c.id}-${color}`}>
         {!isSplice&&<g>
@@ -281,7 +281,7 @@ function ExpandedDeviceWiring({device,cables}:{device:ElectricalDevice;cables:Ca
         {sp.members.map((m,j)=>{
           const ci=cables.findIndex(c=>c.id===m.cableId);
           if(ci<0||ci>=4)return null;
-          const sx=48+ci*52;
+          const sx=188+(ci-(Math.min(cables.length,4)-1)/2)*38;
           const ex=x-9+j*6;
           return <g key={`${m.cableId}-${m.conductor}-${j}`}>
             <path d={`M ${sx} 59 C ${sx-20} 100 ${ex} ${y+31} ${ex} ${y+10}`} stroke="#8ca2ac" strokeWidth="10" fill="none"/>

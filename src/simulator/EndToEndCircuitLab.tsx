@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { ServiceProject, EndToEndCircuit } from "./projectWorkflow";
 import type { ElectricalDevice } from "../electrical/types";
 
@@ -53,6 +53,19 @@ export default function EndToEndCircuitLab({project,onChange,location}:Props) {
   const [slot,setSlot]=useState<number|null>(null);
   const [chosen,setChosen]=useState("");
   const [selectedWire,setSelectedWire]=useState<"black"|"white"|"bare"|null>(null);
+  const [drag,setDrag]=useState<{wire:"black"|"white"|"bare";x:number;y:number}|null>(null);
+  const diagramRef=useRef<SVGSVGElement|null>(null);
+  function position(e:React.PointerEvent<SVGSVGElement>) {
+    const r=diagramRef.current?.getBoundingClientRect();
+    return r?{x:(e.clientX-r.left)*540/r.width,y:(e.clientY-r.top)*380/r.height}:{x:0,y:0};
+  }
+  function finishDrag(e:React.PointerEvent<SVGSVGElement>) {
+    if(!drag)return;
+    const pt=position(e);
+    const near=terminals.find(t=>Math.hypot(pt.x-t.x,pt.y-t.y)<29);
+    if(near)connect(drag.wire,near.id);
+    setDrag(null);
+  }
   const [inspection,setInspection]=useState<Check[]|null>(null);
   const areaId=location?.areaId??project.activeAreaId??"";
   const wall=location?.wall??"NORTH";
@@ -75,14 +88,15 @@ export default function EndToEndCircuitLab({project,onChange,location}:Props) {
   const checks=inspection??[];
   const passed=checks.length>0&&checks.every(c=>c.ok);
   const wires=[
-    {id:"black" as const,key:"roomHot" as const,label:"BLACK / HOT",color:"#20252d",y:92},
-    {id:"white" as const,key:"roomNeutral" as const,label:"WHITE / NEUTRAL",color:"#f5f7fb",y:171},
-    {id:"bare" as const,key:"roomGround" as const,label:"BARE / GROUND",color:"#c98c54",y:250}
+    {id:"black" as const,key:"roomHot" as const,label:"BLACK / HOT",color:"#181b20",y:147},
+    {id:"white" as const,key:"roomNeutral" as const,label:"WHITE / NEUTRAL",color:"#f9faf7",y:198},
+    {id:"bare" as const,key:"roomGround" as const,label:"BARE COPPER / GROUND",color:"#d28a4e",y:249}
   ];
+  // Rear three-quarter training view: brass on right, silver on left, green on frame.
   const terminals=[
-    {id:"brass" as const,label:"BRASS · HOT",color:"#d7a13d",x:405,y:102},
-    {id:"silver" as const,label:"SILVER · NEUTRAL",color:"#d5e0ec",x:405,y:171},
-    {id:"green" as const,label:"GREEN · GROUND",color:"#49d28c",x:405,y:240}
+    {id:"brass" as const,label:"BRASS / HOT",color:"#d9a349",x:467,y:136},
+    {id:"silver" as const,label:"SILVER / NEUTRAL",color:"#d9e1e7",x:347,y:136},
+    {id:"green" as const,label:"GREEN / GROUND",color:"#52c98a",x:359,y:279}
   ];
   function save(next:EndToEndCircuit) {
     onChange({...project,endToEndCircuits:[
@@ -133,46 +147,67 @@ export default function EndToEndCircuitLab({project,onChange,location}:Props) {
         <div style={{fontSize:11,color:"#aacbdc",marginBottom:6}}>
           {selectedWire?`Selected ${selectedWire.toUpperCase()}: choose a terminal screw →`:"Select or drag a conductor end to a terminal screw."}
         </div>
-        <svg viewBox="0 0 510 326" role="group" aria-label="Interactive 14/2 NM-B home-run conductors and receptacle terminal screws"
-          style={{width:"100%",height:"auto",background:"#071622",border:"1px solid #315b73",borderRadius:8,touchAction:"none"}}>
-          <rect x="10" y="15" width="490" height="296" rx="12" fill="#0e2739" stroke="#426b83"/>
-          <text x="28" y="42" fill="#8bdfff" fontSize="15" fontWeight="bold">14/2 NM-B HOME RUN</text>
-          <text x="315" y="42" fill="#8bdfff" fontSize="14" fontWeight="bold">RECEPTACLE</text>
-          <rect x="15" y="68" width="120" height="208" rx="14" fill="#b8a887" stroke="#ebd5a6" strokeWidth="3"/>
-          <text x="24" y="293" fill="#a4c5d5" fontSize="11">Cable jacket</text>
-          <rect x="340" y="65" width="145" height="215" rx="16" fill="#c8d2d9" stroke="#f2f7fa" strokeWidth="3"/>
-          <rect x="358" y="83" width="104" height="178" rx="9" fill="#e4e8e9" stroke="#8796a2"/>
-          <circle cx="375" cy="124" r="6" fill="#768896"/>
-          <circle cx="427" cy="124" r="6" fill="#768896"/>
-          <rect x="391" y="114" width="8" height="22" rx="3" fill="#334956"/>
-          <rect x="412" y="114" width="8" height="22" rx="3" fill="#334956"/>
-          <circle cx="405" cy="200" r="11" fill="#647786"/>
-          <circle cx="405" cy="200" r="5" fill="#d6e0e5"/>
+        <svg ref={diagramRef} viewBox="0 0 540 380" role="group" aria-label="Interactive rear view of a receptacle with white NM-B jacket and individually exposed conductors"
+          onPointerMove={e=>{if(drag)setDrag({...drag,...position(e)});}}
+          onPointerUp={finishDrag}
+          onPointerCancel={()=>setDrag(null)}
+          style={{width:"100%",height:"auto",background:"#071622",border:"1px solid #315b73",borderRadius:8,touchAction:"none",userSelect:"none"}}>
+          <defs>
+            <linearGradient id="boxsteel" x1="0" x2="1"><stop stopColor="#6c7884"/><stop offset="0.5" stopColor="#b0bcc5"/><stop offset="1" stopColor="#536372"/></linearGradient>
+            <linearGradient id="receptacle" x1="0" x2="1"><stop stopColor="#c5c7c3"/><stop offset="0.5" stopColor="#f1f0e8"/><stop offset="1" stopColor="#9fa7a9"/></linearGradient>
+          </defs>
+          <rect x="8" y="8" width="524" height="364" rx="12" fill="#102a3c" stroke="#3e7795"/>
+          <text x="22" y="34" fill="#a2e9ff" fontSize="16" fontWeight="bold">14/2 NM-B HOME RUN</text>
+          <text x="321" y="34" fill="#a2e9ff" fontSize="14" fontWeight="bold">DEVICE BOX · REAR VIEW</text>
+          {/* Metal device box and back of a duplex receptacle. */}
+          <rect x="314" y="54" width="204" height="278" rx="12" fill="url(#boxsteel)" stroke="#cbd8df" strokeWidth="3"/>
+          <rect x="329" y="68" width="174" height="247" rx="6" fill="#213b4c" stroke="#8eabb8" strokeWidth="2"/>
+          <rect x="375" y="76" width="87" height="228" rx="12" fill="url(#receptacle)" stroke="#f7f8f3" strokeWidth="3"/>
+          <rect x="391" y="104" width="56" height="75" rx="8" fill="#d6d9d5" stroke="#9ea9a9"/>
+          <rect x="391" y="194" width="56" height="74" rx="8" fill="#d6d9d5" stroke="#9ea9a9"/>
+          <circle cx="418" cy="187" r="7" fill="#8a9799" stroke="#ebf1f2"/>
+          <rect x="365" y="82" width="9" height="216" rx="3" fill="#b5bdc1"/>
+          <text x="376" y="324" fill="#d2e7f2" fontSize="10">Receptacle mounting strap</text>
+          {/* White nonmetallic sheath, with individual conductors leaving its end. */}
+          <path d="M 22 197 C 53 197 74 197 111 197" fill="none" stroke="#576675" strokeWidth="45" strokeLinecap="round"/>
+          <path d="M 22 197 C 53 197 74 197 111 197" fill="none" stroke="#f0eee7" strokeWidth="39" strokeLinecap="round"/>
+          <path d="M 22 197 C 53 197 74 197 111 197" fill="none" stroke="#d0cfc8" strokeWidth="2"/>
+          <text x="20" y="158" fill="#f1f7f8" fontSize="12">WHITE NM-B JACKET</text>
+          <text x="18" y="236" fill="#c5d9e2" fontSize="11">Cable enters box</text>
           {wires.map(w=>{
             const attached=circuit[w.key];
             const end=terminals.find(t=>t.id===attached);
+            const startX=111, startY=197;
+            const path=end
+              ?`M ${startX} ${startY} C 158 ${startY} 149 ${w.y} 213 ${w.y} C 275 ${w.y} ${end.x-80} ${end.y} ${end.x} ${end.y}`
+              :`M ${startX} ${startY} C 159 ${startY} 149 ${w.y} 213 ${w.y} L 255 ${w.y}`;
             return <g key={w.id}>
-              <path d={end?`M 133 ${w.y} L 225 ${w.y} L ${end.x-20} ${end.y} L ${end.x} ${end.y}`:`M 133 ${w.y} L 226 ${w.y}`}
-                fill="none" stroke={w.id==="white"?"#526f80":"#07131b"} strokeWidth="12" strokeLinecap="round"/>
-              <path d={end?`M 133 ${w.y} L 225 ${w.y} L ${end.x-20} ${end.y} L ${end.x} ${end.y}`:`M 133 ${w.y} L 226 ${w.y}`}
-                fill="none" stroke={w.color} strokeWidth="7" strokeLinecap="round"/>
-              <circle cx="226" cy={w.y} r="14" fill={selectedWire===w.id?"#3db7e7":"#19374b"}
-                stroke={selectedWire===w.id?"#b4f4ff":w.color} strokeWidth="3"
-                onPointerDown={e=>{e.preventDefault();setSelectedWire(w.id);}}
-                onClick={()=>setSelectedWire(w.id)} style={{cursor:"grab"}}/>
-              <text x="144" y={w.y-18} fill="#e1f5ff" fontSize="11">{w.label}</text>
-              {attached&&<text x="240" y={w.y+25} fill="#9ee6b9" fontSize="10">→ {attached.toUpperCase()}</text>}
+              <path d={path} fill="none" stroke="#07111a" strokeWidth={w.id==="bare"?9:14} strokeLinecap="round"/>
+              <path d={path} fill="none" stroke={w.color} strokeWidth={w.id==="bare"?6:10} strokeLinecap="round"/>
+              {w.id==="white"&&<path d={path} fill="none" stroke="#d8d9d7" strokeWidth="1"/>}
+              <text x="155" y={w.y-15} fill="#e5f6ff" fontSize="11" fontWeight="bold">{w.label}</text>
+              {!end&&<g onPointerDown={e=>{e.preventDefault();e.stopPropagation();diagramRef.current?.setPointerCapture(e.pointerId);setSelectedWire(w.id);setDrag({wire:w.id,...position(e)});}}
+                onClick={()=>setSelectedWire(w.id)} style={{cursor:"grab"}}>
+                <circle cx="255" cy={w.y} r="17" fill="#143247" stroke={selectedWire===w.id?"#39d2ff":"#d4e6ec"} strokeWidth="2"/>
+                <circle cx="255" cy={w.y} r="7" fill={w.color} stroke="#698b9d"/>
+              </g>}
             </g>;
           })}
-          {terminals.map(t=><g key={t.id}
-            onPointerUp={()=>{if(selectedWire)connect(selectedWire,t.id);}}
-            onClick={()=>{if(selectedWire)connect(selectedWire,t.id);}}
-            style={{cursor:"pointer"}}>
-            <circle cx={t.x} cy={t.y} r="22" fill="#263c4c" stroke={t.color} strokeWidth="4"/>
-            <circle cx={t.x} cy={t.y} r="11" fill={t.color}/>
-            <path d={`M ${t.x-6} ${t.y} H ${t.x+6}`} stroke="#35424c" strokeWidth="3"/>
-            <text x="287" y={t.y-25} fill="#e5f4fc" fontSize="10">{t.label}</text>
+          {terminals.map(t=><g key={t.id} onClick={()=>{if(selectedWire)connect(selectedWire,t.id);}} style={{cursor:"pointer"}}>
+            <circle cx={t.x} cy={t.y} r="21" fill="#203646" stroke={t.color} strokeWidth="4"/>
+            <circle cx={t.x} cy={t.y} r="12" fill={t.color} stroke="#46525a" strokeWidth="1"/>
+            <path d={`M ${t.x-7} ${t.y} H ${t.x+7}`} stroke="#39414b" strokeWidth="3"/>
+            <circle cx={t.x} cy={t.y} r="27" fill="transparent"/>
           </g>)}
+          <text x="426" y="93" fill="#ffe0a2" fontSize="10">HOT →</text>
+          <text x="320" y="93" fill="#eef5fa" fontSize="10">NEUTRAL</text>
+          <text x="314" y="346" fill="#9ff0b9" fontSize="11">GROUND SCREW</text>
+          {drag&&<>
+            <path d={`M 255 ${wires.find(w=>w.id===drag.wire)?.y??198} Q 288 ${drag.y} ${drag.x} ${drag.y}`} stroke="#0a1117" strokeWidth="13" fill="none" strokeLinecap="round"/>
+            <path d={`M 255 ${wires.find(w=>w.id===drag.wire)?.y??198} Q 288 ${drag.y} ${drag.x} ${drag.y}`} stroke={wires.find(w=>w.id===drag.wire)?.color??"white"} strokeWidth="8" fill="none" strokeLinecap="round"/>
+            <circle cx={drag.x} cy={drag.y} r="7" fill="#7edcff"/>
+          </>}
+          <text x="20" y="354" fill="#b7cfdb" fontSize="11">Select wire → click screw, or drag wire end to screw</text>
         </svg>
         <div style={{display:"flex",flexDirection:"column",gap:6,marginTop:8}}>
           {wires.map(w=><div key={w.id} style={{display:"flex",alignItems:"center",gap:6,fontSize:11}}>

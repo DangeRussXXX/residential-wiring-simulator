@@ -142,6 +142,22 @@ function Workspace(
     try { localStorage.setItem(`rws-visual-wires:${workspaceScope}`, JSON.stringify(wires)); } catch { /* storage unavailable */ }
   }, [workspaceScope, wires]);
 
+  // Device mounting metadata is stored per wall workspace.
+  const [mountingHeights, setMountingHeights] = useState<Record<string, number>>(() => {
+    try { return JSON.parse(localStorage.getItem(`rws-device-heights:${workspaceScope}`) || "{}"); }
+    catch { return {}; }
+  });
+  const [nailedDevices, setNailedDevices] = useState<Record<string, boolean>>(() => {
+    try { return JSON.parse(localStorage.getItem(`rws-nailed-devices:${workspaceScope}`) || "{}"); }
+    catch { return {}; }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(`rws-device-heights:${workspaceScope}`, JSON.stringify(mountingHeights));
+      localStorage.setItem(`rws-nailed-devices:${workspaceScope}`, JSON.stringify(nailedDevices));
+    } catch { /* storage unavailable */ }
+  }, [workspaceScope, mountingHeights, nailedDevices]);
+
 
   const [
     wireMode,
@@ -1191,11 +1207,9 @@ function Workspace(
     id: string
   ) {
 
-    if (!wireMode) {
+    if (!wireMode && !nailedDevices[id]) {
 
-      setDragging(
-        id
-      );
+      setDragging(id);
 
     }
 
@@ -1616,6 +1630,18 @@ function Workspace(
           marginBottom: "10px"
         }}
       >
+        {selectedDevice && (
+          <div style={{display:"flex",alignItems:"center",gap:6,padding:"4px 8px",border:"1px solid #7a9aab",borderRadius:6,background:"#f5f8fa",color:"#172b36",fontSize:12}}>
+            <strong>{selectedDevice.name || selectedDevice.type}</strong>
+            <label>Height (in)
+              <input aria-label="Device mounting height in inches" type="number" min="0" max="120" step="1"
+                value={mountingHeights[selectedDevice.id] ?? (/switch/i.test(selectedDevice.type) ? 48 : /light/i.test(selectedDevice.type) ? 84 : 12)}
+                onChange={e=>setMountingHeights(prev=>({...prev,[selectedDevice.id]:Math.max(0,Math.min(120,Number(e.target.value)||0))}))}
+                style={{width:58,marginLeft:4}} />
+            </label>
+            <span>{nailedDevices[selectedDevice.id] ? "🔨 Fastened" : "Not fastened"}</span>
+          </div>
+        )}
 
         <button
           onClick={() =>
@@ -1960,6 +1986,23 @@ function Workspace(
               )
             )
           }
+
+          {/* Mounting height and hammer/crowbar controls appear beside the selected device. */}
+          {devices.map(device => {
+            if (selectedDevice?.id !== device.id) return null;
+            const defaultHeight = /switch/i.test(device.type) ? 48 : /light/i.test(device.type) ? 84 : 12;
+            const height = mountingHeights[device.id] ?? defaultHeight;
+            const nailed = !!nailedDevices[device.id];
+            return <div key={`mount-tools-${device.id}`} style={{position:"absolute",left:device.x+145,top:device.y-10,zIndex:40,display:"flex",gap:5,alignItems:"center",background:"rgba(255,255,255,.96)",border:"1px solid #287b99",borderRadius:7,padding:"4px 6px",boxShadow:"0 2px 8px #0004"}}>
+              <span style={{fontSize:11,color:"#17394a",whiteSpace:"nowrap"}}>{height}" AFF</span>
+              <button type="button" title={nailed?"Already fastened":"Nail device to stud"} aria-label="Nail device to stud" disabled={nailed}
+                onClick={e=>{e.stopPropagation();setNailedDevices(prev=>({...prev,[device.id]:true}));}}
+                style={{border:"1px solid #8a6b36",borderRadius:5,padding:"4px 7px",background:nailed?"#ddd":"#fff0c9",cursor:nailed?"default":"pointer"}}>🔨</button>
+              <button type="button" title={nailed?"Remove fastener and release device":"Device is not fastened"} aria-label="Remove device with crowbar" disabled={!nailed}
+                onClick={e=>{e.stopPropagation();setNailedDevices(prev=>({...prev,[device.id]:false}));}}
+                style={{border:"1px solid #53768a",borderRadius:5,padding:"4px 7px",background:nailed?"#d8f0ff":"#eee",cursor:nailed?"pointer":"default"}}>🪛</button>
+            </div>;
+          })}
 
           {/* Live home-run conductor overlay: reflects saved right-sidebar terminations.
               Drawn independently of user-authored workspace wires. */}

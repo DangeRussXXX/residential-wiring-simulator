@@ -79,6 +79,7 @@ export type WorkspaceHandle = {
 
 type WorkspaceProps = {
   liveProject?: ServiceProject;
+  onProjectChange?: (next:ServiceProject)=>void;
   liveAreaId?: string;
   liveWall?: "NORTH" | "SOUTH" | "EAST" | "WEST";
 
@@ -108,6 +109,7 @@ function Workspace(
     onSelectDevice,
     onCircuitPathsChange,
     liveProject,
+    onProjectChange,
     liveAreaId,
     liveWall
   },
@@ -174,26 +176,68 @@ function Workspace(
   });
   const [cableSource,setCableSource]=useState<string|null>(null);
   const [cableType,setCableType]=useState<CableKind>("14/2 NM-B");
+  const [homeRunBreaker,setHomeRunBreaker]=useState(1);
   const [selectedCableId,setSelectedCableId]=useState<string|null>(null);
   const [blueprintMode,setBlueprintMode]=useState(false);
   useEffect(()=>{
-    try {setCables(JSON.parse(localStorage.getItem(`rws-cables-v1:${workspaceScope}`)||"[]"));}catch{setCables([]);}
+    try {
+      const legacy: CableRecord[]=JSON.parse(localStorage.getItem(`rws-cables-v1:${workspaceScope}`)||"[]");
+      const shared=liveProject?.wallCables?.filter(c=>c.areaId===liveAreaId&&c.wall===liveWall)??[];
+      setCables(shared.length?shared:legacy);
+    }catch{setCables([]);}
     setCableSource(null);setSelectedCableId(null);setWireMode(false);
   },[workspaceScope]);
   useEffect(()=>{
     try {localStorage.setItem(`rws-cables-v1:${workspaceScope}`,JSON.stringify(cables));}catch{}
   },[workspaceScope,cables]);
+  // One-time migration of existing per-wall cable records into the project so the
+  // distribution panel can see them without recreating any user connections.
+  useEffect(()=>{
+    if(!liveProject||!onProjectChange||!liveAreaId||!liveWall)return;
+    const existing=liveProject.wallCables?.some(c=>c.areaId===liveAreaId&&c.wall===liveWall);
+    if(existing)return;
+    try {
+      const old:CableRecord[]=JSON.parse(localStorage.getItem(`rws-cables-v1:${workspaceScope}`)||"[]");
+      if(!old.length)return;
+      const withNames=old.map(c=>{
+        const from=devices.find(d=>d.id===c.from),to=devices.find(d=>d.id===c.to);
+        return {...c,areaId:liveAreaId,wall:liveWall,
+          fromName:c.fromName??from?.name??"Panel P1",toName:c.toName??to?.name,
+          fromSymbol:c.fromSymbol??from?.symbol,toSymbol:c.toSymbol??to?.symbol,
+          breakerSlot:c.breakerSlot??(c.from===PANEL_SOURCE_ID?1:undefined)};
+      });
+      onProjectChange({...liveProject,wallCables:[...(liveProject.wallCables??[]),...withNames]});
+    }catch{}
+  // Only migrate when opening a wall; never replace data during normal editing.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[workspaceScope]);
+  const saveCables=(next:CableRecord[])=>{
+    setCables(next);
+    if(liveProject && onProjectChange && liveAreaId && liveWall){
+      const other=(liveProject.wallCables??[]).filter(c=>!(c.areaId===liveAreaId&&c.wall===liveWall));
+      onProjectChange({...liveProject,wallCables:[...other,...next.map(c=>({...c,areaId:liveAreaId,wall:liveWall}))]});
+    }
+  };
   const startCable=(id:string)=>{
     setCableSource(id);setSelectedCableId(null);setWireMode(true);
     setSelectedDevice(devices.find(d=>d.id===id)||null);
   };
   const finishCable=(id:string)=>{
     if(!cableSource || cableSource===id)return;
-    const cable:CableRecord={id:crypto.randomUUID(),from:cableSource,to:id,type:cableType,ends:{from:{},to:{}}};
-    setCables(prev=>[...prev,cable]);
+    const fromDevice=devices.find(d=>d.id===cableSource),toDevice=devices.find(d=>d.id===id);
+    const cable:CableRecord={id:crypto.randomUUID(),from:cableSource,to:id,type:cableType,
+      fromName:fromDevice?.name??"Panel P1",toName:toDevice?.name,fromSymbol:fromDevice?.symbol,toSymbol:toDevice?.symbol,
+      areaId:liveAreaId,wall:liveWall,breakerSlot:cableSource===PANEL_SOURCE_ID?homeRunBreaker:undefined,
+      ends:{from:{},to:{}}};
+    saveCables([...cables,cable]);
     setSelectedCableId(cable.id);setCableSource(null);setWireMode(false);
     setSelectedDevice(devices.find(d=>d.id===id)||null);
   };
+  useEffect(()=>{
+    if(cableSource || !selectedDevice)return;
+    const connected=cables.find(c=>c.to===selectedDevice.id||c.from===selectedDevice.id);
+    if(connected)setSelectedCableId(connected.id);
+  },[selectedDevice?.id,cables,cableSource]);
   const selectedCable=cables.find(c=>c.id===selectedCableId);
   const [selectedStud, setSelectedStud] = useState<number|null>(null);
   const [deviceStuds,setDeviceStuds] = useState<Record<string,number>>(() => {
@@ -1741,7 +1785,7 @@ function Workspace(
                     wires.some(w=>w.from.deviceId===selectedDevice.id||w.to.deviceId===selectedDevice.id);
                   if(!window.confirm(`Remove ${selectedDevice.name||selectedDevice.type} from this wall${attached?" and delete its connected wires":""}?`))return;
                   setDevices(prev=>prev.filter(d=>d.id!==selectedDevice.id));
-                  setCables(prev=>prev.filter(c=>c.from!==selectedDevice.id&&c.to!==selectedDevice.id));
+                  saveCables(cables.filter(c=>c.from!==selectedDevice.id&&c.to!==selectedDevice.id));
                   setConnections(prev=>prev.filter(c=>c.from.deviceId!==selectedDevice.id&&c.to.deviceId!==selectedDevice.id));
                   setWires(prev=>prev.filter(w=>w.from.deviceId!==selectedDevice.id&&w.to.deviceId!==selectedDevice.id));
                   setMountingHeights(prev=>{const n={...prev};delete n[selectedDevice.id];return n;});
@@ -1759,6 +1803,13 @@ function Workspace(
             <summary style={{cursor:"pointer",fontWeight:700,color:"#8ee7ff"}}>New Wire Tool · Cable Wiring</summary>
             <div style={{paddingTop:8,display:"flex",flexDirection:"column",gap:8}}>
               <div>Click a device's connection dot, or start a home run from Panel P1.</div>
+              {!cableSource && <label>Home-run breaker
+                <select value={homeRunBreaker} onChange={e=>setHomeRunBreaker(Number(e.target.value))}
+                  style={{display:"block",width:"100%",fontSize:18,padding:7}}>
+                  {(liveProject?.distributionPanel?.breakers??[]).filter(s=>s.breaker).map(s=><option key={s.slot} value={s.slot}>Breaker #{s.slot} · {s.breaker?.amperage}A</option>)}
+                  {!(liveProject?.distributionPanel?.breakers??[]).some(s=>s.breaker)&&<option value={1}>#1 (not installed)</option>}
+                </select>
+              </label>}
               {!cableSource && <button type="button" onClick={()=>{setCableSource(PANEL_SOURCE_ID);setSelectedCableId(null);setWireMode(true);}}
                 style={{padding:8,background:"#145774",color:"white",border:"1px solid #389bc1",borderRadius:5}}>
                 + Start Home Run from Panel P1
@@ -1782,10 +1833,10 @@ function Workspace(
                 </select>
               </label>}
               {selectedCable && <CableWiringPanel key={selectedCable.id} cable={selectedCable} devices={devices}
-                onChange={next=>setCables(prev=>prev.map(c=>c.id===next.id?next:c))}
+                onChange={next=>saveCables(cables.map(c=>c.id===next.id?next:c))}
                 onRemove={()=>{
                   if(!window.confirm("Remove this cable and its conductor terminations?"))return;
-                  setCables(prev=>prev.filter(c=>c.id!==selectedCable.id));setSelectedCableId(null);
+                  saveCables(cables.filter(c=>c.id!==selectedCable.id));setSelectedCableId(null);
                 }}/>}
             </div>
           </details>
@@ -2035,7 +2086,7 @@ function Workspace(
 
           {/* Physical cables between device boxes; conductor terminations are edited in the right panel. */}
           <svg viewBox="0 0 2000 1200" width="2000" height="1200"
-            style={{position:"absolute",inset:0,pointerEvents:"none",zIndex:5}}>
+            style={{position:"absolute",inset:0,pointerEvents:"none",zIndex:15}}>
             {cables.map(c=>{
               const a=devices.find(d=>d.id===c.from),b=devices.find(d=>d.id===c.to);
               if((!a&&c.from!==PANEL_SOURCE_ID)||!b)return null;
@@ -2052,13 +2103,13 @@ function Workspace(
                 {endDevices.map(({device,side,x,y})=>device && <g key={side}>
                   {(c.type.includes("/3")?["black","red","white","ground"]:["black","white","ground"]).map((wire,i)=>{
                     const assigned=c.ends?.[side]?.[wire];
-                    const targetX=x+24+(assigned?22:0);
-                    const targetY=y-23+i*15;
+                    const targetX=assigned?x+10:x+24;
+                    const targetY=assigned?y-20+i*15:y-23+i*15;
                     return <g key={wire}>
                       <path d={`M ${x} ${y} Q ${x+14} ${targetY} ${targetX} ${targetY}`} fill="none" stroke={wire==="white"?"#4b5963":"#19262e"} strokeWidth="9" strokeLinecap="round"/>
                       <path d={`M ${x} ${y} Q ${x+14} ${targetY} ${targetX} ${targetY}`} fill="none" stroke={wireColors[wire]} strokeWidth="5" strokeLinecap="round"/>
                       <circle cx={targetX} cy={targetY} r="5" fill={wireColors[wire]} stroke={assigned?"#25d7ed":"#778c98"} strokeWidth="2"/>
-                      {assigned && <path d={`M ${targetX} ${targetY} L ${x+57} ${y-10+i*11}`} stroke={wireColors[wire]} strokeWidth="3" fill="none"/>}
+                      {assigned && <g><path d={`M ${targetX} ${targetY} L ${x+45} ${y-10+i*11}`} stroke={wireColors[wire]} strokeWidth="5" fill="none"/><circle cx={x+45} cy={y-10+i*11} r="5" fill={wireColors[wire]} stroke="#20d8ff" strokeWidth="2"/></g>}
                     </g>;
                   })}
                 </g>)}

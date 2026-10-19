@@ -1,3 +1,4 @@
+import type { CableRecord } from "./CableWiringPanel";
 import type { SwitchLightConnection } from "./SwitchedLightLab";
 export type ServiceRoute = "UNDERGROUND" | "OVERHEAD";
 export type DisconnectArrangement = "SEPARATE" | "MAIN_BREAKER";
@@ -20,6 +21,7 @@ export type ServiceProject = {
   distributionPanel?: import("../electrical/breakerPanel").BreakerPanel;
   circuitAssignments?: CircuitAssignment[];
   panelWires?: PanelWire[];
+  wallCables?: CableRecord[];
   endToEndCircuits?: EndToEndCircuit[];
   switchedLightCircuits?: SwitchLightConnection[];
   distributionMain?: { installed: boolean; amperage: number; closed: boolean };

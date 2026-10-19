@@ -1,3 +1,4 @@
+import CableWiringPanel, {PANEL_SOURCE_ID} from "./CableWiringPanel";
 import EndToEndCircuitLab from "./EndToEndCircuitLab";
 import RealisticPanel from "./RealisticPanel";
 import ServiceConnectionView from "./ServiceConnectionView";
@@ -26,8 +27,17 @@ export default function ServiceOverview({ project, onChange, onOpenDestination }
   const [kind, setKind] = useState<BreakerType>("STANDARD");
   const [selected, setSelected] = useState(1);
   const [wiringPopup, setWiringPopup] = useState<null | "wire" | "inspect">(null);
+  const [selectedWallCable,setSelectedWallCable]=useState<string>("");
   const panel = project.distributionPanel ?? createBreakerPanel(`distribution-${project.id}`, "Main Distribution Panel", project.service.amperage, 24);
   const slots = panel.breakers;
+  const unifiedHomeRuns=(project.wallCables??[]).filter(c=>c.from===PANEL_SOURCE_ID);
+  const activeUnifiedCable=unifiedHomeRuns.find(c=>c.id===selectedWallCable)??unifiedHomeRuns.find(c=>c.breakerSlot===selected)??null;
+  const visualUnifiedWires=unifiedHomeRuns.flatMap(c=>Object.entries(c.ends?.from??{}).flatMap(([wire,terminal])=>{
+    if(!terminal||!c.breakerSlot)return [];
+    const mapped=terminal==="breaker-hot"?`breaker-${c.breakerSlot}-hot-a`:terminal==="neutral-bar"?"neutral-1":terminal==="ground-bar"?"ground-1":null;
+    if(!mapped)return [];
+    return [{id:`unified-${c.id}-${wire}`,slot:c.breakerSlot,cable:c.type as "14/2 NM-B",conductor:(wire==="ground"?"bare":wire) as "black"|"white"|"red"|"bare",terminal:mapped}];
+  }));
   const distributionMain = project.distributionMain;
   const installMain = (rating: number) => {
     if (rating > project.service.amperage) { window.alert("This training model does not allow a distribution main rating above the configured service rating."); return; }
@@ -99,7 +109,7 @@ export default function ServiceOverview({ project, onChange, onOpenDestination }
           }}
           canDrop={!!draggedBreaker}
           mainBreaker={distributionMain}
-          panelWires={project.panelWires ?? []}
+          panelWires={[...(project.panelWires ?? []),...visualUnifiedWires]}
           onBreakerState={changeBreakerState}
           onMainDrop={(rating) => installMain(rating)}
         /> :         <div style={{ background: "#25313b", padding: 14, border: "3px solid #63717c", borderRadius: 10 }}>
@@ -168,6 +178,24 @@ export default function ServiceOverview({ project, onChange, onOpenDestination }
             <button style={{ ...button, borderColor: "#a45d5d", color: "#ffc4c4" }} onClick={remove}>Remove breaker</button>
           </> : <p style={{ color: "#b3c5cf" }}>Select an installed breaker position to name its circuit and associate rooms.</p>}
         </>)}
+    <section style={{...frame,padding:10}}>
+      <h3 style={{color:"#8beaff",margin:"0 0 10px"}}>🔌 Home-Run Connections · Shared Wiring</h3>
+      {unifiedHomeRuns.length===0?<p style={{fontSize:16}}>No new-style home runs yet. Open a wall and use Start Home Run from Panel P1.</p>:<>
+        <label style={{display:"block",fontSize:17,marginBottom:10}}>Select home run
+          <select style={{...field,display:"block",width:"100%",fontSize:17}} value={activeUnifiedCable?.id??""} onChange={e=>setSelectedWallCable(e.target.value)}>
+            {unifiedHomeRuns.map(c=><option key={c.id} value={c.id}>Breaker #{c.breakerSlot??"?"} → {c.toName??"Device"} · {c.type}</option>)}
+          </select>
+        </label>
+        {activeUnifiedCable&&<CableWiringPanel key={activeUnifiedCable.id} cable={activeUnifiedCable} devices={[]}
+          onChange={next=>onChange({...project,wallCables:(project.wallCables??[]).map(c=>c.id===next.id?next:c)})}
+          onRemove={()=>{
+            if(!window.confirm("Remove this home run from the wall and panel?"))return;
+            onChange({...project,wallCables:(project.wallCables??[]).filter(c=>c.id!==activeUnifiedCable.id)});
+            setSelectedWallCable("");
+          }}/>} 
+        <p style={{fontSize:14,color:"#a7c8d6"}}>Panel terminations here also appear on the realistic breaker panel. Switch terminations remain visible on the wall.</p>
+      </>}
+    </section>
     {accordion("routing", `Circuit Routing & Wiring · Breaker #${selected}`, <>
       {!active?.breaker ? <p>Select an installed breaker first.</p> : <>            <div style={{borderTop:"1px solid #35566a",margin:"14px 0",paddingTop:12}}>
               <strong style={{display:"block",color:"#81e5ff",marginBottom:8}}>Circuit destinations — room / wall</strong>

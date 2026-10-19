@@ -70,93 +70,10 @@ function DeviceFace({ device }: { device: ElectricalDevice }) {
 
 
 /** Integrated open box: all conductors and connectors are drawn INSIDE the same device. */
-function WiredBox({device,cables}:{device:ElectricalDevice;cables:CableRecord[]}) {
-  const splices=cables.flatMap(c=>c.splices??[]).filter((sp,i,all)=>sp.deviceId===device.id&&all.findIndex(other=>other.id===sp.id)===i);
-  const wires=cables.flatMap(c=>{
-    const end=c.from===device.id?"from":"to";
-    return (c.type.includes("/3")?["black","red","white","ground"]:["black","white","ground"]).map(color=>({c,end,color,terminal:c.ends?.[end]?.[color]??null}));
-  });
-  const colors:Record<string,string>={black:"#13191d",white:"#f7f9f8",red:"#e24343",ground:"#bc7843"};
-  const isGfci=device.symbol==="gfci";
-  const isSwitch=device.symbol.includes("switch")||device.symbol==="dimmer";
-  const terminals=isGfci?[
-    {id:"line-hot",x:121,y:36,color:"#d6a049"},{id:"line-neutral",x:97,y:36,color:"#cbd9e0"},
-    {id:"load-hot",x:121,y:66,color:"#d6a049"},{id:"load-neutral",x:97,y:66,color:"#cbd9e0"},
-    {id:"ground",x:110,y:98,color:"#34b783"}
-  ]:isSwitch?[
-    {id:"line",x:119,y:36,color:"#d6a049"},{id:"load",x:119,y:70,color:"#d6a049"},
-    {id:"common",x:119,y:36,color:"#373c40"},{id:"traveler-1",x:119,y:58,color:"#d6a049"},
-    {id:"traveler-2",x:119,y:81,color:"#d6a049"},{id:"ground",x:110,y:99,color:"#34b783"}
-  ]:[
-    {id:"hot",x:121,y:43,color:"#d6a049"},{id:"neutral",x:97,y:43,color:"#cbd9e0"},
-    {id:"ground",x:110,y:98,color:"#34b783"}
-  ];
-  const terminalPoint=(name:string)=>{
-    const lower=name.toLowerCase();
-    const t=terminals.find(t=>t.id===lower)||terminals.find(t=>lower.includes(t.id))||
-      terminals.find(t=>lower.includes("ground")?t.id==="ground":lower.includes("neutral")?t.id.includes("neutral"):t.id.includes("hot")||t.id==="line");
-    return t??terminals[0];
-  };
-  const nut=(x:number,y:number)=><g>
-    <path d={`M ${x-7} ${y+8} L ${x-7} ${y-2} Q ${x} ${y-14} ${x+7} ${y-2} L ${x+7} ${y+8} Z`} fill="#efa337" stroke="#ffda8b" strokeWidth="1.6"/>
-    <path d={`M ${x-5} ${y} H ${x+5} M ${x-5} ${y+4} H ${x+5}`} stroke="#a96323" strokeWidth="1.2"/>
-  </g>;
-  const trace=(path:string,color:string)=><g>
-    <path d={path} fill="none" stroke={color==="white"?"#647d8a":"#8099a5"} strokeWidth="5.7" strokeLinecap="round"/>
-    <path d={path} fill="none" stroke={colors[color]??"#202b34"} strokeWidth="3.4" strokeLinecap="round"/>
-  </g>;
-  return <svg viewBox="0 0 150 122" width="150" height="122" style={{display:"block",overflow:"visible"}} aria-label={`${device.name} with actual saved cable terminations`}>
-    <rect x="3" y="2" width="144" height="116" rx="9" fill="#a7b5bd" stroke="#4d6b7c" strokeWidth="3"/>
-    <rect x="10" y="9" width="130" height="102" rx="6" fill="#e1e1d8" stroke="#788f9b" strokeWidth="1.5"/>
-    <rect x="80" y="14" width="52" height="92" rx="8" fill="#d2d8da" stroke="#7e8c93" strokeWidth="2"/>
-    <rect x="88" y="21" width="36" height="78" rx="5" fill="#f5f3e9" stroke="#9ea9a9" strokeWidth="1.5"/>
-    {isGfci&&<g><rect x="99" y="47" width="14" height="6" rx="2" fill="#b74640"/><rect x="99" y="55" width="14" height="6" rx="2" fill="#48545d"/></g>}
-    {isSwitch&&<rect x="101" y="43" width="10" height="28" rx="2" fill="#85939c" stroke="#52616c"/>}
-    {!isSwitch&&!isGfci&&<circle cx="106" cy="61" r="12" fill="#fff7d8" stroke="#aab3b7" strokeWidth="2"/>}
-    {/* Cable jacket ends at the TOP of the compact box; all conductor paths begin here. */}
-    {cables.slice(0,4).map((c,ci)=>{const x=44+(ci-(Math.min(cables.length,4)-1)/2)*20;return <g key={`entry-${c.id}`}>
-      <path d={`M ${x} -5 V 19`} stroke="#435562" strokeWidth="13" strokeLinecap="round"/>
-      <path d={`M ${x} -5 V 19`} stroke={c.type.includes("MC")?"#aabac2":"#e8e4d9"} strokeWidth="9" strokeLinecap="round"/>
-      <rect x={x-8} y="15" width="16" height="6" rx="2" fill="#8c9fa7" stroke="#516977" strokeWidth="1"/>
-    </g>})}
-    {terminals.map(t=><g key={t.id}><circle cx={t.x} cy={t.y} r="5.3" fill={t.color} stroke="#4e626d" strokeWidth="1.2"/><path d={`M ${t.x-2.6} ${t.y} H ${t.x+2.6}`} stroke="#31424b" strokeWidth="1.3"/></g>)}
-    {wires.map(({c,end,color,terminal},i)=>{
-      const ci=cables.findIndex(item=>item.id===c.id);
-      const conductorIndex=(c.type.includes("/3")?["black","red","white","ground"]:["black","white","ground"]).indexOf(color);
-      const entryX=44+(ci-(Math.min(cables.length,4)-1)/2)*20+(conductorIndex-1.5)*3;
-      const entryY=21;
-      if(terminal?.startsWith("splice:"))return null;
-      const t=terminal&&terminal!=="cap"?terminalPoint(terminal):null;
-      const capped=terminal==="cap";
-      const targetX=t?.x??(22+(i%4)*11),targetY=t?.y??(capped?35+(Math.floor(i/4)*24):32+(i%4)*13);
-      return <g key={`${c.id}-${end}-${color}`}>
-        {trace(`M ${entryX} ${entryY} C ${entryX} ${entryY+27} ${targetX-20} ${targetY-23} ${targetX} ${targetY}`,color)}
-        {capped&&nut(targetX,targetY-8)}
-        <title>{color.toUpperCase()} · {c.fromName??"Panel"} → {c.toName??device.name} · {terminal??"Loose"}</title>
-      </g>;
-    })}
-    {splices.slice(0,3).map((sp,i)=>{
-      const x=26+i*21,y=26+(i%2)*11;
-      return <g key={sp.id}>
-        {sp.members.slice(0,5).map((m,j)=>{
-          const ci=cables.findIndex(c=>c.id===m.cableId);
-          const startX=44+(ci-(Math.min(cables.length,4)-1)/2)*20+(j-1.5)*3;
-          return <g key={`${m.cableId}-${m.end}-${m.conductor}-${j}`}>
-            {trace(`M ${startX} 21 C ${startX} 46 ${x-8+j*4} ${y-10} ${x-7+j*4} ${y+8}`,m.conductor)}
-          </g>;
-        })}
-        {sp.pigtailTerminal&&(()=>{const t=terminalPoint(sp.pigtailTerminal);const family=sp.members[0]?.conductor??"black";return <g>{trace(`M ${x+6} ${y+8} C ${x+28} ${y+30} ${t.x-29} ${t.y-21} ${t.x} ${t.y}`,family)}<title>Pigtail → {sp.pigtailTerminal}</title></g>})()}
-        {nut(x,y)}
-        <title>Wire-nut splice · {sp.members.length} conductors{sp.pigtailTerminal?` · pigtail to ${sp.pigtailTerminal}`:""}</title>
-      </g>;
-    })}
-  </svg>;
-}
-
 /** Readable expanded wiring editor visualization. Each conductor is drawn only to its
  * saved terminal; unassigned ends stop loose, caps stay isolated, and splices
  * remain distinct from direct device terminations. */
-function ExpandedDeviceWiring({device,cables}:{device:ElectricalDevice;cables:CableRecord[]}) {
+function ExpandedDeviceWiring({device,cables,width=500}:{device:ElectricalDevice;cables:CableRecord[];width?:number}) {
   const isGfci=device.symbol==="gfci";
   const isSwitch=["switch-single","switch-three-way","dimmer"].includes(device.symbol);
   const isLight=device.symbol.startsWith("light");
@@ -193,7 +110,7 @@ function ExpandedDeviceWiring({device,cables}:{device:ElectricalDevice;cables:Ca
     return conductors.map((color,i)=>({c,side,color,terminal:c.ends?.[side]?.[color]??null,ci,i}));
   });
   const splices=cables.flatMap(c=>c.splices??[]).filter((sp,i,all)=>sp.deviceId===device.id&&all.findIndex(other=>other.id===sp.id)===i);
-  return <svg viewBox="0 0 500 345" width="500" height="345" role="img" aria-label={`Expanded wiring for ${device.name}; saved connections only`} style={{display:"block",maxWidth:"100%"}}>
+  return <svg viewBox="0 0 500 345" width={width} height={Math.round(width*345/500)} role="img" aria-label={`Expanded wiring for ${device.name}; saved connections only`} style={{display:"block",maxWidth:"100%"}}>
     <rect x="4" y="5" width="492" height="334" rx="13" fill="#dce4e6" stroke="#577788" strokeWidth="4"/>
     <rect x="14" y="15" width="472" height="314" rx="8" fill="#f1f2ec" stroke="#9bb0b9" strokeWidth="2"/>
     <rect x="312" y="53" width="142" height="253" rx="15" fill="#b4c2c9" stroke="#627f8e" strokeWidth="5"/>
@@ -227,7 +144,7 @@ function ExpandedDeviceWiring({device,cables}:{device:ElectricalDevice;cables:Ca
         {!isSplice&&<g>
           <path d={path} stroke={color==="white"?"#667e8a":"#9ab0ba"} strokeWidth="11" fill="none" strokeLinecap="round"/>
           <path d={path} stroke={colors[color]} strokeWidth="7" fill="none" strokeLinecap="round"/>
-          {!t&&terminal!=="cap"&&<circle cx={ex} cy={ey} r="5" fill={colors[color]} stroke="#546e7a" strokeWidth="2"/>}
+          {!t&&terminal!=="cap"&&<g><circle cx={ex} cy={ey} r="5" fill={colors[color]} stroke="#546e7a" strokeWidth="2"/><circle cx={ex} cy={ey} r="2" fill="#dcae6b"/><title>Unconnected loose conductor</title></g>}
           {terminal==="cap"&&<g transform={`translate(${ex} ${ey-10})`}><path d="M -10 10 L -9 -5 Q 0 -21 9 -5 L 10 10 Z" fill="#f2a13a" stroke="#a96a26" strokeWidth="2"/><path d="M -7 0 H 7 M -7 5 H 7" stroke="#b66b26" strokeWidth="2"/></g>}
         </g>}
         <title>{color.toUpperCase()} · {c.fromName??"Panel"} → {c.toName??device.name} · {terminal??"Loose"}</title>
@@ -260,20 +177,25 @@ export default function Device({ device, wireMode, selectedTerminal, selected, o
   void selectedTerminal; void onTerminalClick;
   const [expanded,setExpanded]=useState(false);
   const showWiredBox=wiringCables.length>0;
+  // A single detailed terminal diagram is used at every wall zoom level.
+  // Expand physical drawing space with cable count rather than shrinking conductors.
+  const detailWidth = wiringCables.length >= 3 ? 480 : wiringCables.length === 2 ? 430 : 370;
+  const wallWidth = expanded && showWiredBox ? 540 : showWiredBox ? detailWidth + 16 : 150;
+  const wallHeight = expanded && showWiredBox ? 430 : showWiredBox ? Math.round(detailWidth*345/500)+36 : 150;
   // All compact device types share the same saved-termination rendering path.
   const isExpanded=expanded&&showWiredBox;
 
   const wallMounted = ["outlet", "gfci", "switch-single", "switch-three-way", "dimmer"].includes(device.symbol);
   return <div className="device-component" title={`${device.name} — ${device.type}. Select to inspect or install.`} onMouseDown={e => { e.stopPropagation(); onSelect(device.id); if (wireMode) onCableDestination(device.id); else if(!expanded) onStartDrag(device.id); }}
-    style={{position:"absolute",left:device.x,top:device.y,width:isExpanded?530:150,height:isExpanded?430:150,boxSizing:"border-box",border:selected?"2px solid #00c9f3":"2px solid transparent",borderRadius:8,boxShadow:isExpanded?"0 14px 36px #0009, 0 0 0 3px #00c9f3":"none",background:isExpanded?"#c9d0d1":"transparent",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:wireMode?"crosshair":"grab",userSelect:"none",zIndex:isExpanded?45:10}}>
+    style={{position:"absolute",left:device.x-(wallWidth-150)/2,top:device.y-(wallHeight-150)/2,width:wallWidth,height:wallHeight,boxSizing:"border-box",border:selected?"2px solid #00c9f3":"2px solid transparent",borderRadius:8,boxShadow:isExpanded?"0 14px 36px #0009, 0 0 0 3px #00c9f3":"none",background:isExpanded?"#c9d0d1":"transparent",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:wireMode?"crosshair":"grab",userSelect:"none",zIndex:isExpanded?45:10}}>
     {!showWiredBox&&wallMounted && <div title="Electrical device box" style={{position:"absolute",top:10,left:18,width:114,height:120,background:"#174e87",border:"4px solid #12375c",borderRadius:9,boxShadow:"inset 0 0 0 3px #4680ad, 2px 4px 7px #0005"}}/>}
-    <div style={{position:"relative",zIndex:1,transform:"none",filter:"drop-shadow(1px 3px 2px #0005)",pointerEvents:"none"}}>{isExpanded?<ExpandedDeviceWiring device={device} cables={wiringCables}/>:showWiredBox?<WiredBox device={device} cables={wiringCables}/>:<DeviceFace device={device}/>}</div>
+    <div style={{position:"relative",zIndex:1,transform:"none",filter:"drop-shadow(1px 3px 2px #0005)",pointerEvents:"none"}}>{showWiredBox?<ExpandedDeviceWiring device={device} cables={wiringCables} width={isExpanded?500:detailWidth}/>:<DeviceFace device={device}/>}</div>
     {showWiredBox&&<button type="button" title={isExpanded?"Collapse wiring view":"Expand wiring on wall"} onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();setExpanded(v=>!v);onSelect(device.id);}} style={{position:"absolute",top:2,right:2,zIndex:50,background:"#13516c",color:"#fff",border:"2px solid #7edcf0",borderRadius:5,padding:"4px 8px",fontSize:isExpanded?16:12,cursor:"pointer"}}>{isExpanded?"− Close":"⤢"}</button>}
     {isExpanded&&<div style={{position:"absolute",bottom:5,left:12,right:12,textAlign:"center",fontSize:13,color:"#183c4c",fontWeight:700,pointerEvents:"none"}}>Only saved connections shown · Click − Close to return to wall</div>}
-    <div style={{position:"absolute",top:isExpanded?383:130,left:isExpanded?12:-8,width:isExpanded?320:166,textAlign:"center",fontSize:12,fontWeight:700,color:"#17212c",textShadow:"0 1px #ffffff",pointerEvents:"none"}}>{device.name}</div>
+    <div style={{position:"absolute",top:showWiredBox?wallHeight-27:130,left:showWiredBox?8:-8,width:showWiredBox?wallWidth-16:166,textAlign:"center",fontSize:12,fontWeight:700,color:"#17212c",textShadow:"0 1px #ffffff",pointerEvents:"none"}}>{device.name}</div>
     <button type="button" aria-label={`Start cable from ${device.name}`} title="Wire Tool: select cable source"
       onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();if(wireMode && !cableSource) onCableStart(device.id); else if(wireMode) onCableDestination(device.id); else onCableStart(device.id)}}
-      style={{position:"absolute",left:-9,top:isExpanded?190:61,width:20,height:20,padding:0,borderRadius:"50%",
+      style={{position:"absolute",left:-9,top:showWiredBox?Math.round(wallHeight/2):61,width:20,height:20,padding:0,borderRadius:"50%",
         border:"2px solid #173b4d",background:cableSource?"#00e6ff":"#a2a8ad",
         boxShadow:cableSource?"0 0 0 4px #00e6ff55":"none",zIndex:30,cursor:"crosshair"}}/>
   </div>;

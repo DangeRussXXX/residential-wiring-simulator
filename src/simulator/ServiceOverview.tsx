@@ -10,9 +10,9 @@ const button: React.CSSProperties = { background: "#163c52", border: "1px solid 
 const field: React.CSSProperties = { background: "#0b1824", color: "white", border: "1px solid #397b99", borderRadius: 5, padding: 8, maxWidth: "100%" };
 
 export default function ServiceOverview({ project, onChange, onOpenDestination }: { project: ServiceProject; onChange: (next: ServiceProject) => void; onOpenDestination?: (areaId: string, wall: "NORTH" | "SOUTH" | "EAST" | "WEST") => void }) {
-  const panelSections = ["service", "connections", "directory", "install", "selected", "destinations", "terminations", "labs", "circuits"] as const;
+  const panelSections = ["service", "connections", "install", "selected", "destinations", "terminations", "labs", "circuits"] as const;
   type SectionId = typeof panelSections[number];
-  const [expanded, setExpanded] = useState<Record<SectionId, boolean>>({ service: false, connections: false, directory: true, install: false, selected: true, destinations: false, terminations: true, labs: false, circuits: false });
+  const [expanded, setExpanded] = useState<Record<SectionId, boolean>>({ service: false, connections: false, install: false, selected: true, destinations: false, terminations: true, labs: false, circuits: false });
   const toggle = (id: SectionId) => setExpanded(p => ({...p, [id]: !p[id]}));
   const sectionHeader = (id: SectionId, label: string) => <button type="button" aria-expanded={expanded[id]} onClick={() => toggle(id)} style={{...button, width:"100%", textAlign:"left", display:"flex", justifyContent:"space-between", alignItems:"center", background:"#12283a", padding:"12px 14px", fontWeight:700, fontSize:17, color:"#7fe3ff"}}><span>{label}</span><span aria-hidden="true">{expanded[id] ? "▾" : "▸"}</span></button>;
   const accordion = (id: SectionId, label: string, content: React.ReactNode) => <section style={{...frame,padding:10}}>{sectionHeader(id,label)}{expanded[id] && <div style={{padding:"14px 6px 4px"}}>{content}</div>}</section>;
@@ -60,35 +60,14 @@ export default function ServiceOverview({ project, onChange, onOpenDestination }
     onChange({ ...project, distributionPanel: next, circuitAssignments: assignments.filter(a => a.slot !== selected), panelWires: (project.panelWires ?? []).filter(w => w.slot !== selected) });
   };
   const node = (name: string, detail: string) => <div style={{ flex: 1, minWidth: 140, padding: 14, border: "1px solid #386b88", borderRadius: 8, textAlign: "center", background: "#0b1926" }}><strong>{name}</strong><div style={{ color: "#a4c7d7", fontSize: 12, marginTop: 6 }}>{detail}</div></div>;
-  return <div style={{ color: "#e9f7ff", maxWidth: 1200, margin: "0 auto" }}>
+  return <div style={{ color: "#e9f7ff", width: "100%", minWidth: 0, boxSizing: "border-box" }}>
     <div style={{display:"flex",gap:8,alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",marginBottom:14}}>
       <h2 style={{margin:0,color:"#79e2ff"}}>⚡ Service & Panel Workspace</h2>
 
     </div>
-    {accordion("service", "Electrical Service Setup", <>
-
-      <h2 style={{ color: "#65dbff", marginTop: 0 }}>⚡ Electrical Service · {project.service.amperage}A</h2>
-      <div style={{ display: "flex", alignItems: "stretch", gap: 8, flexWrap: "wrap" }}>
-        {node("UTILITY", project.service.route === "UNDERGROUND" ? "Underground lateral" : "Overhead service drop")}
-        {node("METER", project.service.meterLocation)}
-        {node("SERVICE DISCONNECT", `${project.service.amperage}A · ${project.service.mainDisconnectClosed ? "CLOSED" : "OPEN"}`)}
-        {node("DISTRIBUTION PANEL", "120/240V · L1 / L2 / N / G")}
-      </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 14, flexWrap: "wrap" }}>
-        <button style={button} onClick={() => onChange({ ...project, service: { ...project.service, mainDisconnectClosed: !project.service.mainDisconnectClosed } })}>{project.service.mainDisconnectClosed ? "Open simulated disconnect" : "Close simulated disconnect"}</button>
-        <strong style={{ color: project.service.mainDisconnectClosed ? "#8bebb3" : "#ffc39b" }}>Downstream supply: {project.service.mainDisconnectClosed ? "ON" : "OFF"} (diagram only)</strong>
-      </div>
-      <p style={{ fontSize: 12, color: "#b1c4ce" }}>Training model: the disconnect display does not yet control the circuit solver. Upstream service conductors may remain energized. This is separate service disconnect equipment; the downstream distribution panel is modeled with isolated neutral and ground bars.</p>
-    </>)}
-    {accordion("connections", "Service Connections · Lugs & Feeder", <ServiceConnectionView project={project} />)}
-    {accordion("directory", "Main Distribution Panel · Breaker Positions", <>
-      <div style={{display:"flex",justifyContent:"flex-end",gap:8,flexWrap:"wrap",marginBottom:10}}>
-        <button style={button} onClick={()=>setExpanded(p=>({...p,install:true,selected:true,destinations:true,terminations:true,labs:true,circuits:true}))}>Show All</button>
-        <button style={button} onClick={()=>setExpanded(p=>({...p,install:false,selected:false,destinations:false,terminations:false,labs:false,circuits:false}))}>Hide All</button>
-      </div>
-      <h2 style={{ marginTop: 0, color: "#65dbff" }}>Main Distribution Panel — Breaker Directory</h2>
-      <p style={{ color: "#a8c6d3" }}>Install breakers here, not on bedroom walls. Circuit names and room assignments are saved with this project. Connections to actual wall conductors are a later phase.</p>
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(260px, 1fr) minmax(300px, 1fr)", gap: 18 }}>
+    <div style={{display:"grid",gridTemplateColumns:"minmax(300px, 1fr) minmax(370px, 1.15fr)",gap:16,alignItems:"start",width:"100%"}} className="nova-service-grid">
+      <div style={{minWidth:0,alignSelf:"start"}}>
+        <h3 style={{color:"#79e2ff",margin:"0 0 10px"}}>Main Distribution Panel</h3>
         <div style={{ background: "#25313b", padding: 14, border: "3px solid #63717c", borderRadius: 10 }}>
           <div style={{ background: "#151e28", padding: 12, textAlign: "center", marginBottom: 10, borderRadius: 6 }}><strong>MAIN DISTRIBUTION</strong><div style={{ fontSize: 12, color: "#8cb8cb" }}>Feeder: L1 · L2 · Neutral · Equipment Ground</div></div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}>
@@ -102,7 +81,31 @@ export default function ServiceOverview({ project, onChange, onOpenDestination }
           </div>
           <div style={{ display: "flex", gap: 8, marginTop: 12 }}><div style={{ ...button, flex: 1, textAlign: "center" }}>NEUTRAL BAR (isolated)</div><div style={{ ...button, flex: 1, textAlign: "center" }}>GROUND BAR</div></div>
         </div>
-        <div style={{minWidth:0,alignSelf:"start",display:"flex",flexDirection:"column",gap:8}}>
+      </div>
+      <div style={{minWidth:0,display:"flex",flexDirection:"column",gap:8}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:6}}>
+          <strong style={{color:"#79e2ff",fontSize:18}}>Service & Breaker Controls</strong>
+          <div style={{display:"flex",gap:8}}>
+            <button style={button} onClick={()=>setExpanded(()=>Object.fromEntries(panelSections.map(id=>[id,true])) as Record<SectionId,boolean>)}>Show All</button>
+            <button style={button} onClick={()=>setExpanded(()=>Object.fromEntries(panelSections.map(id=>[id,false])) as Record<SectionId,boolean>)}>Hide All</button>
+          </div>
+        </div>
+        {accordion("service", "Electrical Service Setup", <>
+          <h2 style={{color:"#65dbff",marginTop:0}}>⚡ Electrical Service · {project.service.amperage}A</h2>
+          <div style={{display:"flex",alignItems:"stretch",gap:8,flexWrap:"wrap"}}>
+            {node("UTILITY",project.service.route === "UNDERGROUND" ? "Underground lateral" : "Overhead service drop")}
+            {node("METER",project.service.meterLocation)}
+            {node("SERVICE DISCONNECT",`${project.service.amperage}A · ${project.service.mainDisconnectClosed ? "CLOSED" : "OPEN"}`)}
+            {node("DISTRIBUTION PANEL","120/240V · L1 / L2 / N / G")}
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:14,marginTop:14,flexWrap:"wrap"}}>
+            <button style={button} onClick={()=>onChange({...project,service:{...project.service,mainDisconnectClosed:!project.service.mainDisconnectClosed}})}>{project.service.mainDisconnectClosed ? "Open simulated disconnect" : "Close simulated disconnect"}</button>
+            <strong style={{color:project.service.mainDisconnectClosed ? "#8bebb3" : "#ffc39b"}}>Downstream supply: {project.service.mainDisconnectClosed ? "ON" : "OFF"} (diagram only)</strong>
+          </div>
+          <p style={{fontSize:12,color:"#b1c4ce"}}>Training model: disconnect display does not control the circuit solver. Upstream service conductors may remain energized. Downstream neutral and ground bars are modeled as isolated.</p>
+        </>)}
+        {accordion("connections", "Service Connections · Lugs & Feeder", <ServiceConnectionView project={project} />)}
+
     {accordion("install", "Breaker Library · Drag into Empty Slots", <>
       <p style={{fontSize:12,color:"#b2cbd8",marginTop:0}}>Drag a breaker onto an empty position at left. You can also select a breaker below, choose a position, and click Install (keyboard/touch alternative). These are generic training models; panel listing and physical bus compatibility are not yet verified.</p>
       <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10}}>
@@ -160,8 +163,8 @@ export default function ServiceOverview({ project, onChange, onOpenDestination }
     {accordion("circuits", "Project Circuit Directory", <><h3 style={{ marginTop: 0, color: "#86e1ff" }}>Project Circuit Directory</h3>
       {slots.filter(s => s.breaker).length === 0 ? <p>No breakers installed yet.</p> : slots.filter(s => s.breaker).map(s => <div key={s.slot} style={{ padding: "9px 0", borderBottom: "1px solid #2e4b5c" }}><strong>#{s.slot} · {s.breaker?.amperage}A</strong> — {assignments.find(a => a.slot === s.slot)?.name || "Unassigned"}<div style={{ fontSize: 12, color: "#99b9c8" }}>{(assignments.find(a => a.slot === s.slot)?.areaIds ?? []).map(id => project.areas.find(a => a.id === id)?.name).filter(Boolean).join(", ") || "No rooms assigned"}</div></div>)}
     </>)}
-        </div>
       </div>
-    </>)}
+    </div>
+    <style>{`@media (max-width: 1050px) { .nova-service-grid { grid-template-columns: minmax(0,1fr) !important; } }`}</style>
   </div>;
 }

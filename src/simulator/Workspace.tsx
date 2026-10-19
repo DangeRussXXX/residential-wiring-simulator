@@ -2132,6 +2132,53 @@ function Workspace(
               </g>;
             })}
           </svg>
+          {/* Live box detail: only saved splice/pigtail records are illustrated. */}
+          {!blueprintMode&&<svg viewBox="0 0 2000 1200" width="2000" height="1200"
+            style={{position:"absolute",inset:0,pointerEvents:"none",zIndex:16}}>
+            {devices.flatMap(device=>{
+              const splices=cables.flatMap(c=>c.splices??[]).filter((sp,index,all)=>
+                sp.deviceId===device.id&&all.findIndex(other=>other.id===sp.id)===index);
+              if(!splices.length)return [];
+              const cx=device.x+75, cy=device.y+70;
+              const boxX=Math.max(8,Math.min(2000-254,cx-125));
+              const boxY=Math.max(14,cy-224);
+              const conductorColor=(name:string)=>name==="white"?"#fff":name==="ground"?"#bd824d":name==="red"?"#e74444":"#101820";
+              return [<g key={`box-splices-${device.id}`}>
+                <path d={`M ${cx} ${cy-16} V ${boxY+174}`} stroke="#91dcef" strokeWidth="3" strokeDasharray="5 5"/>
+                <rect x={boxX} y={boxY} width="250" height="176" rx="10" fill="#18394c" fillOpacity=".97" stroke="#3bd8ef" strokeWidth="3"/>
+                <text x={boxX+12} y={boxY+21} fill="#f2fbff" fontSize="14" fontWeight="bold">{device.name} · BOX WIRING</text>
+                {splices.slice(0,3).map((sp,i)=>{
+                  const nutX=boxX+67+i*74, nutY=boxY+52;
+                  const wireNames=sp.members.map(m=>m.conductor);
+                  const pigtail=Boolean(sp.pigtailTerminal);
+                  const members=sp.members.slice(0,4);
+                  return <g key={sp.id}>
+                    {members.map((m,j)=>{
+                      const sx=boxX+17+i*74+j*12;
+                      const sy=boxY+147;
+                      const ex=nutX-11+j*7;
+                      const path=`M ${sx} ${sy} C ${sx} ${boxY+103} ${ex} ${boxY+108} ${ex} ${nutY+14}`;
+                      return <g key={`${m.cableId}-${m.end}-${m.conductor}`}>
+                        <path d={path} fill="none" stroke="#b2c7d2" strokeWidth="8" strokeLinecap="round"/>
+                        <path d={path} fill="none" stroke={conductorColor(m.conductor)} strokeWidth="5" strokeLinecap="round"/>
+                        <title>{m.conductor.toUpperCase()} · {cables.find(c=>c.id===m.cableId)?.fromName??"Source"} → {cables.find(c=>c.id===m.cableId)?.toName??"Device"}</title>
+                      </g>;
+                    })}
+                    {pigtail&&<g>
+                      <path d={`M ${nutX+8} ${nutY+14} C ${nutX+34} ${nutY+45} ${nutX+39} ${boxY+113} ${nutX+39} ${boxY+137}`} fill="none" stroke="#b2c7d2" strokeWidth="9" strokeLinecap="round"/>
+                      <path d={`M ${nutX+8} ${nutY+14} C ${nutX+34} ${nutY+45} ${nutX+39} ${boxY+113} ${nutX+39} ${boxY+137}`} fill="none" stroke={conductorColor(wireNames[0]??"black")} strokeWidth="6" strokeLinecap="round"/>
+                      <circle cx={nutX+39} cy={boxY+137} r="7" fill="#d8a54f" stroke="#ffe7ac" strokeWidth="2"/>
+                      <title>Pigtail to {sp.pigtailTerminal}</title>
+                    </g>}
+                    <path d={`M ${nutX-13} ${nutY+13} L ${nutX-12} ${nutY-3} Q ${nutX} ${nutY-20} ${nutX+12} ${nutY-3} L ${nutX+13} ${nutY+13} Z`} fill="#ed9d2f" stroke="#ffdf9b" strokeWidth="2"/>
+                    {[0,1,2].map(k=><path key={k} d={`M ${nutX-9} ${nutY-1+k*5} Q ${nutX} ${nutY+3+k*5} ${nutX+9} ${nutY-1+k*5}`} fill="none" stroke="#ad621f" strokeWidth="1.6"/>)}
+                    <text x={nutX} y={boxY+166} textAnchor="middle" fontSize="11" fill="#e7f6ff">{pigtail?`→ ${sp.pigtailTerminal}`:`${members.length} wires`}</text>
+                  </g>;
+                })}
+                {splices.length>3&&<text x={boxX+130} y={boxY+39} fill="#ffde9c" fontSize="11">+{splices.length-3} more splices in wiring panel</text>}
+              </g>];
+            })}
+          </svg>}
           {/* Select a stud before installation. */}
           {!blueprintMode && Array.from({length:Math.ceil(2000/(studSpacing*8))},(_,index)=>{
             const x=index*studSpacing*8+13;

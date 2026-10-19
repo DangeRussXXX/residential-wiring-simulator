@@ -165,6 +165,21 @@ function Workspace(
   ] = useState(false);
 
 
+  const [routeEdit, setRouteEdit] = useState(false);
+  const [homeRunRoutes, setHomeRunRoutes] = useState<Record<string, {entryX:number;points:{x:number;y:number}[]}>>(() => {
+    try { return JSON.parse(localStorage.getItem(`rws-home-run-routes:${workspaceScope}`) || "{}"); }
+    catch { return {}; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem(`rws-home-run-routes:${workspaceScope}`, JSON.stringify(homeRunRoutes)); } catch {}
+  }, [homeRunRoutes, workspaceScope]);
+  const heightToY = (height:number) => 1150 - height * 8 - 45;
+  const nailToStud = (device:ElectricalDevice) => {
+    const pitch = studSpacing * 8;
+    const studX = Math.round((device.x + 6) / pitch) * pitch;
+    setDevices(prev => prev.map(d => d.id === device.id ? {...d,x:studX-6} : d));
+    setNailedDevices(prev => ({...prev,[device.id]:true}));
+  };
   const [studSpacing, setStudSpacing] = useState(16);
   const [snapToStuds, setSnapToStuds] = useState(true);
 
@@ -1636,13 +1651,25 @@ function Workspace(
             <label>Height (in)
               <input aria-label="Device mounting height in inches" type="number" min="0" max="120" step="1"
                 value={mountingHeights[selectedDevice.id] ?? (/switch/i.test(selectedDevice.type) ? 48 : /light/i.test(selectedDevice.type) ? 84 : 12)}
-                onChange={e=>setMountingHeights(prev=>({...prev,[selectedDevice.id]:Math.max(0,Math.min(120,Number(e.target.value)||0))}))}
+                onChange={e=>{
+                  const h=Math.max(0,Math.min(120,Number(e.target.value)||0));
+                  const id=selectedDevice.id;
+                  setMountingHeights(prev=>({...prev,[id]:h}));
+                  setDevices(prev=>prev.map(d=>d.id===id?{...d,y:heightToY(h)}:d));
+                }}
                 style={{width:58,marginLeft:4}} />
             </label>
             <span>{nailedDevices[selectedDevice.id] ? "🔨 Fastened" : "Not fastened"}</span>
           </div>
         )}
 
+        <button type="button" onClick={()=>setRouteEdit(v=>!v)}
+          style={{background:routeEdit?"#9bd8ef":"#edf4f8",color:"#193747",border:"1px solid #478aa8",borderRadius:5,padding:"5px 8px"}}>
+          {routeEdit?"✓ Finish Home-Run Route":"↪ Route Home Run"}
+        </button>
+        {routeEdit && <span style={{fontSize:12,color:"#17394a",background:"#eaf5f9",padding:6}}>
+          Click wall to add cable bends for selected home run. Click a bend to remove it.
+        </span>}
         <button
           onClick={() =>
             setWireMode(
@@ -1817,6 +1844,20 @@ function Workspace(
             backgroundSize: `${studSpacing * 8}px 1200px,2000px 1200px`,
             backgroundRepeat: "repeat-x,no-repeat",
             backgroundColor: "#d6d2c8"
+          }}
+          onClick={e=>{
+            if(!routeEdit || !liveProject || !liveAreaId || !liveWall) return;
+            if ((e.target as HTMLElement).closest(".device-component,button,input")) return;
+            const c=(liveProject.endToEndCircuits??[]).find(c=>c.areaId===liveAreaId && c.wall===liveWall);
+            if(!c) return;
+            const key=`${c.slot}:${c.receptacleId}`;
+            const rect=e.currentTarget.getBoundingClientRect();
+            const x=e.clientX-rect.left+e.currentTarget.parentElement!.scrollLeft;
+            const y=e.clientY-rect.top+e.currentTarget.parentElement!.scrollTop;
+            setHomeRunRoutes(prev=>{
+              const old=prev[key]??{entryX:x,points:[]};
+              return {...prev,[key]:{...old,entryX:old.points.length?old.entryX:x,points:[...old.points,{x,y}]}};
+            });
           }}
 
         >
@@ -1996,7 +2037,7 @@ function Workspace(
             return <div key={`mount-tools-${device.id}`} style={{position:"absolute",left:device.x+145,top:device.y-10,zIndex:40,display:"flex",gap:5,alignItems:"center",background:"rgba(255,255,255,.96)",border:"1px solid #287b99",borderRadius:7,padding:"4px 6px",boxShadow:"0 2px 8px #0004"}}>
               <span style={{fontSize:11,color:"#17394a",whiteSpace:"nowrap"}}>{height}" AFF</span>
               <button type="button" title={nailed?"Already fastened":"Nail device to stud"} aria-label="Nail device to stud" disabled={nailed}
-                onClick={e=>{e.stopPropagation();setNailedDevices(prev=>({...prev,[device.id]:true}));}}
+                onClick={e=>{e.stopPropagation();nailToStud(device);}}
                 style={{border:"1px solid #8a6b36",borderRadius:5,padding:"4px 7px",background:nailed?"#ddd":"#fff0c9",cursor:nailed?"default":"pointer"}}>🔨</button>
               <button type="button" title={nailed?"Remove fastener and release device":"Device is not fastened"} aria-label="Remove device with crowbar" disabled={!nailed}
                 onClick={e=>{e.stopPropagation();setNailedDevices(prev=>({...prev,[device.id]:false}));}}
@@ -2020,6 +2061,11 @@ function Workspace(
                   const boxTop = device.y + 20;
                   const cableX = cx - 15;
                   const entryY = Math.max(0, boxTop - 24);
+                  const routeKey=`${c.slot}:${c.receptacleId}`;
+                  const route=homeRunRoutes[routeKey];
+                  const entryX=route?.entryX??cableX;
+                  const pathPoints=[{x:entryX,y:0},...(route?.points??[]),{x:cableX,y:entryY}];
+                  const cablePath=pathPoints.map((p,i)=>`${i?"L":"M"} ${p.x} ${p.y}`).join(" ");
                   const ends = [
                     {key:"hot",terminal:c.roomHot,color:"#171c23",outline:"#c8d4dc",sourceX:cableX-6},
                     {key:"neutral",terminal:c.roomNeutral,color:"#f7f9fb",outline:"#526678",sourceX:cableX},
@@ -2030,10 +2076,13 @@ function Workspace(
                     : terminal === "silver" ? {x:cx-55,y:device.y+55}
                     : {x:cx-42,y:device.y+105};
                   return <g key={`${c.slot}:${c.receptacleId}`}>
-                    <path d={`M ${cableX} 0 L ${cableX} ${entryY}`}
-                      stroke="#727e83" strokeWidth="20" fill="none" />
-                    <path d={`M ${cableX} 0 L ${cableX} ${entryY}`}
-                      stroke="#f2f0e8" strokeWidth="15" fill="none" />
+                    <path d={cablePath}
+                      stroke="#727e83" strokeWidth="20" fill="none" strokeLinejoin="round"/>
+                    <path d={cablePath}
+                      stroke="#f2f0e8" strokeWidth="15" fill="none" strokeLinejoin="round"/>
+                    {routeEdit && (route?.points??[]).map((p,i)=><circle key={i} cx={p.x} cy={p.y} r="10"
+                      fill="#ffb15c" stroke="#1b4055" strokeWidth="3" style={{pointerEvents:"all",cursor:"pointer"}}
+                      onClick={e=>{e.stopPropagation();setHomeRunRoutes(prev=>({...prev,[routeKey]:{...route!,points:route!.points.filter((_,j)=>j!==i)}}));}}/>)}
                     <text x={cableX+14} y={Math.max(16,entryY-35)} fontSize="13"
                       fontWeight="bold" fill="#1b3949" stroke="#e9f0f3" strokeWidth="3"
                       paintOrder="stroke">HR #{c.slot} · 14/2 NM-B</text>

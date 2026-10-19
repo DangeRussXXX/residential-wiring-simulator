@@ -218,7 +218,7 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove,allCab
       <button type="button" onClick={()=>setView("front")} aria-pressed={view==="front"}
         style={{flex:1,padding:9,background:view==="front"?"#167193":"#183d51",color:"white",border:"1px solid #368bab",borderRadius:5}}>Front · Identify</button>
     </div>
-    <svg viewBox="0 0 390 280" width="100%" aria-label={`Interactive ${dev.name} wiring terminals`} style={{background:"#0b1b28",border:"1px solid #36687c",borderRadius:6}}>
+    <svg viewBox="0 0 390 280" width="100%" aria-label={`Interactive ${dev.name} wiring terminals`} style={{background:"#587586",border:"2px solid #9fc4d6",borderRadius:6}}>
       <path d="M 0 124 H 80" stroke={fromPanel?"#181b20":"#e9e7df"} strokeWidth="26" strokeLinecap="round"/>
       <path d="M 0 124 H 80" stroke="#9caeb9" strokeWidth="1"/>
       <DeviceArtwork kind={kind} breakerSlot={cable.breakerSlot} front={view==="front"}/>
@@ -234,23 +234,34 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove,allCab
         const endX=isCapped||splice?targetX-4:targetX;
         const path=`M 76 124 Q 115 124 132 ${y} L ${endX} ${targetY}`;
         return <g key={c} onClick={()=>setSelected(c)} style={{cursor:"pointer"}}>
-          <path d={path} fill="none" stroke={c==="white"?"#61737d":"#06131d"} strokeWidth="11" strokeLinecap="round"/>
+          <path d={path} fill="none" stroke={c==="white"?"#263c49":"#d2e5ee"} strokeWidth="13" strokeLinecap="round"/>
           <path d={path} fill="none" stroke={colors[c]} strokeWidth="7" strokeLinecap="round"/>
           {!isCapped&&!splice&&<circle cx={targetX} cy={targetY} r="7" fill={colors[c]} stroke={selected===c?"#24e6ff":"#7895a4"} strokeWidth={selected===c?4:2}/>}
           {isCapped&&<WireConnector x={targetX-4} y={targetY} selected={selected===c}/>}
 
-          <text x="120" y={Math.max(14,y-11)} fontSize="12" fontWeight="bold" fill="#bce7f5">{c.toUpperCase()}</text>
+          <text x="120" y={Math.max(14,y-11)} fontSize="13" fontWeight="bold" fill="#fff" stroke="#16394b" strokeWidth="2" paintOrder="stroke">{c.toUpperCase()}</text>
         </g>;
       })}
+      {view==="rear"&&splices.flatMap((sp,i)=>sp.members.filter(m=>m.cableId!==cable.id).map((m,j)=>{
+        const sx=197,sy=60+i*62;
+        const fromY=Math.min(255,Math.max(25,sy-35+(j*23)));
+        const family=m.conductor;
+        const path=`M 0 ${fromY} C 72 ${fromY} 100 ${sy} ${sx-4} ${sy}`;
+        return <g key={`${sp.id}-${m.cableId}-${m.end}-${family}`}>
+          <path d={path} fill="none" stroke="#e3f1f6" strokeWidth="12" strokeLinecap="round"/>
+          <path d={path} fill="none" stroke={colors[family]} strokeWidth="7" strokeLinecap="round"/>
+          <text x="8" y={Math.max(12,fromY-8)} fontSize="11" fontWeight="bold" fill="#fff" stroke="#16394b" strokeWidth="2" paintOrder="stroke">{family.toUpperCase()} · OTHER CABLE</text>
+        </g>;
+      }))}
       {view==="rear"&&splices.map((sp,i)=>{
         const sx=197,sy=60+i*62;
         const destination=sp.pigtailTerminal?points[sp.pigtailTerminal]:undefined;
         const family=sp.members[0]?.conductor==="ground"?"ground":sp.members[0]?.conductor==="white"?"white":"black";
         return <g key={sp.id}>
           {destination&&<>
-            <path d={`M ${sx+24} ${sy} Q ${sx+54} ${sy} ${destination.x} ${destination.y}`} fill="none" stroke="#05111b" strokeWidth="12" strokeLinecap="round"/>
+            <path d={`M ${sx+24} ${sy} Q ${sx+54} ${sy} ${destination.x} ${destination.y}`} fill="none" stroke="#d8e9f1" strokeWidth="13" strokeLinecap="round"/>
             <path d={`M ${sx+24} ${sy} Q ${sx+54} ${sy} ${destination.x} ${destination.y}`} fill="none" stroke={colors[family]} strokeWidth="7" strokeLinecap="round"/>
-            <text x={sx+32} y={sy-13} fontSize="11" fontWeight="bold" fill="#94f2ff">PIGTAIL</text>
+            <text x={sx+32} y={sy-13} fontSize="13" fontWeight="bold" fill="#fff" stroke="#173949" strokeWidth="2" paintOrder="stroke">PIGTAIL</text>
           </>}
           <WireConnector x={sx} y={sy} splice selected={Boolean(selected&&attached[selected]===`splice:${sp.id}`)}/>
           <title>{sp.members.length} conductors joined{sp.pigtailTerminal?` with pigtail to ${sp.pigtailTerminal}`:""}</title>
@@ -265,6 +276,11 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove,allCab
         <title>{t.label} — click to terminate selected conductor</title>
       </g>;})}
     </svg>
+    <div style={{fontSize:15,background:"#173f51",padding:"8px 10px",borderRadius:5,marginTop:8,border:"1px solid #417e98"}}>
+      <strong>Viewing box: {dev.name}</strong> · {splices.length} splice{splices.length===1?"":"s"} in this box.
+      {splices.length===0&&<div style={{color:"#b6dce9",marginTop:4}}>No pigtail saved in this box. If you made it at the other device, select <strong>{end==="to"?"Panel / starting device":"Destination device"}</strong> above to view that box.</div>}
+      {splices.map(sp=><div key={sp.id} style={{color:"#f6d59a",marginTop:5}}>{sp.members.length} wires joined{sp.pigtailTerminal?` → pigtail to ${terms.find(t=>t.id===sp.pigtailTerminal)?.label??sp.pigtailTerminal}`:" (no pigtail terminal assigned)"}</div>)}
+    </div>
     <div style={{fontSize:15,color:"#b9d7e5",margin:"8px 0"}}>{view==="front"?"Front view is for identifying the device. Select Rear · Terminals to connect wires.":selected?`Selected ${selected.toUpperCase()} — click the actual screw or splice in the diagram.`:"Select a conductor, then click the matching terminal or splice."}</div>
     {view==="rear"&&<div style={{fontSize:14,color:"#a8cfe0",marginBottom:8}}>Select a conductor, then click a terminal. Orange cap = isolated wire; orange splice = joined conductors.</div>}
     <details style={{margin:"6px 0 10px",fontSize:14,color:"#a7c9da"}}>

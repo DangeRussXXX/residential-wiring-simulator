@@ -177,15 +177,29 @@ function Workspace(
   }, [homeRunRoutes, workspaceScope]);
   const heightToY = (height:number) => 1150 - height * 8 - 45;
   const [selectedStud, setSelectedStud] = useState<number|null>(null);
+  const [deviceStuds,setDeviceStuds] = useState<Record<string,number>>(() => {
+    try { return JSON.parse(localStorage.getItem(`rws-device-studs:${workspaceScope}`) || "{}"); } catch {return {};}
+  });
+  const [heightConfirmed,setHeightConfirmed] = useState<Record<string,boolean>>(() => {
+    try { return JSON.parse(localStorage.getItem(`rws-device-height-confirmed:${workspaceScope}`) || "{}"); } catch {return {};}
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(`rws-device-studs:${workspaceScope}`,JSON.stringify(deviceStuds));
+      localStorage.setItem(`rws-device-height-confirmed:${workspaceScope}`,JSON.stringify(heightConfirmed));
+    } catch {}
+  },[workspaceScope,deviceStuds,heightConfirmed]);
+  const [placementMessage,setPlacementMessage] = useState("");
   const [rightPanelTarget,setRightPanelTarget] = useState<HTMLElement|null>(null);
   useEffect(() => {
     setRightPanelTarget(document.getElementById("rws-wall-tools-panel-target"));
   }, [liveAreaId,liveWall]);
   const nailToStud = (device:ElectricalDevice) => {
-    if(selectedStud === null) { window.alert("Select a highlighted stud before installing."); return; }
+    const stud = deviceStuds[device.id];
+    if(stud === undefined || !heightConfirmed[device.id]) return;
     const pitch = studSpacing * 8;
-    const studX = selectedStud * pitch + 13;
-    const h=mountingHeights[device.id] ?? (/switch/i.test(device.type)?48:/light/i.test(device.type)?84:12);
+    const studX = stud * pitch + 13;
+    const h=mountingHeights[device.id];
     setDevices(prev => prev.map(d => d.id === device.id ? {...d,x:studX-6,y:heightToY(h)} : d));
     setNailedDevices(prev => ({...prev,[device.id]:true}));
     setDragging(null);
@@ -372,8 +386,7 @@ function Workspace(
           definition.electrical?.voltage ?? 120
         ) as Voltage,
 
-      x:
-        snapToStuds && ["outlet", "gfci", "switch-single", "switch-three-way", "dimmer"].includes(definition.symbol) ? Math.round((dropX + 6) / (studSpacing * 8)) * (studSpacing * 8) - 6 : dropX,
+      x: dropX,
 
       y:
         dropY,
@@ -384,10 +397,14 @@ function Workspace(
     };
 
 
-    setDevices(prev => [
-      ...prev,
-      device
-    ]);
+    setDevices(prev => [...prev, device]);
+    const pitch = studSpacing * 8;
+    const stud = Math.round((dropX + 6 - 13) / pitch);
+    setDeviceStuds(prev => ({...prev,[device.id]:stud}));
+    setSelectedStud(stud);
+    setHeightConfirmed(prev => ({...prev,[device.id]:false}));
+    setSelectedDevice(device);
+    onSelectDevice?.(device);
 
 
     // If this was created while a panel was selected,
@@ -1628,11 +1645,15 @@ function Workspace(
       rect.top;
 
 
-    createDevice(
-      componentName,
-      x,
-      y
-    );
+    const pitch=studSpacing*8;
+    const nearest=Math.round((x-13)/pitch);
+    const studX=nearest*pitch+13;
+    if(Math.abs(x-studX)>26) {
+      setPlacementMessage("Drop the component directly on a stud to place it.");
+      return;
+    }
+    setPlacementMessage("");
+    createDevice(componentName,studX-6,y);
 
   }
 
@@ -1650,10 +1671,12 @@ function Workspace(
           <details open style={{border:"1px solid #346b85",borderRadius:7,padding:8,marginBottom:8}}>
             <summary style={{cursor:"pointer",fontWeight:700,color:"#8ee7ff"}}>Device Installation · Show/Hide</summary>
             <div style={{display:"flex",flexDirection:"column",gap:8,paddingTop:8}}>
-              <div>Selected: {selectedDevice ? selectedDevice.name || selectedDevice.type : "Choose a component on the wall"}</div>
+              <div>Selected: {selectedDevice ? selectedDevice.name || selectedDevice.type : "Drag a component onto a stud"}</div>
+              {placementMessage && <div role="status" style={{color:"#ffd3a3"}}>{placementMessage}</div>}
+              {selectedDevice && <div style={{color:"#8fe9ff"}}>Drop stud: {deviceStuds[selectedDevice.id]===undefined?"not assigned":`#${deviceStuds[selectedDevice.id]+1}`} · {nailedDevices[selectedDevice.id]?"Installed":heightConfirmed[selectedDevice.id]?"Ready to hammer":"Enter height to enable hammer"}</div>}
                       <span title="Click a stud on the wall to highlight it before installing a device"
           style={{fontSize:12,color:"#10394e",background:"#d8f5ff",padding:6,borderRadius:4}}>
-          {selectedStud===null?"Select a stud":`Stud #${selectedStud+1} selected`}
+          {selectedDevice && deviceStuds[selectedDevice.id]!==undefined?`Stud #${deviceStuds[selectedDevice.id]+1} (drop location)`:selectedStud===null?"Drop component onto a stud":`Stud #${selectedStud+1} highlighted`}
         </span>
 
                       {selectedDevice && (
@@ -1661,9 +1684,16 @@ function Workspace(
             <strong>{selectedDevice.name || selectedDevice.type}</strong>
             <label>Height (in)
               <input aria-label="Device mounting height in inches" type="number" min="0" max="120" step="1"
-                value={mountingHeights[selectedDevice.id] ?? (/switch/i.test(selectedDevice.type) ? 48 : /light/i.test(selectedDevice.type) ? 84 : 12)}
+                value={mountingHeights[selectedDevice.id] ?? ""} placeholder="Enter height"
                 onChange={e=>{
-                  const h=Math.max(0,Math.min(120,Number(e.target.value)||0));
+                  const valid=e.target.value.trim()!=="" && Number.isFinite(Number(e.target.value)) && Number(e.target.value)>=0 && Number(e.target.value)<=120;
+                  if(!valid) {
+                    setHeightConfirmed(prev=>({...prev,[selectedDevice.id]:false}));
+                    setMountingHeights(prev=>{const next={...prev};delete next[selectedDevice.id];return next;});
+                    return;
+                  }
+                  const h=Number(e.target.value);
+                  setHeightConfirmed(prev=>({...prev,[selectedDevice.id]:true}));
                   const id=selectedDevice.id;
                   setMountingHeights(prev=>({...prev,[id]:h}));
                   setDevices(prev=>prev.map(d=>d.id===id?{...d,y:heightToY(h)}:d));
@@ -1676,7 +1706,7 @@ function Workspace(
 
               {selectedDevice && <div style={{display:"flex",gap:8}}>
                 <button type="button" title="Install the selected device on the highlighted stud at its chosen height"
-                  disabled={!!nailedDevices[selectedDevice.id]}
+                  disabled={!!nailedDevices[selectedDevice.id] || deviceStuds[selectedDevice.id]===undefined || !heightConfirmed[selectedDevice.id]}
                   onClick={()=>nailToStud(selectedDevice)}>🔨 Hammer · Install</button>
                 <button type="button" title="Delete only the selected component from this wall"
                                   onClick={e=>{
@@ -1689,6 +1719,8 @@ function Workspace(
                   setWires(prev=>prev.filter(w=>w.from.deviceId!==selectedDevice.id&&w.to.deviceId!==selectedDevice.id));
                   setMountingHeights(prev=>{const n={...prev};delete n[selectedDevice.id];return n;});
                   setNailedDevices(prev=>{const n={...prev};delete n[selectedDevice.id];return n;});
+                  setDeviceStuds(prev=>{const n={...prev};delete n[selectedDevice.id];return n;});
+                  setHeightConfirmed(prev=>{const n={...prev};delete n[selectedDevice.id];return n;});
                   setSelectedDevice(null);onSelectDevice?.(null);
                 }}
 

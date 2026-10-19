@@ -798,6 +798,7 @@ export default function SimulatorLayout() {
                   project={project}
                   onChange={changeProject}
                   location={{areaId:project.activeAreaId,wall:activeWall,devices}}
+                  selectedDeviceId={selectedDevice?.id}
                 />
                 </details>
                 <details open={showInspection} onToggle={e=>setShowInspection(e.currentTarget.open)}

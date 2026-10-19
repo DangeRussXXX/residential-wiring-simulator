@@ -7,6 +7,7 @@ type Props = {
   project: ServiceProject;
   onChange: (project: ServiceProject) => void;
   location?: { areaId: string; wall: Wall; devices: ElectricalDevice[] };
+  selectedDeviceId?: string;
 };
 const btn: React.CSSProperties = {background:"#17445c",color:"#e5f8ff",border:"1px solid #428eae",borderRadius:5,padding:"8px 10px",cursor:"pointer"};
 const input: React.CSSProperties = {...btn,background:"#0b1a27"};
@@ -49,7 +50,7 @@ function inspect(project: ServiceProject, circuit: EndToEndCircuit): Check[] {
   ];
 }
 
-export default function EndToEndCircuitLab({project,onChange,location}:Props) {
+export default function EndToEndCircuitLab({project,onChange,location,selectedDeviceId}:Props) {
   const [expanded,setExpanded]=useState(true);
   const [slot,setSlot]=useState<number|null>(null);
   const [chosen,setChosen]=useState("");
@@ -78,7 +79,7 @@ export default function EndToEndCircuitLab({project,onChange,location}:Props) {
   const receptacles=devices; // All wall devices can receive a planned home run.
   const stored=(project.endToEndCircuits??[]).find(c=>c.slot===activeSlot&&c.areaId===areaId&&c.wall===wall&&c.receptacleId===chosen)
     ?? (chosen ? undefined : (project.endToEndCircuits??[]).find(c=>c.slot===activeSlot&&c.areaId===areaId&&c.wall===wall));
-  const receptacleId=receptacles.some(d=>d.id===chosen)?chosen:
+  const receptacleId=receptacles.some(d=>d.id===selectedDeviceId)?selectedDeviceId!:receptacles.some(d=>d.id===chosen)?chosen:
     receptacles.some(d=>d.id===stored?.receptacleId)?stored!.receptacleId:receptacles[0]?.id??"";
   // A different selected device must not inherit a previous device's terminals.
   const sameDevice=stored?.receptacleId===receptacleId;
@@ -208,14 +209,14 @@ export default function EndToEndCircuitLab({project,onChange,location}:Props) {
               <path d={path} fill="none" stroke={w.color} strokeWidth={w.id==="bare"?6:10} strokeLinecap="round"/>
               {w.id==="white"&&<path d={path} fill="none" stroke="#d8d9d7" strokeWidth="1"/>}
               <text x="155" y={w.y-15} fill="#e5f6ff" fontSize="11" fontWeight="bold">{w.label}</text>
-              {!end&&<g onPointerDown={e=>{e.preventDefault();e.stopPropagation();diagramRef.current?.setPointerCapture(e.pointerId);setSelectedWire(w.id);setDrag({wire:w.id,...position(e)});}}
+              {<g onPointerDown={e=>{e.preventDefault();e.stopPropagation();diagramRef.current?.setPointerCapture(e.pointerId);setSelectedWire(w.id);setDrag({wire:w.id,...position(e)});}}
                 onClick={()=>setSelectedWire(w.id)} style={{cursor:"grab"}}>
-                <circle cx="255" cy={w.y} r="17" fill="#143247" stroke={selectedWire===w.id?"#39d2ff":"#d4e6ec"} strokeWidth="2"/>
-                <circle cx="255" cy={w.y} r="7" fill={w.color} stroke="#698b9d"/>
+                <circle cx={end?end.x:255} cy={end?end.y:w.y} r="17" fill="#143247" stroke={selectedWire===w.id?"#39d2ff":"#d4e6ec"} strokeWidth="2"/>
+                <circle cx={end?end.x:255} cy={end?end.y:w.y} r="7" fill={w.color} stroke="#698b9d"/>
               </g>}
             </g>;
           })}
-          {terminals.map(t=><g key={t.id} onClick={()=>{if(selectedWire)connect(selectedWire,t.id);}} style={{cursor:"pointer"}}>
+          {terminals.map(t=><g key={t.id} title={`${t.id} screw`} onClick={()=>{if(selectedWire)connect(selectedWire,t.id);}} style={{cursor:"pointer"}}>
             <circle cx={t.x} cy={t.y} r="21" fill="#203646" stroke={t.color} strokeWidth="4"/>
             <circle cx={t.x} cy={t.y} r="12" fill={t.color} stroke="#46525a" strokeWidth="1"/>
             <path d={`M ${t.x-7} ${t.y} H ${t.x+7}`} stroke="#39414b" strokeWidth="3"/>

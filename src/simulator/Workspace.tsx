@@ -2106,29 +2106,14 @@ function Workspace(
             {cables.map(c=>{
               const a=devices.find(d=>d.id===c.from),b=devices.find(d=>d.id===c.to);
               if((!a&&c.from!==PANEL_SOURCE_ID)||!b)return null;
-              const x1=a?a.x+75:26,y1=a?a.y+70:0,x2=b.x+75,y2=b.y+70;
+              const x1=a?a.x+75:26,y1=a?a.y+12:0,x2=b.x+75,y2=b.y+12;
               const middle=c.from===PANEL_SOURCE_ID?Math.max(24,y2-115):Math.max(22,Math.min(y1,y2)-90);
               const d=`M ${x1} ${y1} L ${x1} ${middle} L ${x2} ${middle} L ${x2} ${y2}`;
               const homeRun=c.from===PANEL_SOURCE_ID;
-              const wireColors:Record<string,string>={black:"#161c26",white:"#f8fafc",red:"#d73333",ground:"#b87343"};
-              const endDevices=[{device:a,side:"from" as const,x:x1,y:y1},{device:b,side:"to" as const,x:x2,y:y2}];
               return <g key={c.id}>
                 <path d={d} fill="none" stroke={homeRun?"#000000":"#6c7b84"} strokeWidth="17" strokeLinejoin="round"/>
                 <path d={d} fill="none" stroke={homeRun?"#191b20":c.type.includes("MC")?"#a5afb7":"#f4f0e6"} strokeWidth="12" strokeLinejoin="round"
                   strokeDasharray={c.type.includes("MC")?"8 3":undefined}/>
-                {endDevices.map(({device,side,x,y})=>device && <g key={side}>
-                  {(c.type.includes("/3")?["black","red","white","ground"]:["black","white","ground"]).map((wire,i)=>{
-                    const assigned=c.ends?.[side]?.[wire];
-                    const targetX=assigned?x+10:x+24;
-                    const targetY=assigned?y-20+i*15:y-23+i*15;
-                    return <g key={wire}>
-                      <path d={`M ${x} ${y} Q ${x+14} ${targetY} ${targetX} ${targetY}`} fill="none" stroke={wire==="white"?"#4b5963":"#19262e"} strokeWidth="9" strokeLinecap="round"/>
-                      <path d={`M ${x} ${y} Q ${x+14} ${targetY} ${targetX} ${targetY}`} fill="none" stroke={wireColors[wire]} strokeWidth="5" strokeLinecap="round"/>
-                      <circle cx={targetX} cy={targetY} r="5" fill={wireColors[wire]} stroke={assigned?"#25d7ed":"#778c98"} strokeWidth="2"/>
-                      {assigned && <g><path d={`M ${targetX} ${targetY} L ${x+45} ${y-10+i*11}`} stroke={wireColors[wire]} strokeWidth="5" fill="none"/><circle cx={x+45} cy={y-10+i*11} r="5" fill={wireColors[wire]} stroke="#20d8ff" strokeWidth="2"/></g>}
-                    </g>;
-                  })}
-                </g>)}
               </g>;
             })}
           </svg>

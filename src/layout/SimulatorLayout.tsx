@@ -23,8 +23,7 @@ import {
 
 import {
   createBreakerPanel,
-  installBreaker,
-  removeBreaker
+  installBreaker
 } from "../electrical/breakerPanel";
 
 import {
@@ -44,7 +43,27 @@ import type {
 } from "../electrical/types";
 
 
+import ServiceSetup from "../simulator/ServiceSetup";
+import ServiceOverview from "../simulator/ServiceOverview";
+import { loadServiceProject, saveServiceProject, clearServiceProject, type ServiceProject } from "../simulator/projectWorkflow";
+
 export default function SimulatorLayout() {
+
+  const [project, setProject] = useState<ServiceProject | null>(() => loadServiceProject());
+  const [showService, setShowService] = useState(true);
+  function changeProject(next: ServiceProject) { setProject(next); saveServiceProject(next); }
+  function addArea(buildingId: string) {
+    const name = window.prompt("Room or area name (e.g. Bedroom 1):");
+    if (!name?.trim() || !project) return;
+    const area = { id: crypto.randomUUID(), name: name.trim(), buildingId, kind: "ROOM" as const };
+    changeProject({ ...project, areas: [...project.areas, area], activeAreaId: area.id });
+    setShowService(false);
+  }
+  function addBuilding() {
+    const name = window.prompt("Detached building name (e.g. Workshop):");
+    if (!name?.trim() || !project) return;
+    changeProject({ ...project, buildings: [...project.buildings, { id: crypto.randomUUID(), name: name.trim(), kind: "DETACHED" }] });
+  }
 
   const workspaceRef =
     useRef<WorkspaceHandle>(null);
@@ -151,8 +170,8 @@ export default function SimulatorLayout() {
      * If the device already owns a panel
      * model, use that exact model.
      *
-     * This keeps each panel's breakers
-     * independent.
+     * This is what keeps the 100A and 200A
+     * panels independent.
      */
 
     if (device.panel) {
@@ -273,8 +292,15 @@ export default function SimulatorLayout() {
     /*
      * Include the panel ID in the breaker ID.
      *
-     * This prevents breakers from different
-     * panels from having the same ID.
+     * This prevents:
+     *
+     * panel-100 / slot-1
+     *
+     * and
+     *
+     * panel-200 / slot-1
+     *
+     * from becoming the same breaker.
      */
 
     const breaker =
@@ -305,66 +331,6 @@ export default function SimulatorLayout() {
 
     updatePanel(
       updatedPanel
-    );
-
-  }
-
-
-  // ---------------------------------
-  // REMOVE BREAKER
-  // ---------------------------------
-
-  function handleRemoveBreaker(
-    slotNumber: number
-  ) {
-
-    /*
-     * Never remove a breaker if there
-     * is no active panel.
-     */
-
-    if (
-      !activePanelDevice ||
-      !activePanel
-    ) {
-      return;
-    }
-
-
-    /*
-     * removeBreaker() is responsible for
-     * removing the breaker occupying the
-     * selected slot.
-     *
-     * This is especially important for
-     * two-pole breakers, which occupy two
-     * slots.
-     */
-
-    const updatedPanel =
-      removeBreaker(
-        activePanel,
-        slotNumber
-      );
-
-
-    /*
-     * Save the updated panel back onto
-     * the currently selected device.
-     */
-
-    updatePanel(
-      updatedPanel
-    );
-
-
-    /*
-     * Removing a breaker clears any
-     * displayed fault state.
-     */
-
-    setCircuitStatus(
-      "READY"
     );
 
   }
@@ -624,7 +590,8 @@ export default function SimulatorLayout() {
   // ---------------------------------
 
   return (
-
+    <>
+    {!project && <ServiceSetup onCreate={changeProject} />}
     <div
       style={{
         height: "100vh",
@@ -654,6 +621,21 @@ export default function SimulatorLayout() {
           overflow: "hidden"
         }}
       >
+
+        {project && <aside style={{ width: 205, flexShrink: 0, background: "#101a25", padding: 10, overflowY: "auto", borderRight: "1px solid #29627b", fontSize: 13 }}>
+          <strong style={{ color: "#72dcff" }}>PROJECT EXPLORER</strong>
+          <div style={{ margin: "8px 0", overflowWrap: "anywhere" }}>{project.name}</div>
+          <button onClick={() => setShowService(true)} style={{ width: "100%", marginBottom: 10, background: showService ? "#146d8d" : "#243c4b" }}>⚡ Service & Panel</button>
+          {project.buildings.map(building => <div key={building.id} style={{ marginBottom: 12, borderTop: "1px solid #2c4553", paddingTop: 8 }}>
+            <strong>{building.kind === "MAIN" ? "🏠" : "🏗"} {building.name}</strong>
+            {building.kind === "DETACHED" && <div style={{ color: "#f1b96e", fontSize: 11 }}>Subpanel / feeder: not yet configured</div>}
+            {project.areas.filter(area => area.buildingId === building.id).map(area => <button key={area.id} onClick={() => { changeProject({ ...project, activeAreaId: area.id }); setShowService(false); }} style={{ display: "block", width: "100%", marginTop: 5, textAlign: "left", background: !showService && project.activeAreaId === area.id ? "#146d8d" : "#243442" }}>▸ {area.name}</button>)}
+            <button onClick={() => addArea(building.id)} style={{ marginTop: 6, width: "100%" }}>+ Add Room / Area</button>
+          </div>)}
+          <button onClick={addBuilding} style={{ width: "100%" }}>+ Detached Building</button>
+          <button onClick={() => { if (window.confirm("Start a new service project? The current project navigation will be replaced.")) { clearServiceProject(); setProject(null); } }} style={{ width: "100%", marginTop: 24, color: "#ffc3ae" }}>New Service Project</button>
+          <p style={{ fontSize: 11, color: "#9caebb" }}>Rooms are organized here. Workspace devices are still shared globally until room-scoped wiring is implemented.</p>
+        </aside>}
 
         {/* =============================== */}
         {/* COMPONENT LIBRARY */}
@@ -720,11 +702,13 @@ export default function SimulatorLayout() {
             flex: 1,
             padding: "15px",
             background: "#303030",
-            overflow: "hidden",
+            overflow: "auto",
             minWidth: 0
           }}
         >
 
+          {project && showService && <ServiceOverview project={project} onChange={changeProject} />}
+          {project && !showService && <div style={{ padding: "4px 8px", color: "#90e7ff", fontSize: 13 }}>Editing: {project.areas.find(a => a.id === project.activeAreaId)?.name ?? "Choose a room"}</div>}
           <Workspace
             ref={
               workspaceRef
@@ -965,10 +949,6 @@ export default function SimulatorLayout() {
                   onInstallBreaker={
                     handleInstallBreaker
                   }
-
-                  onRemoveBreaker={
-                    handleRemoveBreaker
-                  }
                 />
 
               ) : (
@@ -1112,6 +1092,7 @@ export default function SimulatorLayout() {
       </div>
 
     </div>
+    </>
 
   );
 

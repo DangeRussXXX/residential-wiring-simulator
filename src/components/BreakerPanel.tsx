@@ -1,810 +1,761 @@
-// Residential Wiring Simulator
-// Electrical Core - Breaker Panel System
-//
-// Responsibilities:
-// - Panel service information
-// - Physical breaker slots
-// - Breaker installation
-// - Breaker removal
-// - Breaker replacement
-// - Single-pole placement
-// - Two-pole placement
-// - Physical slot occupancy
-//
-// IMPORTANT:
-// The panel owns PHYSICAL placement.
-// The breaker owns ELECTRICAL characteristics.
-//
-// A two-pole breaker is one Breaker object occupying
-// two physical BreakerSlot objects.
-
-import {
-  createBreaker,
-  assignBreakerSlot,
-} from "./breaker";
+import { useState } from "react";
 
 import type {
-  Breaker,
-} from "./breaker";
+  BreakerPanel as BreakerPanelType
+} from "../electrical/breakerPanel";
 
 import type {
-  BreakerPoles,
-} from "./types";
+  BreakerType,
+  Breaker
+} from "../electrical/breaker";
+
+import type {
+  BreakerPoles
+} from "../electrical/types";
 
 
-// ============================================================
-// BREAKER SLOT
-// ============================================================
-
-export interface BreakerSlot {
-
-  id: string;
-
+export type BreakerConfiguration = {
   slot: number;
+  amperage: number;
+  breakerType: BreakerType;
+  poles: BreakerPoles;
+};
 
-  installed: boolean;
 
-  breaker: Breaker | null;
+type BreakerPanelProps = {
 
-  /**
-   * Present on secondary physical positions of
-   * multi-pole breakers.
-   *
-   * Example:
-   *
-   * slot 5:
-   *   breaker = breakerA
-   *   occupiedBy = breakerA.id
-   *
-   * slot 6:
-   *   breaker = breakerA
-   *   occupiedBy = breakerA.id
-   */
-  occupiedBy?: string;
+  panel: BreakerPanelType;
+
+  circuitStatus?:
+    | "READY"
+    | "WARNING"
+    | "FAULT";
+
+  onTrip?: () => void;
+
+  onReset?: () => void;
+
+  onInstallBreaker?: (
+    config: BreakerConfiguration
+  ) => void;
+
+  onRemoveBreaker?: (
+    slotNumber: number
+  ) => void;
+
+};
+
+
+const breakerSizes = [
+  15,
+  20,
+  25,
+  30,
+  40,
+  50,
+  60
+];
+
+
+const breakerTypes: {
+  value: BreakerType;
+  label: string;
+}[] = [
+
+  {
+    value: "STANDARD",
+    label: "Standard"
+  },
+
+  {
+    value: "GFCI",
+    label: "GFCI"
+  },
+
+  {
+    value: "AFCI",
+    label: "AFCI"
+  },
+
+  {
+    value: "DUAL_FUNCTION",
+    label: "AFCI/GFCI Combo"
+  }
+
+];
+
+
+const poleOptions: {
+  value: BreakerPoles;
+  label: string;
+}[] = [
+
+  {
+    value: 1,
+    label: "1 Pole — 120V"
+  },
+
+  {
+    value: 2,
+    label: "2 Pole — 240V"
+  }
+
+];
+
+
+function getBreakerDisplayName(
+  breaker: Breaker
+) {
+
+  if (
+    breaker.breakerType ===
+    "DUAL_FUNCTION"
+  ) {
+
+    return "AFCI/GFCI";
+
+  }
+
+  return breaker.breakerType;
 
 }
 
 
-// ============================================================
-// BREAKER PANEL
-// ============================================================
+export default function BreakerPanel({
 
-export interface BreakerPanel {
+  panel,
 
-  id: string;
+  circuitStatus = "READY",
 
-  name: string;
+  onTrip,
 
-  manufacturer?: string;
+  onReset,
 
-  model?: string;
+  onInstallBreaker,
 
-  mainBreaker: number;
+  onRemoveBreaker
 
-  voltage: 240;
+}: BreakerPanelProps) {
 
-  spaces: number;
 
-  serviceConnected: boolean;
+  const [
+    selectedSlot,
+    setSelectedSlot
+  ] = useState<number | null>(null);
 
-  grounded: boolean;
 
-  breakers: BreakerSlot[];
+  const [
+    selectedAmperage,
+    setSelectedAmperage
+  ] = useState<number>(20);
 
-}
 
+  const [
+    selectedType,
+    setSelectedType
+  ] = useState<BreakerType>(
+    "STANDARD"
+  );
 
-// ============================================================
-// CREATE PANEL
-// ============================================================
 
-export function createBreakerPanel(
-  id: string,
-  name: string,
-  mainBreaker: number,
-  slots: number,
-): BreakerPanel {
+  const [
+    selectedPoles,
+    setSelectedPoles
+  ] = useState<BreakerPoles>(1);
 
-  if (
-    !Number.isInteger(slots) ||
-    slots <= 0
-  ) {
 
-    throw new Error(
-      "Breaker panel must have at least one physical slot.",
-    );
+  const statusColor =
+    circuitStatus === "FAULT"
+      ? "#ff4040"
+      : circuitStatus === "WARNING"
+      ? "#ffd700"
+      : "#39ff14";
 
-  }
 
-  return {
+  const statusText =
+    circuitStatus === "FAULT"
+      ? "BREAKER TRIPPED"
+      : circuitStatus === "WARNING"
+      ? "CHECK CONNECTIONS"
+      : "BREAKER READY";
 
-    id,
 
-    name,
+  const selectedBreaker =
+    selectedSlot !== null
+      ? panel.breakers.find(
+          slot =>
+            slot.slot === selectedSlot
+        )?.breaker ?? null
+      : null;
 
-    manufacturer: "Generic",
-
-    model: "Residential Load Center",
-
-    mainBreaker,
-
-    voltage: 240,
-
-    spaces: slots,
-
-    serviceConnected: true,
-
-    grounded: true,
-
-    breakers:
-      Array.from(
-        {
-          length: slots,
-        },
-        (_, index) => ({
-
-          id:
-            `slot-${index + 1}`,
-
-          slot:
-            index + 1,
-
-          installed: false,
-
-          breaker: null,
-
-          occupiedBy: undefined,
-
-        }),
-      ),
-
-  };
-
-}
-
-
-// ============================================================
-// GET BREAKER OCCUPIED SLOTS
-// ============================================================
-
-export function getBreakerOccupiedSlots(
-  breaker: Breaker,
-): number[] {
-
-  if (
-    breaker.poles === 2
-  ) {
-
-    return [
-      breaker.slot,
-      breaker.slot + 1,
-    ];
-
-  }
-
-  return [
-    breaker.slot,
-  ];
-
-}
-
-
-// ============================================================
-// FIND BREAKER AT PHYSICAL SLOT
-// ============================================================
-//
-// This is the authoritative resolver.
-//
-// It handles:
-//
-// 1. Primary slot
-// 2. Secondary pole
-// 3. Legacy occupiedBy data
-//
-// A caller should NEVER need to manually calculate
-// "slot - 1" for a two-pole breaker.
-
-export function getBreakerAtSlot(
-  panel: BreakerPanel,
-  slotNumber: number,
-): Breaker | null {
-
-  const slot =
-    panel.breakers.find(
-      item =>
-        item.slot === slotNumber,
-    );
-
-  if (!slot) {
-    return null;
-  }
-
-  /*
-   * Preferred representation.
-   */
-  if (
-    slot.breaker
-  ) {
-
-    return slot.breaker;
-
-  }
-
-  /*
-   * Legacy / compatibility representation.
-   */
-  if (
-    slot.occupiedBy
-  ) {
-
-    const owner =
-      panel.breakers.find(
-        item =>
-          item.breaker?.id ===
-          slot.occupiedBy,
-      );
-
-    if (
-      owner?.breaker
-    ) {
-
-      return owner.breaker;
-
-    }
-
-  }
-
-  return null;
-
-}
-
-
-// ============================================================
-// FIND BREAKER START SLOT
-// ============================================================
-//
-// Returns the first physical slot of the breaker.
-//
-// For:
-//
-//   slot 5 -> 5
-//
-//   slot 6 -> 5 if slot 6 is the second pole
-//
-//   slot 5 -> 5 if slot 5 is the first pole
-
-export function getBreakerStartSlot(
-  panel: BreakerPanel,
-  breaker: Breaker,
-  fallbackSlot?: number,
-): number {
-
-  /*
-   * First use the physical panel representation.
-   */
-  const ownerSlot =
-    panel.breakers.find(
-      slot =>
-        slot.breaker?.id ===
-        breaker.id,
-    );
-
-  if (
-    ownerSlot
-  ) {
-
-    return ownerSlot.slot;
-
-  }
-
-  /*
-   * If legacy data only tells us that the
-   * selected physical position is occupied,
-   * infer the first slot.
-   */
-  const selected =
-    fallbackSlot ??
-    breaker.slot;
-
-  if (
-    breaker.poles === 2
-  ) {
-
-    /*
-     * If the selected position equals the
-     * breaker's stored starting slot, use it.
-     */
-    if (
-      breaker.slot === selected
-    ) {
-
-      return selected;
-
-    }
-
-    /*
-     * Otherwise the selected position is
-     * assumed to be the second pole.
-     */
-    if (
-      breaker.slot !== -1 &&
-      breaker.slot < selected
-    ) {
-
-      return breaker.slot;
-
-    }
-
-    const previous =
-      selected - 1;
-
-    if (
-      previous >= 1
-    ) {
-
-      return previous;
-
-    }
-
-  }
-
-  return selected;
-
-}
-
-
-// ============================================================
-// FIND BREAKER STARTING AT SLOT
-// ============================================================
-
-export function getBreakerStartingAtSlot(
-  panel: BreakerPanel,
-  slotNumber: number,
-): Breaker | null {
-
-  const breaker =
-    getBreakerAtSlot(
-      panel,
-      slotNumber,
-    );
-
-  if (!breaker) {
-    return null;
-  }
-
-  const start =
-    getBreakerStartSlot(
-      panel,
-      breaker,
-      slotNumber,
-    );
 
   return (
-    start === slotNumber
-      ? breaker
-      : null
-  );
-
-}
-
-
-// ============================================================
-// CHECK SLOT RANGE
-// ============================================================
-
-function areSlotsInRange(
-  panel: BreakerPanel,
-  breaker: Breaker,
-): boolean {
-
-  return getBreakerOccupiedSlots(
-    breaker,
-  ).every(
-    slotNumber =>
-      slotNumber >= 1 &&
-      slotNumber <= panel.spaces,
-  );
-
-}
-
-
-// ============================================================
-// CHECK SLOT AVAILABILITY
-// ============================================================
-
-export function areBreakerSlotsAvailable(
-  panel: BreakerPanel,
-  breaker: Breaker,
-): boolean {
-
-  if (
-    !areSlotsInRange(
-      panel,
-      breaker,
-    )
-  ) {
 
-    return false;
+    <div
+      style={{
+        background:
+          "linear-gradient(135deg,#111827,#050505)",
 
-  }
+        border:
+          "1px solid #176070",
 
-  return getBreakerOccupiedSlots(
-    breaker,
-  ).every(
-    slotNumber => {
+        borderRadius: "10px",
 
-      const slot =
-        panel.breakers.find(
-          item =>
-            item.slot === slotNumber,
-        );
+        padding: "15px",
 
-      if (!slot) {
-        return false;
-      }
+        color: "white",
 
-      return (
-        !slot.installed &&
-        slot.breaker === null &&
-        !slot.occupiedBy
-      );
+        display: "flex",
 
-    },
-  );
+        flexDirection: "column",
 
-}
+        gap: "12px"
+      }}
+    >
 
+      <h3
+        style={{
+          margin: 0,
+          color: "#00eaff",
+          letterSpacing: "1px"
+        }}
+      >
+        ⚡ {panel.name}
+      </h3>
 
-// ============================================================
-// INSTALL BREAKER
-// ============================================================
-//
-// IMPORTANT:
-// This function ONLY installs into empty slots.
-//
-// Replacement is handled separately by
-// replaceBreaker() / installOrReplaceBreaker().
 
-export function installBreaker(
-  panel: BreakerPanel,
-  breaker: Breaker,
-): BreakerPanel {
-
-  /*
-   * Always normalize the breaker to its requested
-   * starting slot before installation.
-   */
-  const normalizedBreaker =
-    assignBreakerSlot(
-      breaker,
-      breaker.slot,
-    );
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center"
+        }}
+      >
 
-  if (
-    !areBreakerSlotsAvailable(
-      panel,
-      normalizedBreaker,
-    )
-  ) {
+        <span>
+          {panel.manufacturer ?? "Generic"}{" "}
+          {panel.model ?? "Residential Load Center"}
+        </span>
 
-    console.warn(
-      "Cannot install breaker: required panel slots are unavailable.",
-    );
+        <span
+          style={{
+            color: statusColor,
+            fontWeight: 800
+          }}
+        >
+          ● {statusText}
+        </span>
 
-    return panel;
+      </div>
 
-  }
 
-  const occupiedSlots =
-    getBreakerOccupiedSlots(
-      normalizedBreaker,
-    );
+      {/* PANEL INFORMATION */}
 
-  return {
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns:
+            "1fr 1fr",
+          gap: "10px"
+        }}
+      >
 
-    ...panel,
+        <div
+          style={{
+            background: "#080b10",
+            padding: "10px",
+            borderRadius: "6px",
+            border:
+              "1px solid #176070"
+          }}
+        >
 
-    breakers:
-      panel.breakers.map(
-        slot => {
+          Main Breaker
 
-          if (
-            !occupiedSlots.includes(
-              slot.slot,
-            )
-          ) {
+          <br />
 
-            return slot;
+          <strong>
+            {panel.mainBreaker}A
+          </strong>
 
-          }
+        </div>
 
-          return {
 
-            ...slot,
+        <div
+          style={{
+            background: "#080b10",
+            padding: "10px",
+            borderRadius: "6px",
+            border:
+              "1px solid #176070"
+          }}
+        >
 
-            installed: true,
+          Breaker Slots
 
-            breaker:
-              normalizedBreaker,
+          <br />
 
-            occupiedBy:
-              normalizedBreaker.id,
+          <strong>
+            {panel.breakers.length}
+          </strong>
 
-          };
+        </div>
 
-        },
-      ),
+      </div>
 
-  };
 
-}
+      {/* BREAKER SLOTS */}
 
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns:
+            "repeat(4,1fr)",
+          gap: "8px"
+        }}
+      >
 
-// ============================================================
-// REMOVE BREAKER
-// ============================================================
-//
-// Passing EITHER physical position removes the whole breaker.
-//
-// Example:
-//
-// removeBreaker(panel, 5)
-//
-// or:
-//
-// removeBreaker(panel, 6)
-//
-// Both remove a two-pole breaker occupying 5 + 6.
+        {panel.breakers.map(slot => (
 
-export function removeBreaker(
-  panel: BreakerPanel,
-  slotNumber: number,
-): BreakerPanel {
+          <div
+            key={slot.id}
 
-  const breaker =
-    getBreakerAtSlot(
-      panel,
-      slotNumber,
-    );
+            onClick={() =>
+              setSelectedSlot(
+                slot.slot
+              )
+            }
 
-  if (!breaker) {
-    return panel;
-  }
+            style={{
 
-  const occupiedSlots =
-    getBreakerOccupiedSlots(
-      breaker,
-    );
+              background:
+                slot.installed
+                  ? "#123b12"
+                  : selectedSlot ===
+                    slot.slot
+                  ? "#17202b"
+                  : "#080b10",
 
-  return {
+              border:
+                selectedSlot ===
+                slot.slot
+                  ? "2px solid #00eaff"
+                  : slot.installed
+                  ? "1px solid #39ff14"
+                  : "1px solid #176070",
 
-    ...panel,
+              borderRadius: "6px",
 
-    breakers:
-      panel.breakers.map(
-        slot => {
+              padding: "8px",
 
-          if (
-            !occupiedSlots.includes(
-              slot.slot,
-            )
-          ) {
-
-            return slot;
-
-          }
-
-          return {
-
-            ...slot,
-
-            installed: false,
-
-            breaker: null,
-
-            occupiedBy: undefined,
-
-          };
-
-        },
-      ),
-
-  };
-
-}
+              textAlign: "center",
 
-
-// ============================================================
-// REPLACE BREAKER
-// ============================================================
-//
-// Replaces the breaker currently occupying the requested
-// starting/selected position.
-//
-// The old breaker is completely removed first.
-//
-// This means:
-//
-// old 2-pole at 5 + 6
-//
-// can safely become:
-//
-// new 1-pole at 5
-//
-// or:
-//
-// new 2-pole at 5 + 6
+              fontSize: "12px",
 
-export function replaceBreaker(
-  panel: BreakerPanel,
-  breaker: Breaker,
-): BreakerPanel {
+              cursor: "pointer",
 
-  const existing =
-    getBreakerAtSlot(
-      panel,
-      breaker.slot,
-    );
+              transition: ".2s"
+            }}
+          >
 
-  /*
-   * No existing breaker.
-//   * Just install normally.
-   */
-  if (!existing) {
+            <div>
+              SLOT {slot.slot}
+            </div>
 
-    return installBreaker(
-      panel,
-      breaker,
-    );
 
-  }
+            <div
+              style={{
+                marginTop: "5px",
 
-  /*
-   * Remove the entire existing physical footprint.
-   */
-  const clearedPanel =
-    removeBreaker(
-      panel,
-      breaker.slot,
-    );
+                color:
+                  slot.installed
+                    ? "#39ff14"
+                    : "#777",
 
-  /*
-   * Now install the replacement.
-   */
-  return installBreaker(
-    clearedPanel,
-    breaker,
-  );
+                fontWeight: 800
+              }}
+            >
 
-}
-
-
-// ============================================================
-// INSTALL OR REPLACE
-// ============================================================
-//
-// This is the function the UI/application layer should
-// normally use when the user presses:
-//
-// INSTALL BREAKER
-//
-// or:
-//
-// REPLACE BREAKER
+              {slot.installed &&
+              slot.breaker
 
-export function installOrReplaceBreaker(
-  panel: BreakerPanel,
-  breaker: Breaker,
-): BreakerPanel {
+                ? (
+                  <>
+                    {slot.breaker.amperage}A{" "}
+                    {getBreakerDisplayName(
+                      slot.breaker
+                    )}
 
-  const existing =
-    getBreakerAtSlot(
-      panel,
-      breaker.slot,
-    );
-
-  if (existing) {
-
-    return replaceBreaker(
-      panel,
-      breaker,
-    );
-
-  }
-
-  return installBreaker(
-    panel,
-    breaker,
-  );
-
-}
-
-
-// ============================================================
-// FIND SLOT
-// ============================================================
-
-export function getBreakerSlot(
-  panel: BreakerPanel,
-  slotNumber: number,
-): BreakerSlot | undefined {
-
-  return panel.breakers.find(
-    slot =>
-      slot.slot === slotNumber,
-  );
-
-}
-
-
-// ============================================================
-// CHECK WHETHER SLOT IS OCCUPIED
-// ============================================================
-
-export function isBreakerSlotOccupied(
-  panel: BreakerPanel,
-  slotNumber: number,
-): boolean {
-
-  return (
-    getBreakerAtSlot(
-      panel,
-      slotNumber,
-    ) !== null
-  );
-
-}
-
-
-// ============================================================
-// CHECK WHETHER BREAKER CAN FIT
-// ============================================================
-
-export function canInstallBreaker(
-  panel: BreakerPanel,
-  slotNumber: number,
-  poles: BreakerPoles,
-): boolean {
-
-  const breaker =
-    createBreaker(
-      `validation-${panel.id}-${slotNumber}`,
-      slotNumber,
-      15,
-      poles,
-      "STANDARD",
-    );
-
-  return areBreakerSlotsAvailable(
-    panel,
-    breaker,
-  );
-
-}
-
-
-// ============================================================
-// ADD STANDARD BREAKER
-// ============================================================
-
-export function addStandardBreaker(
-  panel: BreakerPanel,
-  slotNumber: number,
-  amperage: number,
-): BreakerPanel {
-
-  const breaker =
-    createBreaker(
-      `breaker-${panel.id}-${slotNumber}`,
-      slotNumber,
-      amperage,
-      1,
-      "STANDARD",
-    );
-
-  return installBreaker(
-    panel,
-    breaker,
+                    <br />
+
+                    {slot.breaker.poles === 2
+                      ? "240V"
+                      : "120V"}
+                  </>
+                )
+
+                : "EMPTY"}
+
+            </div>
+
+          </div>
+
+        ))}
+
+      </div>
+
+
+      {/* SELECTED SLOT */}
+
+      {selectedSlot !== null && (
+
+        <div
+          style={{
+            background: "#080b10",
+            border:
+              "1px solid #176070",
+            borderRadius: "8px",
+            padding: "12px"
+          }}
+        >
+
+          <h4
+            style={{
+              marginTop: 0
+            }}
+          >
+            Slot {selectedSlot}
+          </h4>
+
+
+          {/* EXISTING BREAKER */}
+
+          {selectedBreaker && (
+
+            <div
+              style={{
+                background: "#123b12",
+                border:
+                  "1px solid #39ff14",
+                padding: "10px",
+                borderRadius: "6px",
+                marginBottom: "12px"
+              }}
+            >
+
+              <strong>
+                Installed Breaker
+              </strong>
+
+              <br />
+
+              {selectedBreaker.amperage}A{" "}
+
+              {getBreakerDisplayName(
+                selectedBreaker
+              )}
+
+              <br />
+
+              {selectedBreaker.poles === 2
+                ? "240V"
+                : "120V"}
+
+              <button
+                onClick={() => {
+
+                  onRemoveBreaker?.(
+                    selectedSlot
+                  );
+
+                }}
+
+                style={{
+                  width: "100%",
+                  marginTop: "8px",
+                  padding: "8px",
+                  background:
+                    "#3b1010",
+                  color: "#ff8080",
+                  border:
+                    "1px solid #ff4040",
+                  borderRadius: "5px",
+                  cursor: "pointer",
+                  fontWeight: 800
+                }}
+              >
+                REMOVE BREAKER
+              </button>
+
+            </div>
+
+          )}
+
+
+          {/* BREAKER SIZE */}
+
+          <label>
+            Breaker Size
+          </label>
+
+          <select
+            value={selectedAmperage}
+
+            onChange={e =>
+              setSelectedAmperage(
+                Number(
+                  e.target.value
+                )
+              )
+            }
+
+            style={{
+              width: "100%",
+              padding: "9px",
+              marginTop: "5px",
+              marginBottom: "10px",
+              background: "#111827",
+              color: "white",
+              border:
+                "1px solid #176070",
+              borderRadius: "5px"
+            }}
+          >
+
+            {breakerSizes.map(size => (
+
+              <option
+                key={size}
+                value={size}
+              >
+                {size}A
+              </option>
+
+            ))}
+
+          </select>
+
+
+          {/* BREAKER TYPE */}
+
+          <label>
+            Breaker Type
+          </label>
+
+          <select
+            value={selectedType}
+
+            onChange={e =>
+              setSelectedType(
+                e.target.value as BreakerType
+              )
+            }
+
+            style={{
+              width: "100%",
+              padding: "9px",
+              marginTop: "5px",
+              marginBottom: "10px",
+              background: "#111827",
+              color: "white",
+              border:
+                "1px solid #176070",
+              borderRadius: "5px"
+            }}
+          >
+
+            {breakerTypes.map(type => (
+
+              <option
+                key={type.value}
+                value={type.value}
+              >
+                {type.label}
+              </option>
+
+            ))}
+
+          </select>
+
+
+          {/* POLES */}
+
+          <label>
+            Breaker Poles
+          </label>
+
+          <select
+            value={selectedPoles}
+
+            onChange={e => {
+
+              const value =
+                Number(
+                  e.target.value
+                );
+
+              setSelectedPoles(
+                value === 2 ? 2 : 1
+              );
+
+            }}
+
+            style={{
+              width: "100%",
+              padding: "9px",
+              marginTop: "5px",
+              marginBottom: "10px",
+              background: "#111827",
+              color: "white",
+              border:
+                "1px solid #176070",
+              borderRadius: "5px"
+            }}
+          >
+
+            {poleOptions.map(option => (
+
+              <option
+                key={option.value}
+                value={option.value}
+              >
+                {option.label}
+              </option>
+
+            ))}
+
+          </select>
+
+
+          {/* VOLTAGE */}
+
+          <div
+            style={{
+              background: "#111827",
+              padding: "9px",
+              borderRadius: "5px",
+              marginBottom: "10px",
+              border:
+                "1px solid #176070"
+            }}
+          >
+
+            Voltage:{" "}
+
+            <strong>
+              {selectedPoles === 2
+                ? "240V"
+                : "120V"}
+            </strong>
+
+          </div>
+
+
+          {/* INSTALL */}
+
+          <button
+            onClick={() => {
+
+              if (
+                selectedSlot === null
+              ) {
+                return;
+              }
+
+              onInstallBreaker?.({
+
+                slot:
+                  selectedSlot,
+
+                amperage:
+                  selectedAmperage,
+
+                breakerType:
+                  selectedType,
+
+                poles:
+                  selectedPoles
+
+              });
+
+            }}
+
+            style={{
+              padding: "10px",
+              width: "100%",
+              background: "#123b12",
+              color: "#39ff14",
+              border:
+                "1px solid #39ff14",
+              borderRadius: "6px",
+              fontWeight: 800,
+              cursor: "pointer"
+            }}
+          >
+
+            {selectedBreaker
+              ? "REPLACE BREAKER"
+              : "INSTALL BREAKER"}
+
+          </button>
+
+        </div>
+
+      )}
+
+
+      {/* CONTROLS */}
+
+      <div
+        style={{
+          display: "flex",
+          gap: "10px"
+        }}
+      >
+
+        <button
+          onClick={onTrip}
+
+          style={{
+            flex: 1,
+            padding: "10px",
+            borderRadius: "6px",
+            border:
+              "1px solid #ff4040",
+            background:
+              "linear-gradient(#3b1010,#140000)",
+            color: "#ff8080",
+            fontWeight: 800,
+            cursor: "pointer"
+          }}
+        >
+          ⚠ TRIP BREAKER
+        </button>
+
+
+        <button
+          onClick={onReset}
+
+          style={{
+            flex: 1,
+            padding: "10px",
+            borderRadius: "6px",
+            border:
+              "1px solid #39ff14",
+            background:
+              "linear-gradient(#123b12,#001400)",
+            color: "#39ff14",
+            fontWeight: 800,
+            cursor: "pointer"
+          }}
+        >
+          🔄 RESET
+        </button>
+
+      </div>
+
+    </div>
+
   );
 
 }

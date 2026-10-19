@@ -1,40 +1,26 @@
-// Residential Wiring Simulator
-// Main Simulator Workspace
+// Residential Wiring Simulator v2.6
+// Main simulator workspace
 //
-// Responsibilities:
-//
-// - Device placement
-// - Terminal wiring
-// - Visual wires
-// - Electrical connections
-// - Circuit topology
-// - Panel ownership
-// - Simulator context integration
-//
-// IMPORTANT:
-//
-// BREAKERS ARE NOT WORKSPACE DEVICES.
-//
-// There is NO breaker drag/drop logic here.
-//
-// Breakers belong exclusively to the BreakerPanel system.
-//
-// Panels ARE workspace devices:
-//
-//   Breaker Panel
-//   Sub Panel
-//
-// Normal components may still be dragged onto the workspace.
+// Handles:
+// - device placement
+// - terminal wiring
+// - visual wires
+// - electrical connections
+// - circuit topology
+// - panel ownership
+// - breaker ownership
+// - simulator context integration
 
 import {
   useState,
   useImperativeHandle,
-  forwardRef
+  forwardRef,
+  useRef
 } from "react";
 
 import type {
-  MouseEvent,
-  DragEvent
+  DragEvent,
+  MouseEvent
 } from "react";
 
 import {
@@ -68,197 +54,38 @@ import type {
 
 export type WorkspaceHandle = {
 
-  addDevice: (
+  addDevice:
+  (
     name: string,
     x?: number,
     y?: number
   ) => void;
 
-  updateDevice: (
+  updateDevice:
+  (
     device: ElectricalDevice
   ) => void;
 
-  getConnections: () => Connection[];
+  getConnections:
+  (
+  ) => Connection[];
 
 };
 
 
 type WorkspaceProps = {
 
-  onSelectDevice?: (
+  onSelectDevice?:
+  (
     device: ElectricalDevice | null
   ) => void;
 
-  onCircuitPathsChange?: (
+  onCircuitPathsChange?:
+  (
     paths: string[][]
   ) => void;
 
 };
-
-
-// ============================================================
-// TERMINAL NORMALIZATION
-// ============================================================
-
-function normalizeTerminalType(
-  type: string
-):
-  | "hot"
-  | "neutral"
-  | "ground"
-  | "load"
-  | "traveler"
-  | "control" {
-
-  switch (
-    type
-  ) {
-
-    case "LINE":
-    case "HOT":
-    case "hot":
-
-      return "hot";
-
-
-    case "NEUTRAL":
-    case "neutral":
-
-      return "neutral";
-
-
-    case "GROUND":
-    case "ground":
-
-      return "ground";
-
-
-    case "LOAD":
-    case "load":
-
-      return "load";
-
-
-    case "TRAVELER":
-    case "traveler":
-
-      return "traveler";
-
-
-    case "CONTROL":
-    case "control":
-
-      return "control";
-
-
-    default:
-
-      return "load";
-
-  }
-
-}
-
-
-// ============================================================
-// PANEL DETECTION
-// ============================================================
-
-function isPanelComponentName(
-  value: string
-): boolean {
-
-  const normalized =
-    value
-      .trim()
-      .toLowerCase();
-
-
-  return (
-
-    normalized ===
-      "breaker panel" ||
-
-    normalized ===
-      "sub panel" ||
-
-    normalized.includes(
-      "breaker panel"
-    ) ||
-
-    normalized.includes(
-      "sub panel"
-    )
-
-  );
-
-}
-
-
-// ============================================================
-// BREAKER NAME DETECTION
-// ============================================================
-//
-// This remains ONLY as a safety guard.
-//
-// It is NOT used for drag/drop anymore.
-//
-// A breaker simply cannot become a workspace device.
-//
-
-function looksLikeBreakerName(
-  value: string
-): boolean {
-
-  const normalized =
-    value
-      .trim()
-      .toLowerCase();
-
-
-  if (
-    !normalized
-  ) {
-
-    return false;
-
-  }
-
-
-  if (
-    isPanelComponentName(
-      normalized
-    )
-  ) {
-
-    return false;
-
-  }
-
-
-  return (
-
-    normalized ===
-      "breaker" ||
-
-    normalized ===
-      "circuit breaker" ||
-
-    normalized.includes(
-      "circuit breaker"
-    ) ||
-
-    normalized.endsWith(
-      " breaker"
-    ) ||
-
-    normalized.startsWith(
-      "breaker "
-    )
-
-  );
-
-}
 
 
 // ============================================================
@@ -277,74 +104,59 @@ function Workspace(
   ref
 ) {
 
-
   // ==========================================================
-  // SIMULATOR STATE
+  // GLOBAL SIMULATOR STATE
   // ==========================================================
 
   const {
     devices,
     setDevices,
-
     connections,
     setConnections,
-
     selectedDevice,
     setSelectedDevice
-
   } = useSimulator();
 
 
   // ==========================================================
-  // LOCAL STATE
+  // LOCAL WORKSPACE STATE
   // ==========================================================
 
   const [
     wires,
     setWires
-  ] =
-    useState<Wire[]>(
-      []
-    );
+  ] = useState<Wire[]>([]);
 
 
   const [
     wireMode,
     setWireMode
-  ] =
-    useState(
-      false
-    );
+  ] = useState(false);
 
 
   const [
     wireColor,
     setWireColor
-  ] =
-    useState(
-      "black"
-    );
+  ] = useState("black");
 
 
   const [
     selectedTerminal,
     setSelectedTerminal
-  ] =
-    useState<{
-      deviceId: string;
-      terminalId: string;
-    } | null>(
-      null
-    );
+  ] = useState<{
+    deviceId: string;
+    terminalId: string;
+  } | null>(null);
 
 
   const [
     dragging,
     setDragging
-  ] =
-    useState<string | null>(
-      null
-    );
+  ] = useState<string | null>(null);
+
+
+  const svgRef =
+    useRef<SVGSVGElement | null>(null);
 
 
   // ==========================================================
@@ -352,39 +164,37 @@ function Workspace(
   // ==========================================================
 
   function isPanel(
-    device:
-      | ElectricalDevice
-      | null
-      | undefined
+    device: ElectricalDevice | null | undefined
   ): boolean {
 
     return !!device && (
-
-      device.type ===
-        "Breaker Panel" ||
-
-      device.type ===
-        "Sub Panel"
-
+      device.type === "Breaker Panel" ||
+      device.type === "Sub Panel"
     );
 
   }
 
 
-  function getSelectedPanelId():
-    string | undefined {
+  // ==========================================================
+  // CURRENTLY SELECTED PANEL
+  //
+  // IMPORTANT:
+  // There is NO DEFAULT PANEL.
+  //
+  // If the selected device is a panel, new devices inherit
+  // that panel's ID.
+  // ==========================================================
+
+  function getSelectedPanelId(): string | undefined {
 
     if (
       selectedDevice &&
-      isPanel(
-        selectedDevice
-      )
+      isPanel(selectedDevice)
     ) {
 
       return selectedDevice.id;
 
     }
-
 
     return undefined;
 
@@ -392,148 +202,50 @@ function Workspace(
 
 
   // ==========================================================
-  // CREATE DEVICE
+  // CREATE DEVICE FROM COMPONENT CATALOG
   // ==========================================================
 
   function createDevice(
     name: string,
     dropX: number = 150,
     dropY: number = 120
-  ): void {
-
-    // --------------------------------------------------------
-    // BREAKERS ARE NEVER WORKSPACE DEVICES.
-    //
-    // Panels remain valid.
-    // --------------------------------------------------------
-
-    if (
-      looksLikeBreakerName(
-        name
-      )
-    ) {
-
-      console.warn(
-        `[Workspace] Breaker "${name}" cannot be created here.`
-      );
-
-      return;
-
-    }
-
-
-    // --------------------------------------------------------
-    // FIND CATALOG COMPONENT.
-    // --------------------------------------------------------
+  ) {
 
     const definition =
       componentCatalog.find(
         component =>
-          component.name ===
-          name
+          component.name === name
       );
 
 
-    if (
-      !definition
-    ) {
-
-      console.warn(
-        `[Workspace] Component not found in catalog: ${name}`
-      );
-
+    if (!definition) {
       return;
-
     }
 
 
-    // --------------------------------------------------------
-    // SECOND BREAKER SAFETY CHECK.
-    // --------------------------------------------------------
-
-    const definitionType =
-      String(
-        definition.type ??
-          ""
-      )
-        .trim()
-        .toLowerCase();
-
-
-    if (
-
-      (
-        definitionType ===
-          "breaker" ||
-
-        definitionType ===
-          "circuit breaker"
-
-      ) &&
-
-      !isPanelComponentName(
-        definition.name
-      )
-
-    ) {
-
-      console.warn(
-        `[Workspace] Catalog breaker "${definition.name}" refused.`
-      );
-
-      return;
-
-    }
-
-
-    // ========================================================
-    // TERMINALS
-    // ========================================================
-
-    const terminals:
-      ElectricalDevice["terminals"] =
-
+    const terminals =
       definition.terminals.map(
         terminal => ({
-
+          ...terminal,
           id:
-            `${terminal.id}-${crypto.randomUUID()}`,
-
-          name:
-            terminal.label,
-
-          label:
-            terminal.label,
-
-          type:
-            normalizeTerminalType(
-              terminal.type
-            ),
-
-          x:
-            terminal.x,
-
-          y:
-            terminal.y
-
+            `${terminal.id}-${crypto.randomUUID()}`
         })
       );
 
 
-    // ========================================================
-    // PANEL OWNERSHIP
-    // ========================================================
+    // --------------------------------------------------------
+    // IMPORTANT:
+    // If a panel is selected, the newly created circuit/device
+    // belongs to that panel.
+    //
+    // If NO panel is selected, panelId stays undefined.
+    // --------------------------------------------------------
 
     const panelId =
       getSelectedPanelId();
 
 
-    // ========================================================
-    // DEVICE
-    // ========================================================
-
-    const device:
-      ElectricalDevice = {
+    const device: ElectricalDevice = {
 
       id:
         crypto.randomUUID(),
@@ -547,57 +259,44 @@ function Workspace(
       type:
         definition.type,
 
-      connectedDevices:
-        [],
+      connectedDevices: [],
 
-      calculatedLoad:
-        0,
+      calculatedLoad: 0,
 
-      calculatedAmps:
-        0,
+      calculatedAmps: 0,
 
       amperage:
         definition.electrical?.amps,
 
       poles:
-        definition.electrical?.poles as
-          | BreakerPoles
-          | undefined,
+        definition.electrical?.poles as BreakerPoles,
 
       breakerSize:
         definition.electrical?.amps,
 
       mainBreaker:
-
         isPanel({
-          id:
-            "",
-
-          name:
-            "",
-
-          symbol:
-            "",
-
-          type:
-            definition.type,
-
-          x:
-            0,
-
-          y:
-            0,
-
-          terminals:
-            []
-
+          id: "",
+          name: "",
+          symbol: "",
+          type: definition.type,
+          x: 0,
+          y: 0,
+          terminals: []
         })
-
           ? definition.electrical?.amps
-
           : undefined,
 
+      // ------------------------------------------------------
+      // PANEL OWNERSHIP
+      // ------------------------------------------------------
+
       panelId,
+
+      // ------------------------------------------------------
+      // No breaker is assigned until a breaker is actually
+      // associated with this circuit.
+      // ------------------------------------------------------
 
       breakerId:
         undefined,
@@ -605,17 +304,13 @@ function Workspace(
       terminals,
 
       load: {
-
         watts:
-          definition.electrical?.watts ??
-          0
-
+          definition.electrical?.watts ?? 0
       },
 
       voltage:
         (
-          definition.electrical?.voltage ??
-          120
+          definition.electrical?.voltage ?? 120
         ) as Voltage,
 
       x:
@@ -630,19 +325,18 @@ function Workspace(
     };
 
 
-    // ========================================================
-    // ADD
-    // ========================================================
+    setDevices(prev => [
+      ...prev,
+      device
+    ]);
 
-    setDevices(
-      previous => [
 
-        ...previous,
-
-        device
-
-      ]
-    );
+    // If this was created while a panel was selected,
+    // keep that panel selected.
+    //
+    // We deliberately do NOT automatically select the new
+    // device because doing so would make the panel disappear
+    // from the active-panel selector logic.
 
   }
 
@@ -653,21 +347,14 @@ function Workspace(
 
   function updateDevice(
     updatedDevice: ElectricalDevice
-  ): void {
+  ) {
 
-    setDevices(
-      previous =>
-        previous.map(
-          device =>
-
-            device.id ===
-            updatedDevice.id
-
-              ? updatedDevice
-
-              : device
-
-        )
+    setDevices(prev =>
+      prev.map(device =>
+        device.id === updatedDevice.id
+          ? updatedDevice
+          : device
+      )
     );
 
 
@@ -684,7 +371,7 @@ function Workspace(
 
 
   // ==========================================================
-  // IMPERATIVE API
+  // EXPOSE WORKSPACE API
   // ==========================================================
 
   useImperativeHandle(
@@ -700,11 +387,7 @@ function Workspace(
       getConnections:
         () => connections
 
-    }),
-
-    [
-      connections
-    ]
+    })
   );
 
 
@@ -714,33 +397,26 @@ function Workspace(
 
   function selectDevice(
     id: string
-  ): void {
+  ) {
 
     let device =
       devices.find(
         item =>
-          item.id ===
-          id
+          item.id === id
       ) || null;
 
 
-    if (
-      !device
-    ) {
-
+    if (!device) {
       return;
-
     }
 
 
     // --------------------------------------------------------
-    // Panel calculations.
+    // Panels calculate only THEIR OWN circuits.
     // --------------------------------------------------------
 
     if (
-      isPanel(
-        device
-      )
+      isPanel(device)
     ) {
 
       const paths =
@@ -772,26 +448,18 @@ function Workspace(
         calculatedAmps:
           load /
           (
-            device.voltage ??
-            120
+            device.voltage ?? 120
           )
 
       };
 
 
-      setDevices(
-        previous =>
-          previous.map(
-            item =>
-
-              item.id ===
-              device!.id
-
-                ? device!
-
-                : item
-
-          )
+      setDevices(prev =>
+        prev.map(item =>
+          item.id === device?.id
+            ? device!
+            : item
+        )
       );
 
     }
@@ -810,23 +478,71 @@ function Workspace(
 
 
   // ==========================================================
-  // PANEL OWNERSHIP
+  // ASSIGN PANEL OWNERSHIP
+  // ==========================================================
+  //
+  // This is the important part for preventing:
+  //
+  // 100A circuit appearing in 200A panel
+  //
+  // and
+  //
+  // 200A circuit appearing in 100A panel.
+  //
+  // ==========================================================
+
+  function assignPanelOwnership(
+    deviceId: string,
+    panelId: string
+  ) {
+
+    setDevices(prev =>
+      prev.map(device => {
+
+        if (
+          device.id !== deviceId
+        ) {
+          return device;
+        }
+
+
+        // Never assign a panel to another panel.
+        if (
+          isPanel(device)
+        ) {
+          return device;
+        }
+
+
+        return {
+
+          ...device,
+
+          panelId
+
+        };
+
+      })
+    );
+
+  }
+
+
+  // ==========================================================
+  // ASSIGN PANEL OWNERSHIP TO CONNECTED CIRCUIT
   // ==========================================================
 
   function assignCircuitOwnership(
-    deviceList: ElectricalDevice[],
     startDeviceId: string,
     panelId: string
-  ): Set<string> {
+  ) {
 
     const visited =
       new Set<string>();
 
 
     const queue: string[] = [
-
       startDeviceId
-
     ];
 
 
@@ -843,13 +559,9 @@ function Workspace(
 
 
       if (
-        visited.has(
-          currentId
-        )
+        visited.has(currentId)
       ) {
-
         continue;
-
       }
 
 
@@ -859,35 +571,24 @@ function Workspace(
 
 
       const currentDevice =
-        deviceList.find(
-          item =>
-            item.id ===
-            currentId
+        devices.find(
+          device =>
+            device.id === currentId
         );
 
 
-      if (
-        !currentDevice
-      ) {
-
+      if (!currentDevice) {
         continue;
-
       }
 
 
       // ------------------------------------------------------
-      // Never absorb another panel.
+      // Do not absorb another panel.
       // ------------------------------------------------------
 
       if (
-
-        isPanel(
-          currentDevice
-        ) &&
-
-        currentDevice.id !==
-          panelId
-
+        isPanel(currentDevice) &&
+        currentDevice.id !== panelId
       ) {
 
         continue;
@@ -896,9 +597,7 @@ function Workspace(
 
 
       if (
-        !isPanel(
-          currentDevice
-        )
+        !isPanel(currentDevice)
       ) {
 
         ownedDeviceIds.add(
@@ -909,8 +608,7 @@ function Workspace(
 
 
       (
-        currentDevice.connectedDevices ??
-        []
+        currentDevice.connectedDevices ?? []
       ).forEach(
         connectedId => {
 
@@ -932,10 +630,43 @@ function Workspace(
     }
 
 
-    return ownedDeviceIds;
+    if (
+      ownedDeviceIds.size === 0
+    ) {
+      return;
+    }
+
+
+    setDevices(prev =>
+      prev.map(device => {
+
+        if (
+          !ownedDeviceIds.has(
+            device.id
+          )
+        ) {
+
+          return device;
+
+        }
+
+
+        return {
+
+          ...device,
+
+          panelId
+
+        };
+
+      })
+    );
 
   }
 
+
+  // Reserved for the upcoming circuit ownership integration.
+  void assignCircuitOwnership;
 
   // ==========================================================
   // TERMINAL WIRING
@@ -944,31 +675,18 @@ function Workspace(
   function terminalClick(
     deviceId: string,
     terminalId: string
-  ): void {
+  ) {
 
-    if (
-      !wireMode
-    ) {
-
+    if (!wireMode) {
       return;
-
     }
 
 
-    // --------------------------------------------------------
-    // First terminal.
-    // --------------------------------------------------------
-
-    if (
-      !selectedTerminal
-    ) {
+    if (!selectedTerminal) {
 
       setSelectedTerminal({
-
         deviceId,
-
         terminalId
-
       });
 
       return;
@@ -977,17 +695,14 @@ function Workspace(
 
 
     // --------------------------------------------------------
-    // Clicking the same terminal cancels selection.
+    // Same terminal clicked twice
     // --------------------------------------------------------
 
     if (
-
       selectedTerminal.deviceId ===
         deviceId &&
-
       selectedTerminal.terminalId ===
         terminalId
-
     ) {
 
       setSelectedTerminal(
@@ -999,16 +714,15 @@ function Workspace(
     }
 
 
-    // --------------------------------------------------------
-    // Duplicate connection check.
-    // --------------------------------------------------------
+    // ========================================================
+    // PREVENT DUPLICATE CONNECTIONS
+    // ========================================================
 
     const duplicateExists =
       connections.some(
         connection => (
 
           (
-
             connection.from.deviceId ===
               selectedTerminal.deviceId &&
 
@@ -1020,13 +734,11 @@ function Workspace(
 
             connection.to.terminalId ===
               terminalId
-
           )
 
           ||
 
           (
-
             connection.from.deviceId ===
               deviceId &&
 
@@ -1038,7 +750,6 @@ function Workspace(
 
             connection.to.terminalId ===
               selectedTerminal.terminalId
-
           )
 
         )
@@ -1050,7 +761,7 @@ function Workspace(
     ) {
 
       console.warn(
-        "[Workspace] Connection already exists."
+        "Connection already exists"
       );
 
 
@@ -1064,7 +775,7 @@ function Workspace(
 
 
     // ========================================================
-    // DEVICES
+    // GET DEVICES
     // ========================================================
 
     const fromDevice =
@@ -1098,17 +809,22 @@ function Workspace(
 
 
     // ========================================================
-    // PANEL OWNERSHIP
+    // DETERMINE PANEL OWNERSHIP
     // ========================================================
 
     let connectionPanelId:
-      string | undefined;
+      string | undefined =
+        undefined;
 
+
+    // --------------------------------------------------------
+    // Case 1:
+    //
+    // Directly connecting FROM a panel.
+    // --------------------------------------------------------
 
     if (
-      isPanel(
-        fromDevice
-      )
+      isPanel(fromDevice)
     ) {
 
       connectionPanelId =
@@ -1116,16 +832,28 @@ function Workspace(
 
     }
 
+
+    // --------------------------------------------------------
+    // Case 2:
+    //
+    // Directly connecting TO a panel.
+    // --------------------------------------------------------
+
     else if (
-      isPanel(
-        toDevice
-      )
+      isPanel(toDevice)
     ) {
 
       connectionPanelId =
         toDevice.id;
 
     }
+
+
+    // --------------------------------------------------------
+    // Case 3:
+    //
+    // Existing circuit already belongs to a panel.
+    // --------------------------------------------------------
 
     else if (
       fromDevice.panelId
@@ -1136,6 +864,7 @@ function Workspace(
 
     }
 
+
     else if (
       toDevice.panelId
     ) {
@@ -1144,6 +873,23 @@ function Workspace(
         toDevice.panelId;
 
     }
+
+
+    // --------------------------------------------------------
+    // Case 4:
+    //
+    // A panel is currently selected.
+    //
+    // This lets the user select:
+    //
+    // 100A Panel
+    //     ↓
+    // Wire
+    //     ↓
+    // Existing circuit
+    //
+    // and explicitly move that circuit to the 100A panel.
+    // --------------------------------------------------------
 
     else {
 
@@ -1154,7 +900,7 @@ function Workspace(
 
 
     // ========================================================
-    // VISUAL WIRE
+    // CREATE VISUAL WIRE
     // ========================================================
 
     const wire: Wire = {
@@ -1190,8 +936,7 @@ function Workspace(
         "NM-B",
 
       color:
-        wireColor.toUpperCase() as
-          Wire["color"],
+        wireColor.toUpperCase() as Wire["color"],
 
       length:
         0,
@@ -1209,7 +954,7 @@ function Workspace(
 
 
     // ========================================================
-    // ELECTRICAL CONNECTION
+    // CREATE ELECTRICAL CONNECTION
     // ========================================================
 
     const connection: Connection = {
@@ -1272,197 +1017,146 @@ function Workspace(
     };
 
 
-    setWires(
-      previous => [
+    // ========================================================
+    // SAVE VISUAL WIRE
+    // ========================================================
 
-        ...previous,
+    setWires(prev => [
 
-        wire
+      ...prev,
 
-      ]
-    );
+      wire
 
-
-    setConnections(
-      previous => [
-
-        ...previous,
-
-        connection
-
-      ]
-    );
+    ]);
 
 
     // ========================================================
-    // DEVICE GRAPH
+    // SAVE ELECTRICAL CONNECTION
     // ========================================================
 
-    setDevices(
-      previous => {
+    setConnections(prev => [
 
-        const updatedDevices =
-          previous.map(
-            device => {
+      ...prev,
 
-              if (
-                device.id ===
-                selectedTerminal.deviceId
-              ) {
+      connection
 
-                return {
-
-                  ...device,
-
-                  connectedDevices: [
-
-                    ...new Set([
-
-                      ...(device.connectedDevices ??
-                        []),
-
-                      deviceId
-
-                    ])
-
-                  ]
-
-                };
-
-              }
+    ]);
 
 
-              if (
-                device.id ===
+    // ========================================================
+    // UPDATE CONNECTED DEVICES
+    // ========================================================
+
+    setDevices(prev =>
+      prev.map(device => {
+
+        // -----------------------------------------------
+        // First endpoint
+        // -----------------------------------------------
+
+        if (
+          device.id ===
+          selectedTerminal.deviceId
+        ) {
+
+          return {
+
+            ...device,
+
+            connectedDevices: [
+
+              ...new Set([
+
+                ...(device.connectedDevices ?? []),
+
                 deviceId
-              ) {
 
-                return {
+              ])
 
-                  ...device,
+            ]
 
-                  connectedDevices: [
-
-                    ...new Set([
-
-                      ...(device.connectedDevices ??
-                        []),
-
-                      selectedTerminal.deviceId
-
-                    ])
-
-                  ]
-
-                };
-
-              }
-
-
-              return device;
-
-            }
-          );
-
-
-        if (
-          !connectionPanelId
-        ) {
-
-          return updatedDevices;
+          };
 
         }
 
 
-        const ownershipStarts:
-          string[] = [];
-
+        // -----------------------------------------------
+        // Second endpoint
+        // -----------------------------------------------
 
         if (
-          !isPanel(
-            fromDevice
-          )
+          device.id ===
+          deviceId
         ) {
 
-          ownershipStarts.push(
-            fromDevice.id
-          );
+          return {
+
+            ...device,
+
+            connectedDevices: [
+
+              ...new Set([
+
+                ...(device.connectedDevices ?? []),
+
+                selectedTerminal.deviceId
+
+              ])
+
+            ]
+
+          };
 
         }
 
 
-        if (
-          !isPanel(
-            toDevice
-          )
-        ) {
+        return device;
 
-          ownershipStarts.push(
-            toDevice.id
-          );
-
-        }
+      })
+    );
 
 
-        const ownedDeviceIds =
-          new Set<string>();
+    // ========================================================
+    // PANEL OWNERSHIP
+    // ========================================================
 
+    if (
+      connectionPanelId
+    ) {
 
-        ownershipStarts.forEach(
-          startId => {
+      // ----------------------------------------------------
+      // Assign the directly connected device.
+      // ----------------------------------------------------
 
-            const ids =
-              assignCircuitOwnership(
-                updatedDevices,
-                startId,
-                connectionPanelId!
-              );
+      if (
+        !isPanel(toDevice)
+      ) {
 
-
-            ids.forEach(
-              id => {
-
-                ownedDeviceIds.add(
-                  id
-                );
-
-              }
-
-            );
-
-          }
-        );
-
-
-        return updatedDevices.map(
-          device => {
-
-            if (
-              !ownedDeviceIds.has(
-                device.id
-              )
-            ) {
-
-              return device;
-
-            }
-
-
-            return {
-
-              ...device,
-
-              panelId:
-                connectionPanelId
-
-            };
-
-          }
+        assignPanelOwnership(
+          toDevice.id,
+          connectionPanelId
         );
 
       }
-    );
 
+
+      if (
+        !isPanel(fromDevice)
+      ) {
+
+        assignPanelOwnership(
+          fromDevice.id,
+          connectionPanelId
+        );
+
+      }
+
+    }
+
+
+    // --------------------------------------------------------
+    // Clear terminal selection.
+    // --------------------------------------------------------
 
     setSelectedTerminal(
       null
@@ -1472,74 +1166,63 @@ function Workspace(
 
 
   // ==========================================================
-  // DEVICE DRAGGING
+  // DRAGGING
   // ==========================================================
 
   function startDrag(
     id: string
-  ): void {
+  ) {
 
-    if (
-      wireMode
-    ) {
+    if (!wireMode) {
 
-      return;
+      setDragging(
+        id
+      );
 
     }
-
-
-    setDragging(
-      id
-    );
 
   }
 
 
   function moveBoard(
-    event: MouseEvent<HTMLDivElement>
-  ): void {
+    e: MouseEvent<HTMLDivElement>
+  ) {
 
-    if (
-      !dragging
-    ) {
-
+    if (!dragging) {
       return;
-
     }
 
 
     const rect =
-      event.currentTarget
-        .getBoundingClientRect();
+      e.currentTarget.getBoundingClientRect();
 
 
-    setDevices(
-      previous =>
-        previous.map(
-          device =>
+    setDevices(prev =>
+      prev.map(device =>
 
-            device.id ===
-            dragging
+        device.id === dragging
 
-              ? {
+          ? {
 
-                  ...device,
+              ...device,
 
-                  x:
-                    event.clientX -
-                    rect.left -
-                    75,
+              x:
+                e.clientX -
+                rect.left -
+                75,
 
-                  y:
-                    event.clientY -
-                    rect.top -
-                    45
+              y:
+                e.clientY -
+                rect.top -
+                45
 
-                }
+            }
 
-              : device
+          :
 
-        )
+            device
+
+      )
     );
 
   }
@@ -1549,7 +1232,7 @@ function Workspace(
   // CLEAR WORKSPACE
   // ==========================================================
 
-  function clearWorkspace(): void {
+  function clearWorkspace() {
 
     setDevices([]);
 
@@ -1557,13 +1240,9 @@ function Workspace(
 
     setConnections([]);
 
-    setSelectedTerminal(
-      null
-    );
+    setSelectedTerminal(null);
 
-    setSelectedDevice(
-      null
-    );
+    setSelectedDevice(null);
 
     onCircuitPathsChange?.(
       []
@@ -1573,23 +1252,20 @@ function Workspace(
 
 
   // ==========================================================
-  // CIRCUIT PATHS
+  // FIND CIRCUIT PATHS
+  //
+  // ONLY returns devices belonging to this panel.
   // ==========================================================
 
   function getCircuitPaths(
     device: ElectricalDevice,
     deviceList: ElectricalDevice[],
-    path: string[] = [
-      device.name
-    ],
-    visited =
-      new Set<string>()
+    path: string[] = [device.name],
+    visited = new Set<string>()
   ): string[][] {
 
     if (
-      visited.has(
-        device.id
-      )
+      visited.has(device.id)
     ) {
 
       return [];
@@ -1598,9 +1274,7 @@ function Workspace(
 
 
     const nextVisited =
-      new Set(
-        visited
-      );
+      new Set(visited);
 
 
     nextVisited.add(
@@ -1608,30 +1282,23 @@ function Workspace(
     );
 
 
-    let paths:
-      string[][] = [];
+    let paths: string[][] = [];
 
 
     (
-      device.connectedDevices ??
-      []
+      device.connectedDevices ?? []
     ).forEach(
       id => {
 
         const connected =
           deviceList.find(
             item =>
-              item.id ===
-              id
+              item.id === id
           );
 
 
-        if (
-          !connected
-        ) {
-
+        if (!connected) {
           return;
-
         }
 
 
@@ -1646,15 +1313,14 @@ function Workspace(
         }
 
 
+        // ----------------------------------------------------
+        // If this device belongs to a different panel,
+        // do NOT display it in this panel's circuit tree.
+        // ----------------------------------------------------
+
         if (
-
-          isPanel(
-            connected
-          ) &&
-
-          connected.id !==
-            device.id
-
+          connected.panelId &&
+          connected.panelId !== device.id
         ) {
 
           return;
@@ -1662,19 +1328,13 @@ function Workspace(
         }
 
 
+        // ----------------------------------------------------
+        // Never traverse into another panel.
+        // ----------------------------------------------------
+
         if (
-
-          !isPanel(
-            device
-          ) &&
-
-          connected.panelId &&
-
-          device.panelId &&
-
-          connected.panelId !==
-            device.panelId
-
+          isPanel(connected) &&
+          connected.id !== device.id
         ) {
 
           return;
@@ -1715,14 +1375,15 @@ function Workspace(
 
 
   // ==========================================================
-  // PANEL LOAD
+  // CALCULATE PANEL LOAD
+  //
+  // ONLY counts loads assigned to this panel.
   // ==========================================================
 
   function calculateLoad(
     device: ElectricalDevice,
     deviceList: ElectricalDevice[],
-    visited =
-      new Set<string>()
+    visited = new Set<string>()
   ): number {
 
     if (
@@ -1742,10 +1403,7 @@ function Workspace(
 
 
     return (
-
-      device.connectedDevices ??
-      []
-
+      device.connectedDevices ?? []
     ).reduce(
       (
         total,
@@ -1755,13 +1413,21 @@ function Workspace(
         const connected =
           deviceList.find(
             item =>
-              item.id ===
-              id
+              item.id === id
           );
 
 
+        if (!connected) {
+          return total;
+        }
+
+
+        // ----------------------------------------------------
+        // Do not count another panel.
+        // ----------------------------------------------------
+
         if (
-          !connected
+          isPanel(connected)
         ) {
 
           return total;
@@ -1769,24 +1435,13 @@ function Workspace(
         }
 
 
-        if (
-          isPanel(
-            connected
-          )
-        ) {
-
-          return total;
-
-        }
-
+        // ----------------------------------------------------
+        // Do not count devices belonging to another panel.
+        // ----------------------------------------------------
 
         if (
-
           connected.panelId &&
-
-          connected.panelId !==
-            device.id
-
+          connected.panelId !== device.id
         ) {
 
           return total;
@@ -1812,16 +1467,14 @@ function Workspace(
         );
 
       },
-
       0
-
     );
 
   }
 
 
   // ==========================================================
-  // TERMINAL POSITION
+  // FIND TERMINAL POSITION
   // ==========================================================
 
   function getTerminalPosition(
@@ -1832,16 +1485,14 @@ function Workspace(
     const device =
       devices.find(
         item =>
-          item.id ===
-          deviceId
+          item.id === deviceId
       );
 
 
     const terminal =
       device?.terminals.find(
         item =>
-          item.id ===
-          terminalId
+          item.id === terminalId
       );
 
 
@@ -1871,36 +1522,27 @@ function Workspace(
 
 
   // ==========================================================
-  // NORMAL COMPONENT DRAG/DROP
+  // COMPONENT LIBRARY DRAG/DROP
   // ==========================================================
-  //
-  // Breakers are not handled here.
-  //
-  // The only components accepted by the workspace are normal
-  // catalog components. Panels are normal components too.
-  //
 
   function allowDrop(
-    event: DragEvent<HTMLDivElement>
-  ): void {
+    e: DragEvent<HTMLDivElement>
+  ) {
 
-    event.preventDefault();
-
-    event.dataTransfer.dropEffect =
-      "copy";
+    e.preventDefault();
 
   }
 
 
   function dropComponent(
-    event: DragEvent<HTMLDivElement>
-  ): void {
+    e: DragEvent<HTMLDivElement>
+  ) {
 
-    event.preventDefault();
+    e.preventDefault();
 
 
     const componentName =
-      event.dataTransfer.getData(
+      e.dataTransfer.getData(
         "componentType"
       );
 
@@ -1909,50 +1551,22 @@ function Workspace(
       !componentName
     ) {
 
-      console.warn(
-        "[Workspace] Drop contained no componentType."
-      );
-
-      return;
-
-    }
-
-
-    // --------------------------------------------------------
-    // Final safety guard.
-    //
-    // This is intentionally NOT breaker drag/drop logic.
-    // It simply prevents an actual breaker from ever becoming
-    // a workspace device.
-    // --------------------------------------------------------
-
-    if (
-      looksLikeBreakerName(
-        componentName
-      )
-    ) {
-
-      console.warn(
-        `[Workspace] Breaker "${componentName}" cannot be created here.`
-      );
-
       return;
 
     }
 
 
     const rect =
-      event.currentTarget
-        .getBoundingClientRect();
+      e.currentTarget.getBoundingClientRect();
 
 
     const x =
-      event.clientX -
+      e.clientX -
       rect.left;
 
 
     const y =
-      event.clientY -
+      e.clientY -
       rect.top;
 
 
@@ -1973,37 +1587,31 @@ function Workspace(
 
     <div>
 
-      {/* ====================================================
-          TOOLBAR
-          ==================================================== */}
+      {/* =====================================================
+          WORKSPACE TOOLBAR
+          ===================================================== */}
 
       <div
         style={{
-          display:
-            "flex",
-
-          gap:
-            "10px",
-
-          marginBottom:
-            "10px"
+          display: "flex",
+          gap: "10px",
+          marginBottom: "10px"
         }}
       >
 
         <button
-          type="button"
-
           onClick={() =>
             setWireMode(
-              current =>
-                !current
+              !wireMode
             )
           }
         >
 
-          {wireMode
-            ? "Exit Wire"
-            : "Wire Tool"}
+          {
+            wireMode
+              ? "Exit Wire"
+              : "Wire Tool"
+          }
 
         </button>
 
@@ -2012,12 +1620,10 @@ function Workspace(
           value={
             wireColor
           }
-
-          onChange={
-            event =>
-              setWireColor(
-                event.target.value
-              )
+          onChange={e =>
+            setWireColor(
+              e.target.value
+            )
           }
         >
 
@@ -2041,23 +1647,19 @@ function Workspace(
 
 
         <button
-          type="button"
-
           onClick={
             clearWorkspace
           }
         >
-
           Clear
-
         </button>
 
       </div>
 
 
-      {/* ====================================================
+      {/* =====================================================
           TRAINING BOARD
-          ==================================================== */}
+          ===================================================== */}
 
       <div
 
@@ -2071,40 +1673,38 @@ function Workspace(
           dropComponent
         }
 
-        onMouseDown={
-          event => {
+        onMouseDown={e => {
 
-            const target =
-              event.target as HTMLElement;
-
-
-            if (
-              target.closest(
-                ".device-component"
-              )
-            ) {
-
-              return;
-
-            }
+          const target =
+            e.target as HTMLElement;
 
 
-            setSelectedDevice(
-              null
-            );
+          if (
+            target.closest(
+              ".device-component"
+            )
+          ) {
 
-
-            onSelectDevice?.(
-              null
-            );
-
-
-            setSelectedTerminal(
-              null
-            );
+            return;
 
           }
-        }
+
+
+          setSelectedDevice(
+            null
+          );
+
+
+          onSelectDevice?.(
+            null
+          );
+
+
+          setSelectedTerminal(
+            null
+          );
+
+        }}
 
         onMouseMove={
           moveBoard
@@ -2147,6 +1747,7 @@ function Workspace(
       >
 
         <div
+
           style={{
 
             width:
@@ -2159,13 +1760,18 @@ function Workspace(
               "relative"
 
           }}
+
         >
 
-          {/* ================================================
-              WIRES
+          {/* =================================================
+              SVG WIRES
               ================================================= */}
 
           <svg
+
+            ref={
+              svgRef
+            }
 
             style={{
 
@@ -2191,133 +1797,137 @@ function Workspace(
 
           >
 
-            {wires.map(
-              wire => {
+            {
+              wires.map(
+                wire => {
 
-                const start =
-                  getTerminalPosition(
-                    wire.from.deviceId,
-                    wire.from.terminalId
+                  const start =
+                    getTerminalPosition(
+                      wire.from.deviceId,
+                      wire.from.terminalId
+                    );
+
+
+                  const end =
+                    getTerminalPosition(
+                      wire.to.deviceId,
+                      wire.to.terminalId
+                    );
+
+
+                  if (
+                    !start ||
+                    !end
+                  ) {
+
+                    return null;
+
+                  }
+
+
+                  return (
+
+                    <line
+
+                      key={
+                        wire.id
+                      }
+
+                      x1={
+                        start.x
+                      }
+
+                      y1={
+                        start.y
+                      }
+
+                      x2={
+                        end.x
+                      }
+
+                      y2={
+                        end.y
+                      }
+
+                      stroke={
+                        wire.color
+                      }
+
+                      strokeWidth={
+                        "5"
+                      }
+
+                    />
+
                   );
-
-
-                const end =
-                  getTerminalPosition(
-                    wire.to.deviceId,
-                    wire.to.terminalId
-                  );
-
-
-                if (
-                  !start ||
-                  !end
-                ) {
-
-                  return null;
 
                 }
-
-
-                return (
-
-                  <line
-
-                    key={
-                      wire.id
-                    }
-
-                    x1={
-                      start.x
-                    }
-
-                    y1={
-                      start.y
-                    }
-
-                    x2={
-                      end.x
-                    }
-
-                    y2={
-                      end.y
-                    }
-
-                    stroke={
-                      wire.color
-                    }
-
-                    strokeWidth={
-                      "5"
-                    }
-
-                  />
-
-                );
-
-              }
-            )}
+              )
+            }
 
           </svg>
 
 
-          {/* ================================================
+          {/* =================================================
               DEVICES
               ================================================= */}
 
-          {devices.map(
-            device => (
+          {
+            devices.map(
+              device => (
 
-              <Device
+                <Device
 
-                key={
-                  device.id
-                }
+                  key={
+                    device.id
+                  }
 
-                data-device-id={
-                  device.id
-                }
+                  data-device-id={
+                    device.id
+                  }
 
-                device={
-                  device
-                }
+                  device={
+                    device
+                  }
 
-                wireMode={
-                  wireMode
-                }
+                  wireMode={
+                    wireMode
+                  }
 
-                selectedTerminal={
+                  selectedTerminal={
 
-                  selectedTerminal
+                    selectedTerminal
 
-                    ? `${selectedTerminal.deviceId}-${selectedTerminal.terminalId}`
+                      ? `${selectedTerminal.deviceId}-${selectedTerminal.terminalId}`
 
-                    : null
+                      : null
 
-                }
+                  }
 
-                selected={
+                  selected={
 
-                  selectedDevice?.id ===
-                  device.id
+                    selectedDevice?.id ===
+                    device.id
 
-                }
+                  }
 
-                onSelect={
-                  selectDevice
-                }
+                  onSelect={
+                    selectDevice
+                  }
 
-                onTerminalClick={
-                  terminalClick
-                }
+                  onTerminalClick={
+                    terminalClick
+                  }
 
-                onStartDrag={
-                  startDrag
-                }
+                  onStartDrag={
+                    startDrag
+                  }
 
-              />
+                />
 
+              )
             )
-          )}
+          }
 
         </div>
 

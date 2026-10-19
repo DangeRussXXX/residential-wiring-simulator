@@ -35,6 +35,7 @@ import {
 import Device from "../components/Device";
 import type { ServiceProject } from "./projectWorkflow";
 import { createPortal } from "react-dom";
+import CableWiringPanel, { cableKinds, type CableKind, type CableRecord } from "./CableWiringPanel";
 
 import type {
   ElectricalDevice,
@@ -176,6 +177,31 @@ function Workspace(
     try { localStorage.setItem(`rws-home-run-routes:${workspaceScope}`, JSON.stringify(homeRunRoutes)); } catch {}
   }, [homeRunRoutes, workspaceScope]);
   const heightToY = (height:number) => 1150 - height * 8 - 45;
+  const [cables,setCables] = useState<CableRecord[]>(()=>{
+    try {return JSON.parse(localStorage.getItem(`rws-cables-v1:${workspaceScope}`)||"[]");}catch{return [];}
+  });
+  const [cableSource,setCableSource]=useState<string|null>(null);
+  const [cableType,setCableType]=useState<CableKind>("14/2 NM-B");
+  const [selectedCableId,setSelectedCableId]=useState<string|null>(null);
+  useEffect(()=>{
+    try {setCables(JSON.parse(localStorage.getItem(`rws-cables-v1:${workspaceScope}`)||"[]"));}catch{setCables([]);}
+    setCableSource(null);setSelectedCableId(null);setWireMode(false);
+  },[workspaceScope]);
+  useEffect(()=>{
+    try {localStorage.setItem(`rws-cables-v1:${workspaceScope}`,JSON.stringify(cables));}catch{}
+  },[workspaceScope,cables]);
+  const startCable=(id:string)=>{
+    setCableSource(id);setSelectedCableId(null);setWireMode(true);
+    setSelectedDevice(devices.find(d=>d.id===id)||null);
+  };
+  const finishCable=(id:string)=>{
+    if(!cableSource || cableSource===id)return;
+    const cable:CableRecord={id:crypto.randomUUID(),from:cableSource,to:id,type:cableType,ends:{from:{},to:{}}};
+    setCables(prev=>[...prev,cable]);
+    setSelectedCableId(cable.id);setCableSource(null);setWireMode(false);
+    setSelectedDevice(devices.find(d=>d.id===id)||null);
+  };
+  const selectedCable=cables.find(c=>c.id===selectedCableId);
   const [selectedStud, setSelectedStud] = useState<number|null>(null);
   const [deviceStuds,setDeviceStuds] = useState<Record<string,number>>(() => {
     try { return JSON.parse(localStorage.getItem(`rws-device-studs:${workspaceScope}`) || "{}"); } catch {return {};}
@@ -1715,6 +1741,7 @@ function Workspace(
                     wires.some(w=>w.from.deviceId===selectedDevice.id||w.to.deviceId===selectedDevice.id);
                   if(!window.confirm(`Remove ${selectedDevice.name||selectedDevice.type} from this wall${attached?" and delete its connected wires":""}?`))return;
                   setDevices(prev=>prev.filter(d=>d.id!==selectedDevice.id));
+                  setCables(prev=>prev.filter(c=>c.from!==selectedDevice.id&&c.to!==selectedDevice.id));
                   setConnections(prev=>prev.filter(c=>c.from.deviceId!==selectedDevice.id&&c.to.deviceId!==selectedDevice.id));
                   setWires(prev=>prev.filter(w=>w.from.deviceId!==selectedDevice.id&&w.to.deviceId!==selectedDevice.id));
                   setMountingHeights(prev=>{const n={...prev};delete n[selectedDevice.id];return n;});
@@ -1726,6 +1753,36 @@ function Workspace(
 
                   >🪛 Crowbar · Remove</button>
               </div>}
+            </div>
+          </details>
+          <details open style={{border:"1px solid #346b85",borderRadius:7,padding:8,marginBottom:8}}>
+            <summary style={{cursor:"pointer",fontWeight:700,color:"#8ee7ff"}}>New Wire Tool · Cable Wiring</summary>
+            <div style={{paddingTop:8,display:"flex",flexDirection:"column",gap:8}}>
+              <div>Click the single connection dot on a device to start a cable.</div>
+              {cableSource && <>
+                <div style={{color:"#8fe9ff"}}>Starting device: {devices.find(d=>d.id===cableSource)?.name}</div>
+                <label>Cable type
+                  <select aria-label="Cable type" value={cableType} onChange={e=>setCableType(e.target.value as CableKind)}
+                    style={{width:"100%",padding:8,background:"#173d50",color:"white"}}>
+                    {cableKinds.map(kind=><option key={kind} value={kind}>{kind}</option>)}
+                  </select>
+                </label>
+                <div>Now click the destination device on the wall.</div>
+                <button type="button" onClick={()=>{setCableSource(null);setWireMode(false)}}>Cancel cable</button>
+              </>}
+              {cables.length>0 && <label>Installed cables
+                <select aria-label="Choose cable" value={selectedCableId??""} onChange={e=>setSelectedCableId(e.target.value||null)}
+                  style={{width:"100%",padding:8,background:"#173d50",color:"white"}}>
+                  <option value="">Select cable to wire</option>
+                  {cables.map(c=><option key={c.id} value={c.id}>{c.type} · {devices.find(d=>d.id===c.from)?.name||"Missing"} → {devices.find(d=>d.id===c.to)?.name||"Missing"}</option>)}
+                </select>
+              </label>}
+              {selectedCable && <CableWiringPanel key={selectedCable.id} cable={selectedCable} devices={devices}
+                onChange={next=>setCables(prev=>prev.map(c=>c.id===next.id?next:c))}
+                onRemove={()=>{
+                  if(!window.confirm("Remove this cable and its conductor terminations?"))return;
+                  setCables(prev=>prev.filter(c=>c.id!==selectedCable.id));setSelectedCableId(null);
+                }}/>}
             </div>
           </details>
           <details style={{border:"1px solid #346b85",borderRadius:7,padding:8,marginBottom:8}}>
@@ -1756,53 +1813,7 @@ function Workspace(
           <details style={{border:"1px solid #346b85",borderRadius:7,padding:8,marginBottom:8}}>
             <summary style={{cursor:"pointer",fontWeight:700,color:"#8ee7ff"}}>Wall Tools · Show/Hide</summary>
             <div style={{display:"flex",flexDirection:"column",gap:8,paddingTop:8}}>
-                      <button
-          onClick={() =>
-            setWireMode(
-              !wireMode
-            )
-          }
-        >
-
-          {
-            wireMode
-              ? "Exit Wire"
-              : "Wire Tool"
-          }
-
-        </button>
-
-
-        <select
-          value={
-            wireColor
-          }
-          onChange={e =>
-            setWireColor(
-              e.target.value
-            )
-          }
-        >
-
-          <option value="black">
-            Hot
-          </option>
-
-          <option value="red">
-            Load
-          </option>
-
-          <option value="white">
-            Neutral
-          </option>
-
-          <option value="green">
-            Ground
-          </option>
-
-        </select>
-
-
+        <div style={{fontSize:11,color:"#b9dce9"}}>The old terminal-to-terminal Wire Tool has been replaced. Click the single gray dot on a device to start a cable.</div>
         <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12 }}>
           Studs
           <select value={studSpacing} onChange={e => setStudSpacing(Number(e.target.value))}>
@@ -2056,6 +2067,22 @@ function Workspace(
           </svg>
 
 
+          {/* Physical cables between device boxes; conductor terminations are edited in the right panel. */}
+          <svg viewBox="0 0 2000 1200" width="2000" height="1200"
+            style={{position:"absolute",inset:0,pointerEvents:"none",zIndex:5}}>
+            {cables.map(c=>{
+              const a=devices.find(d=>d.id===c.from),b=devices.find(d=>d.id===c.to);
+              if(!a||!b)return null;
+              const x1=a.x+75,y1=a.y+70,x2=b.x+75,y2=b.y+70;
+              const middle=Math.min(y1,y2)-90;
+              const d=`M ${x1} ${y1} L ${x1} ${middle} L ${x2} ${middle} L ${x2} ${y2}`;
+              return <g key={c.id}>
+                <path d={d} fill="none" stroke="#6c7b84" strokeWidth="16" strokeLinejoin="round"/>
+                <path d={d} fill="none" stroke={c.type.includes("MC")?"#a5afb7":"#f4f0e6"} strokeWidth="12" strokeLinejoin="round"
+                  strokeDasharray={c.type.includes("MC")?"8 3":undefined}/>
+              </g>;
+            })}
+          </svg>
           {/* Select a stud before installation. */}
           {Array.from({length:Math.ceil(2000/(studSpacing*8))},(_,index)=>{
             const x=index*studSpacing*8+13;
@@ -2120,10 +2147,10 @@ function Workspace(
                     terminalClick
                   }
 
-                  onStartDrag={
-                    startDrag
-                  }
-
+                  onStartDrag={startDrag}
+                  onCableStart={startCable}
+                  onCableDestination={finishCable}
+                  cableSource={cableSource===device.id}
                 />
 
               )

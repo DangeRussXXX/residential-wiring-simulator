@@ -2132,51 +2132,62 @@ function Workspace(
               </g>;
             })}
           </svg>
-          {/* Live box detail: only saved splice/pigtail records are illustrated. */}
+          {/* Device-local wiring: direct terminals, upright wire nuts, and isolated caps.
+              Rendered in the wall itself, without a detached callout or pop-up. */}
           {!blueprintMode&&<svg viewBox="0 0 2000 1200" width="2000" height="1200"
-            style={{position:"absolute",inset:0,pointerEvents:"none",zIndex:16}}>
-            {devices.flatMap(device=>{
-              const splices=cables.flatMap(c=>c.splices??[]).filter((sp,index,all)=>
+            style={{position:"absolute",inset:0,pointerEvents:"none",zIndex:16,overflow:"visible"}}>
+            {devices.map(device=>{
+              const related=cables.filter(c=>c.from===device.id||c.to===device.id);
+              const splices=related.flatMap(c=>c.splices??[]).filter((sp,index,all)=>
                 sp.deviceId===device.id&&all.findIndex(other=>other.id===sp.id)===index);
-              if(!splices.length)return [];
-              const cx=device.x+75, cy=device.y+70;
-              const boxX=Math.max(8,Math.min(2000-254,cx-125));
-              const boxY=Math.max(14,cy-224);
-              const conductorColor=(name:string)=>name==="white"?"#fff":name==="ground"?"#bd824d":name==="red"?"#e74444":"#101820";
-              return [<g key={`box-splices-${device.id}`}>
-                <path d={`M ${cx} ${cy-16} V ${boxY+174}`} stroke="#91dcef" strokeWidth="3" strokeDasharray="5 5"/>
-                <rect x={boxX} y={boxY} width="250" height="176" rx="10" fill="#18394c" fillOpacity=".97" stroke="#3bd8ef" strokeWidth="3"/>
-                <text x={boxX+12} y={boxY+21} fill="#f2fbff" fontSize="14" fontWeight="bold">{device.name} · BOX WIRING</text>
-                {splices.slice(0,3).map((sp,i)=>{
-                  const nutX=boxX+67+i*74, nutY=boxY+52;
-                  const wireNames=sp.members.map(m=>m.conductor);
-                  const pigtail=Boolean(sp.pigtailTerminal);
-                  const members=sp.members.slice(0,4);
+              const ends=related.map(c=>({c,side:(c.from===device.id?"from":"to") as "from"|"to"}));
+              const capped=ends.flatMap(({c,side})=>Object.entries(c.ends?.[side]??{})
+                .filter(([,terminal])=>terminal==="cap")
+                .map(([wire])=>({c,wire})));
+              if(!splices.length&&!capped.length)return null;
+              const cx=device.x+75,cy=device.y+70;
+              const color=(name:string)=>name==="white"?"#f6f9fc":name==="ground"?"#b87845":name==="red"?"#e34848":"#101820";
+              const wire=(d:string,name:string,width=5)=><g>
+                <path d={d} fill="none" stroke={name==="white"?"#596c76":"#c5d5df"} strokeWidth={width+3} strokeLinecap="round"/>
+                <path d={d} fill="none" stroke={color(name)} strokeWidth={width} strokeLinecap="round"/>
+              </g>;
+              const nut=(x:number,y:number)=><g>
+                <path d={`M ${x-12} ${y+12} L ${x-11} ${y-3} Q ${x} ${y-19} ${x+11} ${y-3} L ${x+12} ${y+12} Z`} fill="#f1a033" stroke="#ffdc91" strokeWidth="2"/>
+                {[0,1,2].map(i=><path key={i} d={`M ${x-9} ${y-2+i*5} Q ${x} ${y+2+i*5} ${x+9} ${y-2+i*5}`} fill="none" stroke="#b86b20" strokeWidth="1.6"/>)}
+              </g>;
+              return <g key={`inline-wiring-${device.id}`}>
+                {splices.slice(0,4).map((sp,i)=>{
+                  const nx=cx-34+i*30,ny=cy-99-(i%2)*17;
+                  const members=sp.members.slice(0,5);
+                  const family=members[0]?.conductor??"black";
+                  const target=sp.pigtailTerminal;
                   return <g key={sp.id}>
                     {members.map((m,j)=>{
-                      const sx=boxX+17+i*74+j*12;
-                      const sy=boxY+147;
-                      const ex=nutX-11+j*7;
-                      const path=`M ${sx} ${sy} C ${sx} ${boxY+103} ${ex} ${boxY+108} ${ex} ${nutY+14}`;
+                      const sx=cx-68+j*13+i*6,sy=cy-9+(j%2)*7;
+                      const tx=nx-9+j*(18/Math.max(1,members.length-1));
                       return <g key={`${m.cableId}-${m.end}-${m.conductor}`}>
-                        <path d={path} fill="none" stroke="#b2c7d2" strokeWidth="8" strokeLinecap="round"/>
-                        <path d={path} fill="none" stroke={conductorColor(m.conductor)} strokeWidth="5" strokeLinecap="round"/>
-                        <title>{m.conductor.toUpperCase()} · {cables.find(c=>c.id===m.cableId)?.fromName??"Source"} → {cables.find(c=>c.id===m.cableId)?.toName??"Device"}</title>
+                        {wire(`M ${sx} ${sy} C ${sx-7} ${cy-49} ${tx} ${ny+42} ${tx} ${ny+12}`,m.conductor,5)}
+                        <title>{m.conductor.toUpperCase()} · {related.find(c=>c.id===m.cableId)?.fromName??"Source"} → {related.find(c=>c.id===m.cableId)?.toName??"Device"} · wire-nut splice</title>
                       </g>;
                     })}
-                    {pigtail&&<g>
-                      <path d={`M ${nutX+8} ${nutY+14} C ${nutX+34} ${nutY+45} ${nutX+39} ${boxY+113} ${nutX+39} ${boxY+137}`} fill="none" stroke="#b2c7d2" strokeWidth="9" strokeLinecap="round"/>
-                      <path d={`M ${nutX+8} ${nutY+14} C ${nutX+34} ${nutY+45} ${nutX+39} ${boxY+113} ${nutX+39} ${boxY+137}`} fill="none" stroke={conductorColor(wireNames[0]??"black")} strokeWidth="6" strokeLinecap="round"/>
-                      <circle cx={nutX+39} cy={boxY+137} r="7" fill="#d8a54f" stroke="#ffe7ac" strokeWidth="2"/>
-                      <title>Pigtail to {sp.pigtailTerminal}</title>
+                    {target&&<g>
+                      {wire(`M ${nx+9} ${ny+12} C ${nx+45} ${ny+45} ${cx+43} ${cy-55} ${cx+24} ${cy-21}`,family,5)}
+                      <circle cx={cx+24} cy={cy-21} r="5" fill={color(family)} stroke="#26d9f0" strokeWidth="2"/>
+                      <title>{family.toUpperCase()} pigtail → ${target}</title>
                     </g>}
-                    <path d={`M ${nutX-13} ${nutY+13} L ${nutX-12} ${nutY-3} Q ${nutX} ${nutY-20} ${nutX+12} ${nutY-3} L ${nutX+13} ${nutY+13} Z`} fill="#ed9d2f" stroke="#ffdf9b" strokeWidth="2"/>
-                    {[0,1,2].map(k=><path key={k} d={`M ${nutX-9} ${nutY-1+k*5} Q ${nutX} ${nutY+3+k*5} ${nutX+9} ${nutY-1+k*5}`} fill="none" stroke="#ad621f" strokeWidth="1.6"/>)}
-                    <text x={nutX} y={boxY+166} textAnchor="middle" fontSize="11" fill="#e7f6ff">{pigtail?`→ ${sp.pigtailTerminal}`:`${members.length} wires`}</text>
+                    {nut(nx,ny)}
+                    <title>{device.name}: ${members.length} conductors joined${target?` with pigtail to ${target}`:""}</title>
                   </g>;
                 })}
-                {splices.length>3&&<text x={boxX+130} y={boxY+39} fill="#ffde9c" fontSize="11">+{splices.length-3} more splices in wiring panel</text>}
-              </g>];
+                {capped.slice(0,6).map(({c,wire:wireName},i)=>{
+                  const x=cx+38+i*13,y=cy-68-(i%2)*20;
+                  return <g key={`cap-${c.id}-${wireName}`}>
+                    {wire(`M ${cx+6+i*5} ${cy-7} Q ${x-13} ${cy-36} ${x} ${y+12}`,wireName,5)}
+                    {nut(x,y)}
+                    <title>{wireName.toUpperCase()} capped individually · ${c.fromName??"Panel"} → ${c.toName??device.name}</title>
+                  </g>;
+                })}
+              </g>;
             })}
           </svg>}
           {/* Select a stud before installation. */}

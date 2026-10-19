@@ -10,6 +10,12 @@ const button: React.CSSProperties = { background: "#163c52", border: "1px solid 
 const field: React.CSSProperties = { background: "#0b1824", color: "white", border: "1px solid #397b99", borderRadius: 5, padding: 8, maxWidth: "100%" };
 
 export default function ServiceOverview({ project, onChange, onOpenDestination }: { project: ServiceProject; onChange: (next: ServiceProject) => void; onOpenDestination?: (areaId: string, wall: "NORTH" | "SOUTH" | "EAST" | "WEST") => void }) {
+  const panelSections = ["service", "connections", "directory", "install", "selected", "destinations", "terminations", "labs", "circuits"] as const;
+  type SectionId = typeof panelSections[number];
+  const [expanded, setExpanded] = useState<Record<SectionId, boolean>>({ service: false, connections: false, directory: true, install: false, selected: true, destinations: false, terminations: true, labs: false, circuits: false });
+  const toggle = (id: SectionId) => setExpanded(p => ({...p, [id]: !p[id]}));
+  const sectionHeader = (id: SectionId, label: string) => <button type="button" aria-expanded={expanded[id]} onClick={() => toggle(id)} style={{...button, width:"100%", textAlign:"left", display:"flex", justifyContent:"space-between", alignItems:"center", background:"#12283a", padding:"12px 14px", fontWeight:700, fontSize:17, color:"#7fe3ff"}}><span>{label}</span><span aria-hidden="true">{expanded[id] ? "▾" : "▸"}</span></button>;
+  const accordion = (id: SectionId, label: string, content: React.ReactNode) => <section style={{...frame,padding:10}}>{sectionHeader(id,label)}{expanded[id] && <div style={{padding:"14px 6px 4px"}}>{content}</div>}</section>;
   const [slot, setSlot] = useState(1);
   const [amps, setAmps] = useState(15);
   const [poles, setPoles] = useState<1 | 2>(1);
@@ -42,7 +48,12 @@ export default function ServiceOverview({ project, onChange, onOpenDestination }
   };
   const node = (name: string, detail: string) => <div style={{ flex: 1, minWidth: 140, padding: 14, border: "1px solid #386b88", borderRadius: 8, textAlign: "center", background: "#0b1926" }}><strong>{name}</strong><div style={{ color: "#a4c7d7", fontSize: 12, marginTop: 6 }}>{detail}</div></div>;
   return <div style={{ color: "#e9f7ff", maxWidth: 1200, margin: "0 auto" }}>
-    <section style={frame}>
+    <div style={{display:"flex",gap:8,alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",marginBottom:14}}>
+      <h2 style={{margin:0,color:"#79e2ff"}}>⚡ Service & Panel Workspace</h2>
+      <div style={{display:"flex",gap:8}}><button style={button} onClick={()=>setExpanded(Object.fromEntries(panelSections.map(id=>[id,true])) as Record<SectionId,boolean>)}>Show All</button><button style={button} onClick={()=>setExpanded(Object.fromEntries(panelSections.map(id=>[id,false])) as Record<SectionId,boolean>)}>Hide All</button></div>
+    </div>
+    {accordion("service", "Electrical Service Setup", <>
+
       <h2 style={{ color: "#65dbff", marginTop: 0 }}>⚡ Electrical Service · {project.service.amperage}A</h2>
       <div style={{ display: "flex", alignItems: "stretch", gap: 8, flexWrap: "wrap" }}>
         {node("UTILITY", project.service.route === "UNDERGROUND" ? "Underground lateral" : "Overhead service drop")}
@@ -55,9 +66,9 @@ export default function ServiceOverview({ project, onChange, onOpenDestination }
         <strong style={{ color: project.service.mainDisconnectClosed ? "#8bebb3" : "#ffc39b" }}>Downstream supply: {project.service.mainDisconnectClosed ? "ON" : "OFF"} (diagram only)</strong>
       </div>
       <p style={{ fontSize: 12, color: "#b1c4ce" }}>Training model: the disconnect display does not yet control the circuit solver. Upstream service conductors may remain energized. This is separate service disconnect equipment; the downstream distribution panel is modeled with isolated neutral and ground bars.</p>
-    </section>
-    <ServiceConnectionView project={project} />
-    <section style={frame}>
+    </>)}
+    {accordion("connections", "Service Connections · Lugs & Feeder", <ServiceConnectionView project={project} />)}
+    {accordion("directory", "Main Distribution Panel · Breaker Positions", <>
       <h2 style={{ marginTop: 0, color: "#65dbff" }}>Main Distribution Panel — Breaker Directory</h2>
       <p style={{ color: "#a8c6d3" }}>Install breakers here, not on bedroom walls. Circuit names and room assignments are saved with this project. Connections to actual wall conductors are a later phase.</p>
       <div style={{ display: "grid", gridTemplateColumns: "minmax(260px, 1fr) minmax(260px, 1fr)", gap: 18 }}>
@@ -72,8 +83,10 @@ export default function ServiceOverview({ project, onChange, onOpenDestination }
           </div>
           <div style={{ display: "flex", gap: 8, marginTop: 12 }}><div style={{ ...button, flex: 1, textAlign: "center" }}>NEUTRAL BAR (isolated)</div><div style={{ ...button, flex: 1, textAlign: "center" }}>GROUND BAR</div></div>
         </div>
-        <div>
-          <h3 style={{ color: "#86e1ff", marginTop: 0 }}>Install a breaker</h3>
+        <div style={{alignSelf:"start",padding:14,border:"1px solid #36546a",borderRadius:8}}><strong style={{color:"#85e3ff"}}>Selected breaker #{selected}</strong><p>{active?.breaker ? `${active.breaker.amperage}A · ${active.breaker.poles}-pole` : "Empty position"}</p><p style={{fontSize:13,color:"#b6d3df"}}>Use the expandable sections below to install, configure, route, and wire the selected breaker.</p></div>
+      </div>
+    </>)}
+    {accordion("install", "Install a Breaker", <>          <h3 style={{ color: "#86e1ff", marginTop: 0 }}>Install a breaker</h3>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
             <label>Position <select style={field} value={slot} onChange={e => setSlot(Number(e.target.value))}>{slots.filter(s => !s.installed).map(s => <option key={s.slot} value={s.slot}>{s.slot}</option>)}</select></label>
             <label>Rating <select style={field} value={amps} onChange={e => setAmps(Number(e.target.value))}>{[15,20,25,30,40,50,60].map(n => <option key={n} value={n}>{n}A</option>)}</select></label>
@@ -81,14 +94,18 @@ export default function ServiceOverview({ project, onChange, onOpenDestination }
             <label>Protection <select style={field} value={kind} onChange={e => setKind(e.target.value as BreakerType)}><option value="STANDARD">Standard</option><option value="AFCI">AFCI</option><option value="GFCI">GFCI</option><option value="DUAL_FUNCTION">Dual function</option></select></label>
           </div>
           <button style={button} onClick={install}>+ Install in panel</button>
-          <hr style={{ borderColor: "#395466", margin: "22px 0" }}/>
-          <h3 style={{ color: "#86e1ff" }}>Selected position {selected}</h3>
+</>)}
+    {accordion("selected", `Selected Breaker · Position ${selected}`, <>          <h3 style={{ color: "#86e1ff" }}>Selected position {selected}</h3>
           {active?.breaker ? <>
             <div style={{ marginBottom: 12 }}>{active.breaker.amperage}A · {active.breaker.poles}-pole · {active.breaker.breakerType}</div>
             <label style={{ display: "block", marginBottom: 10 }}>Circuit name <input style={{ ...field, width: "100%", display: "block", marginTop: 5 }} value={assignment?.name ?? ""} placeholder="e.g. Bedroom 1 receptacles" onChange={e => saveAssignment(e.target.value)} /></label>
             <strong style={{ display: "block", marginBottom: 8 }}>Areas served (directory labels)</strong>
             {project.areas.length ? project.areas.map(area => <label key={area.id} style={{ display: "block", marginBottom: 8 }}><input type="checkbox" checked={assignment?.areaIds.includes(area.id) ?? false} onChange={e => saveAssignment(assignment?.name ?? "", e.target.checked ? [...(assignment?.areaIds ?? []), area.id] : (assignment?.areaIds ?? []).filter(id => id !== area.id))}/> {area.name}</label>) : <p style={{ color: "#9db5c3" }}>Add a room to assign an area to this breaker.</p>}
-            <div style={{borderTop:"1px solid #35566a",margin:"14px 0",paddingTop:12}}>
+            <button style={{ ...button, borderColor: "#a45d5d", color: "#ffc4c4" }} onClick={remove}>Remove breaker</button>
+          </> : <p style={{ color: "#b3c5cf" }}>Select an installed breaker position to name its circuit and associate rooms.</p>}
+        </>)}
+    {accordion("destinations", "Circuit Destinations · Rooms & Walls", <>
+      {!active?.breaker ? <p>Select an installed breaker first.</p> : <>            <div style={{borderTop:"1px solid #35566a",margin:"14px 0",paddingTop:12}}>
               <strong style={{display:"block",color:"#81e5ff",marginBottom:8}}>Circuit destinations — room / wall</strong>
               <p style={{fontSize:12,color:"#b3c9d5"}}>Create a routing destination. This records a planned home run; conductor termination comes in the next wiring-engine update.</p>
               {project.areas.length ? project.areas.map(area => <div key={area.id} style={{border:"1px solid #2f4e62",padding:8,marginBottom:8,borderRadius:6}}>
@@ -106,14 +123,17 @@ export default function ServiceOverview({ project, onChange, onOpenDestination }
                 })}
               </div>) : <p>Add a room in Project Explorer first.</p>}
             </div>
-            <button style={{ ...button, borderColor: "#a45d5d", color: "#ffc4c4" }} onClick={remove}>Remove breaker</button>
-          </> : <p style={{ color: "#b3c5cf" }}>Select an installed breaker position to name its circuit and associate rooms.</p>}
-        </div>
-      </div>
-    </section>
-    <PanelWiringLab project={project} selectedSlot={selected} onChange={onChange} />
-    <section style={frame}><h3 style={{ marginTop: 0, color: "#86e1ff" }}>Project Circuit Directory</h3>
+</>}
+    </>)}
+    {accordion("terminations", `Wire to Breaker · Position ${selected}`, <PanelWiringLab project={project} selectedSlot={selected} onChange={onChange} />)}
+    {accordion("labs", "Wiring Labs · Training Exercises", <>
+      <h3 style={{color:"#84e4ff",marginTop:0}}>Practice: 120V Branch Circuit</h3>
+      <p>Select a breaker, add a training cable in <strong>Wire to Breaker</strong>, then terminate each conductor on a simulated breaker, neutral or equipment-ground terminal. Run the inspection in that panel to check the exercise.</p>
+      <p style={{fontSize:12,color:"#aac7d7"}}>Training-only: panel feeder and room wiring are not electrically connected to the solver yet. Never use this display as instructions for working on energized service equipment.</p>
+      <button style={button} onClick={()=>setExpanded(p=>({...p,terminations:true}))}>Open Breaker Wiring Lab ↓</button>
+    </>)}
+    {accordion("circuits", "Project Circuit Directory", <><h3 style={{ marginTop: 0, color: "#86e1ff" }}>Project Circuit Directory</h3>
       {slots.filter(s => s.breaker).length === 0 ? <p>No breakers installed yet.</p> : slots.filter(s => s.breaker).map(s => <div key={s.slot} style={{ padding: "9px 0", borderBottom: "1px solid #2e4b5c" }}><strong>#{s.slot} · {s.breaker?.amperage}A</strong> — {assignments.find(a => a.slot === s.slot)?.name || "Unassigned"}<div style={{ fontSize: 12, color: "#99b9c8" }}>{(assignments.find(a => a.slot === s.slot)?.areaIds ?? []).map(id => project.areas.find(a => a.id === id)?.name).filter(Boolean).join(", ") || "No rooms assigned"}</div></div>)}
-    </section>
+    </>)}
   </div>;
 }

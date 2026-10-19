@@ -17,6 +17,7 @@ export default function ServiceOverview({ project, onChange, onOpenDestination }
   const sectionHeader = (id: SectionId, label: string) => <button type="button" aria-expanded={expanded[id]} onClick={() => toggle(id)} style={{...button, width:"100%", textAlign:"left", display:"flex", justifyContent:"space-between", alignItems:"center", background:"#12283a", padding:"12px 14px", fontWeight:700, fontSize:17, color:"#7fe3ff"}}><span>{label}</span><span aria-hidden="true">{expanded[id] ? "▾" : "▸"}</span></button>;
   const accordion = (id: SectionId, label: string, content: React.ReactNode) => <section style={{...frame,padding:10}}>{sectionHeader(id,label)}{expanded[id] && <div style={{padding:"14px 6px 4px"}}>{content}</div>}</section>;
   const [slot, setSlot] = useState(1);
+  const [draggedBreaker, setDraggedBreaker] = useState<{ amps: number; poles: 1 | 2; kind: BreakerType } | null>(null);
   const [amps, setAmps] = useState(15);
   const [poles, setPoles] = useState<1 | 2>(1);
   const [kind, setKind] = useState<BreakerType>("STANDARD");
@@ -31,15 +32,27 @@ export default function ServiceOverview({ project, onChange, onOpenDestination }
     const destinations = [...(assignment?.destinations ?? []).filter(d => !(d.areaId === areaId && d.wall === wall)), {areaId, wall, cable}];
     onChange({...project, distributionPanel: panel, circuitAssignments: [...assignments.filter(a => a.slot !== selected), { ...assignment, slot: selected, name: assignment?.name ?? "", areaIds: [...new Set([...(assignment?.areaIds ?? []),areaId])], destinations }]});
   };
-  const install = () => {
-    if (slots.find(s => s.slot === slot)?.installed) { window.alert("That breaker position is already occupied."); return; }
-    if (poles === 2 && (slot >= slots.length || slots.find(s => s.slot === slot + 1)?.installed)) { window.alert("Select two available adjacent positions for this conceptual two-pole breaker."); return; }
-    const breaker = createBreaker(`breaker-${project.id}-${slot}`, slot, amps, poles, kind);
+  const installAt = (position: number, rating: number, poleCount: 1 | 2, protection: BreakerType) => {
+    const target = slots.find(s => s.slot === position);
+    if (!target || target.installed) { window.alert("That breaker position is occupied."); return; }
+    // In this generic training panel, two-pole devices use the next modeled position.
+    // Manufacturer-specific physical stab/phase compatibility is not modeled yet.
+    if (poleCount === 2 && (!slots.find(s => s.slot === position + 1) || slots.find(s => s.slot === position + 1)?.installed)) {
+      window.alert("This two-pole training breaker needs two free modeled positions."); return;
+    }
+    const breaker = createBreaker(`breaker-${project.id}-${position}`, position, rating, poleCount, protection);
     const next = installBreaker(panel, breaker);
-    // Reserve the second position. The electrical engine will receive physical bus-stab validation in a later update.
-    if (poles === 2) next.breakers = next.breakers.map(s => s.slot === slot + 1 ? { ...s, installed: true, occupiedBy: breaker.id, breaker: null } : s);
-    onChange({ ...project, distributionPanel: next }); setSelected(slot);
+    if (poleCount === 2) next.breakers = next.breakers.map(s => s.slot === position + 1 ? { ...s, installed: true, occupiedBy: breaker.id, breaker: null } : s);
+    onChange({ ...project, distributionPanel: next });
+    setSelected(position);
+    setSlot(position);
   };
+  const install = () => installAt(slot, amps, poles, kind);
+  const breakerCatalog = ([15,20,25,30,40,50,60,70,80,90,100] as const).flatMap(rating =>
+    (["STANDARD","AFCI","GFCI","DUAL_FUNCTION"] as BreakerType[]).flatMap(protection =>
+      ([1,2] as const).filter(p => !(p === 1 && rating > 60)).map(poleCount => ({amps:rating, poles:poleCount, kind:protection}))
+    )
+  );
   const remove = () => {
     if (!active?.breaker) return;
     let next = removeBreaker(panel, selected);
@@ -50,7 +63,7 @@ export default function ServiceOverview({ project, onChange, onOpenDestination }
   return <div style={{ color: "#e9f7ff", maxWidth: 1200, margin: "0 auto" }}>
     <div style={{display:"flex",gap:8,alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",marginBottom:14}}>
       <h2 style={{margin:0,color:"#79e2ff"}}>⚡ Service & Panel Workspace</h2>
-      <div style={{display:"flex",gap:8}}><button style={button} onClick={()=>setExpanded(Object.fromEntries(panelSections.map(id=>[id,true])) as Record<SectionId,boolean>)}>Show All</button><button style={button} onClick={()=>setExpanded(Object.fromEntries(panelSections.map(id=>[id,false])) as Record<SectionId,boolean>)}>Hide All</button></div>
+
     </div>
     {accordion("service", "Electrical Service Setup", <>
 
@@ -69,13 +82,19 @@ export default function ServiceOverview({ project, onChange, onOpenDestination }
     </>)}
     {accordion("connections", "Service Connections · Lugs & Feeder", <ServiceConnectionView project={project} />)}
     {accordion("directory", "Main Distribution Panel · Breaker Positions", <>
+      <div style={{display:"flex",justifyContent:"flex-end",gap:8,flexWrap:"wrap",marginBottom:10}}>
+        <button style={button} onClick={()=>setExpanded(p=>({...p,install:true,selected:true,destinations:true,terminations:true,labs:true,circuits:true}))}>Show All</button>
+        <button style={button} onClick={()=>setExpanded(p=>({...p,install:false,selected:false,destinations:false,terminations:false,labs:false,circuits:false}))}>Hide All</button>
+      </div>
       <h2 style={{ marginTop: 0, color: "#65dbff" }}>Main Distribution Panel — Breaker Directory</h2>
       <p style={{ color: "#a8c6d3" }}>Install breakers here, not on bedroom walls. Circuit names and room assignments are saved with this project. Connections to actual wall conductors are a later phase.</p>
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(260px, 1fr) minmax(340px, 1fr)", gap: 18 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(260px, 1fr) minmax(300px, 1fr)", gap: 18 }}>
         <div style={{ background: "#25313b", padding: 14, border: "3px solid #63717c", borderRadius: 10 }}>
           <div style={{ background: "#151e28", padding: 12, textAlign: "center", marginBottom: 10, borderRadius: 6 }}><strong>MAIN DISTRIBUTION</strong><div style={{ fontSize: 12, color: "#8cb8cb" }}>Feeder: L1 · L2 · Neutral · Equipment Ground</div></div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}>
-            {slots.map(s => <button key={s.slot} onClick={() => setSelected(s.occupiedBy ? (slots.find(x => x.breaker?.id === s.occupiedBy)?.slot ?? s.slot) : s.slot)} style={{ ...button, textAlign: "left", minHeight: 66, background: selected === s.slot ? "#155a79" : s.installed ? "#202b34" : "#121c25", borderColor: selected === s.slot ? "#69ddff" : "#465764" }}>
+            {slots.map(s => <button key={s.slot} onClick={() => setSelected(s.occupiedBy ? (slots.find(x => x.breaker?.id === s.occupiedBy)?.slot ?? s.slot) : s.slot)} onDragOver={e => { if (draggedBreaker) e.preventDefault(); }}
+              onDrop={e => { e.preventDefault(); if (draggedBreaker) { installAt(s.slot, draggedBreaker.amps, draggedBreaker.poles, draggedBreaker.kind); setDraggedBreaker(null); } }}
+              style={{ ...button, textAlign: "left", minHeight: 66, background: selected === s.slot ? "#155a79" : s.installed ? "#202b34" : "#121c25", borderColor: selected === s.slot ? "#69ddff" : "#465764" }}>
               <div style={{ color: "#94b4c4", fontSize: 11 }}>POSITION {s.slot}</div>
               <strong>{s.breaker ? `${s.breaker.amperage}A · ${s.breaker.poles}P` : s.occupiedBy ? "2-pole continuation" : "EMPTY"}</strong>
               {s.breaker && <div style={{ fontSize: 11, color: "#b2d9e8", overflowWrap: "anywhere" }}>{assignments.find(a => a.slot === s.slot)?.name || "Unassigned circuit"}</div>}
@@ -84,15 +103,23 @@ export default function ServiceOverview({ project, onChange, onOpenDestination }
           <div style={{ display: "flex", gap: 8, marginTop: 12 }}><div style={{ ...button, flex: 1, textAlign: "center" }}>NEUTRAL BAR (isolated)</div><div style={{ ...button, flex: 1, textAlign: "center" }}>GROUND BAR</div></div>
         </div>
         <div style={{minWidth:0,alignSelf:"start",display:"flex",flexDirection:"column",gap:8}}>
-    {accordion("install", "Install a Breaker", <>          <h3 style={{ color: "#86e1ff", marginTop: 0 }}>Install a breaker</h3>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
-            <label>Position <select style={field} value={slot} onChange={e => setSlot(Number(e.target.value))}>{slots.filter(s => !s.installed).map(s => <option key={s.slot} value={s.slot}>{s.slot}</option>)}</select></label>
-            <label>Rating <select style={field} value={amps} onChange={e => setAmps(Number(e.target.value))}>{[15,20,25,30,40,50,60].map(n => <option key={n} value={n}>{n}A</option>)}</select></label>
-            <label>Poles <select style={field} value={poles} onChange={e => setPoles(Number(e.target.value) as 1 | 2)}><option value={1}>1 pole</option><option value={2}>2 pole</option></select></label>
-            <label>Protection <select style={field} value={kind} onChange={e => setKind(e.target.value as BreakerType)}><option value="STANDARD">Standard</option><option value="AFCI">AFCI</option><option value="GFCI">GFCI</option><option value="DUAL_FUNCTION">Dual function</option></select></label>
-          </div>
-          <button style={button} onClick={install}>+ Install in panel</button>
-</>)}
+    {accordion("install", "Breaker Library · Drag into Empty Slots", <>
+      <p style={{fontSize:12,color:"#b2cbd8",marginTop:0}}>Drag a breaker onto an empty position at left. You can also select a breaker below, choose a position, and click Install (keyboard/touch alternative). These are generic training models; panel listing and physical bus compatibility are not yet verified.</p>
+      <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10}}>
+        <label>Position <select style={field} value={slot} onChange={e=>setSlot(Number(e.target.value))}>{slots.filter(s=>!s.installed).map(s=><option key={s.slot} value={s.slot}>{s.slot}</option>)}</select></label>
+        <button style={button} onClick={install}>Install selected breaker</button>
+      </div>
+      <div style={{maxHeight:320,overflowY:"auto",display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(145px,1fr))",gap:7}}>
+        {breakerCatalog.map(item=><button type="button" key={`${item.amps}-${item.poles}-${item.kind}`} draggable
+          onDragStart={e=>{setDraggedBreaker(item); e.dataTransfer.effectAllowed="copy";e.dataTransfer.setData("text/plain",`${item.amps}A ${item.poles}P ${item.kind}`);}}
+          onDragEnd={()=>setDraggedBreaker(null)}
+          onClick={()=>{setAmps(item.amps);setPoles(item.poles);setKind(item.kind);}}
+          style={{...button,textAlign:"left",background:amps===item.amps&&poles===item.poles&&kind===item.kind?"#155a79":"#142938",display:"flex",gap:9,alignItems:"center"}}>
+          <span aria-hidden="true" style={{background:"#293843",border:"2px solid #8fa6b5",borderRadius:4,padding:"8px 5px",fontSize:11,whiteSpace:"nowrap"}}>▣ {item.poles}P</span>
+          <span><strong>{item.amps}A</strong><br/><span style={{fontSize:11}}>{item.kind.replace("_"," ")}</span></span>
+        </button>)}
+      </div>
+    </>)}
     {accordion("selected", `Selected Breaker · Position ${selected}`, <>          <h3 style={{ color: "#86e1ff" }}>Selected position {selected}</h3>
           {active?.breaker ? <>
             <div style={{ marginBottom: 12 }}>{active.breaker.amperage}A · {active.breaker.poles}-pole · {active.breaker.breakerType}</div>
@@ -130,11 +157,11 @@ export default function ServiceOverview({ project, onChange, onOpenDestination }
       <p style={{fontSize:12,color:"#aac7d7"}}>Training-only: panel feeder and room wiring are not electrically connected to the solver yet. Never use this display as instructions for working on energized service equipment.</p>
       <button style={button} onClick={()=>setExpanded(p=>({...p,terminations:true}))}>Open Breaker Wiring Lab ↓</button>
     </>)}
-        </div>
-      </div>
-    </>)}
     {accordion("circuits", "Project Circuit Directory", <><h3 style={{ marginTop: 0, color: "#86e1ff" }}>Project Circuit Directory</h3>
       {slots.filter(s => s.breaker).length === 0 ? <p>No breakers installed yet.</p> : slots.filter(s => s.breaker).map(s => <div key={s.slot} style={{ padding: "9px 0", borderBottom: "1px solid #2e4b5c" }}><strong>#{s.slot} · {s.breaker?.amperage}A</strong> — {assignments.find(a => a.slot === s.slot)?.name || "Unassigned"}<div style={{ fontSize: 12, color: "#99b9c8" }}>{(assignments.find(a => a.slot === s.slot)?.areaIds ?? []).map(id => project.areas.find(a => a.id === id)?.name).filter(Boolean).join(", ") || "No rooms assigned"}</div></div>)}
+    </>)}
+        </div>
+      </div>
     </>)}
   </div>;
 }

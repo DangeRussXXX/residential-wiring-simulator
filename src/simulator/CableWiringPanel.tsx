@@ -109,9 +109,10 @@ function DeviceArtwork({kind,breakerSlot,front}:{kind:string;breakerSlot?:number
       <text x="349" y="167" fontSize="9" fill="#f7d79b">LOAD</text></>}
   </g>;
 }
-function WireConnector({x,y,splice=false,selected=false}:{x:number;y:number;splice?:boolean;selected?:boolean}) {
-  // Wire approaches from left; connector mouth is at x, closed tip at x+27.
-  return <g transform={`translate(${x} ${y})`} pointerEvents="none">
+function WireConnector({x,y,splice=false,selected=false,upright=false}:{x:number;y:number;splice?:boolean;selected?:boolean;upright?:boolean}) {
+  // Upright connectors have a CLOSED tip above and an OPEN mouth below.
+  // Conductors enter independently from below; the pigtail exits beside the bundle.
+  return <g transform={`translate(${x} ${y}) rotate(${upright?-90:0})`} pointerEvents="none">
     <path d="M -2 -10 L 9 -10 Q 14 -10 17 -8 L 26 -5 Q 30 0 26 5 L 17 8 Q 14 10 9 10 L -2 10 Z"
       fill={splice?"#e69a2f":"#ecaa38"} stroke="#ffe1a3" strokeWidth="1.7"/>
     <rect x="-2" y="-11" width="7" height="22" rx="2" fill="#bb7124" stroke="#ffe1a3" strokeWidth="1.3"/>
@@ -249,44 +250,47 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove,allCab
         const isCapped=assigned==="cap";
         const splice=assigned?.startsWith("splice:")?splices.find(sp=>`splice:${sp.id}`===assigned):undefined;
         const groupIndex=splice?splices.findIndex(sp=>sp.id===splice.id):-1;
-        // Every conductor in the same splice converges at one connector.
-        const targetX=t?.x??(splice?201:201);
-        const targetY=t?.y??(splice?48+Math.max(0,groupIndex)*76:y);
-        const endX=isCapped||splice?targetX-4:targetX;
+        const sx=194, sy=80+Math.max(0,groupIndex)*95;
+        const spliceMembers=splice?.members??[];
+        const memberIndex=Math.max(0,spliceMembers.findIndex(m=>m.cableId===cable.id&&m.end===end&&m.conductor===c));
+        const spread=(memberIndex-(spliceMembers.length-1)/2)*11;
+        const targetX=splice?sx+spread:(t?.x??201);
+        const targetY=splice?sy+15:(t?.y??y);
         const path=splice
-          ?`M 76 124 C 105 124 112 ${y} 145 ${y} C 164 ${y} 166 ${targetY} ${endX} ${targetY}`
-          :`M 76 124 Q 115 124 132 ${y} L ${endX} ${targetY}`;
+          ?`M 76 124 C 108 124 ${100+memberIndex*12} ${155+memberIndex*9} ${targetX} ${targetY}`
+          :`M 76 124 Q 115 124 132 ${y} L ${isCapped?targetX-4:targetX} ${targetY}`;
         return <g key={c} onClick={()=>setSelected(c)} style={{cursor:"pointer"}}>
-          <path d={path} fill="none" stroke={c==="white"?"#263c49":"#d2e5ee"} strokeWidth="13" strokeLinecap="round"/>
+          <path d={path} fill="none" stroke={c==="white"?"#263c49":"#d2e5ee"} strokeWidth="12" strokeLinecap="round"/>
           <path d={path} fill="none" stroke={colors[c]} strokeWidth="7" strokeLinecap="round"/>
           {!isCapped&&!splice&&<circle cx={targetX} cy={targetY} r="7" fill={colors[c]} stroke={selected===c?"#24e6ff":"#7895a4"} strokeWidth={selected===c?4:2}/>}
           {isCapped&&<WireConnector x={targetX-4} y={targetY} selected={selected===c}/>}
-
-
         </g>;
       })}
-      {view==="rear"&&splices.flatMap((sp,i)=>sp.members.filter(m=>m.cableId!==cable.id).map((m,j)=>{
-        const sx=197,sy=48+i*76;
-        const fromY=Math.min(255,Math.max(20,sy-26+(j*22)));
-        const family=m.conductor;
-        const path=`M 0 ${fromY} C 72 ${fromY} 100 ${sy} ${sx-4} ${sy}`;
-        return <g key={`${sp.id}-${m.cableId}-${m.end}-${family}`}>
-          <path d={path} fill="none" stroke="#e3f1f6" strokeWidth="12" strokeLinecap="round"/>
-          <path d={path} fill="none" stroke={colors[family]} strokeWidth="7" strokeLinecap="round"/>
-
+      {view==="rear"&&splices.flatMap((sp,i)=>sp.members.filter(m=>!(m.cableId===cable.id&&m.end===end)).map((m,j)=>{
+        const sx=194,sy=80+i*95;
+        const memberIndex=sp.members.findIndex(a=>a.cableId===m.cableId&&a.end===m.end&&a.conductor===m.conductor);
+        const spread=(memberIndex-(sp.members.length-1)/2)*11;
+        const startY=Math.min(260,175+i*18+j*22);
+        const path=`M 0 ${startY} C 90 ${startY} ${110+j*18} ${sy+60} ${sx+spread} ${sy+15}`;
+        return <g key={`${sp.id}-${m.cableId}-${m.end}-${m.conductor}`}>
+          <path d={path} fill="none" stroke={m.conductor==="white"?"#263c49":"#d2e5ee"} strokeWidth="12" strokeLinecap="round"/>
+          <path d={path} fill="none" stroke={colors[m.conductor]} strokeWidth="7" strokeLinecap="round"/>
         </g>;
       }))}
       {view==="rear"&&splices.map((sp,i)=>{
-        const sx=197,sy=48+i*76;
+        const sx=194,sy=80+i*95;
         const destination=sp.pigtailTerminal?points[sp.pigtailTerminal]:undefined;
         const family=sp.members[0]?.conductor==="ground"?"ground":sp.members[0]?.conductor==="white"?"white":"black";
+        // The pigtail is a separate conductor, running down from the mouth,
+        // then turning right to its actual device terminal.
+        const path=destination?`M ${sx+8} ${sy+15} C ${sx+35} ${sy+52} ${destination.x-52} ${destination.y+40} ${destination.x} ${destination.y}`:"";
         return <g key={sp.id}>
           {destination&&<>
-            <path d={`M ${sx+25} ${sy} C ${sx+62} ${sy-30} ${destination.x-52} ${destination.y+24} ${destination.x} ${destination.y}`} fill="none" stroke="#d8e9f1" strokeWidth="13" strokeLinecap="round"/>
-            <path d={`M ${sx+25} ${sy} C ${sx+62} ${sy-30} ${destination.x-52} ${destination.y+24} ${destination.x} ${destination.y}`} fill="none" stroke={colors[family]} strokeWidth="7" strokeLinecap="round"/>
+            <path d={path} fill="none" stroke={family==="white"?"#263c49":"#d2e5ee"} strokeWidth="12" strokeLinecap="round"/>
+            <path d={path} fill="none" stroke={colors[family]} strokeWidth="7" strokeLinecap="round"/>
           </>}
-          <WireConnector x={sx} y={sy} splice selected={Boolean(selected&&attached[selected]===`splice:${sp.id}`)}/>
-          <title>{sp.members.length} conductors joined{sp.pigtailTerminal?` with pigtail to ${sp.pigtailTerminal}`:""}</title>
+          <WireConnector x={sx} y={sy} upright splice selected={Boolean(selected&&attached[selected]===`splice:${sp.id}`)}/>
+          <title>{sp.members.length} separate conductors enter connector from below{sp.pigtailTerminal?` · pigtail to ${sp.pigtailTerminal}`:""}</title>
         </g>;
       })}
       {view==="rear"&&terms.map(t=>{const pt=points[t.id];if(!pt)return null;const isSplice=t.id.includes("splice");return <g key={t.id} onClick={()=>choose(t.id)} style={{cursor:"pointer"}}>

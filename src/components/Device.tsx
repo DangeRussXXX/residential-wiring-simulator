@@ -74,7 +74,7 @@ export default function Device({ device, wireMode, selectedTerminal, selected, o
     <div style={{position:"relative",zIndex:1,filter:"drop-shadow(1px 3px 2px #0005)"}}><DeviceFace device={device}/></div>
     <div style={{position:"absolute",top:130,left:-8,width:166,textAlign:"center",fontSize:12,fontWeight:700,color:"#17212c",textShadow:"0 1px #ffffff",pointerEvents:"none"}}>{device.name}</div>
     <button type="button" aria-label={`Start cable from ${device.name}`} title="Wire Tool: select cable source"
-      onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onCableStart(device.id)}}
+      onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();if(wireMode && !cableSource) onCableStart(device.id); else if(wireMode) onCableDestination(device.id); else onCableStart(device.id)}}
       style={{position:"absolute",left:-9,top:61,width:20,height:20,padding:0,borderRadius:"50%",
         border:"2px solid #173b4d",background:cableSource?"#00e6ff":"#a2a8ad",
         boxShadow:cableSource?"0 0 0 4px #00e6ff55":"none",zIndex:30,cursor:"crosshair"}}/>

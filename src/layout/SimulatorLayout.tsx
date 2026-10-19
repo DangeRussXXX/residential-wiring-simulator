@@ -1,6 +1,5 @@
 import WholeHouseBlueprint from "../simulator/WholeHouseBlueprint";
 import WallCircuitInspector from "../simulator/WallCircuitInspector";
-import EndToEndCircuitLab from "../simulator/EndToEndCircuitLab";
 import ElectricalServiceWorkspace from "../simulator/ElectricalServiceWorkspace";
 
 // Residential Wiring Simulator v2.5
@@ -63,7 +62,6 @@ export default function SimulatorLayout() {
   const [showPanelControls,setShowPanelControls]=useState(false);
   const [showProperties,setShowProperties]=useState(false);
   const [showInspection,setShowInspection]=useState(false);
-  const [showWiring,setShowWiring]=useState(true);
   const [showBlueprint, setShowBlueprint] = useState(false);
   const [showElectricalService, setShowElectricalService] = useState(false);
   const [activeWall, setActiveWall] = useState<WallSide | null>(null);
@@ -791,16 +789,6 @@ export default function SimulatorLayout() {
 
             {project && !showService && !showBlueprint && activeWall && project.activeAreaId && (
               <>
-                <details open={showWiring} onToggle={e=>setShowWiring(e.currentTarget.open)}
-                  style={{border:"1px solid #346b85",borderRadius:7,marginTop:8,padding:7}}>
-                  <summary style={{cursor:"pointer",color:"#a2eaff",fontWeight:700}}>Room Wiring & Home Runs · Show/Hide</summary>
-                <EndToEndCircuitLab
-                  project={project}
-                  onChange={changeProject}
-                  location={{areaId:project.activeAreaId,wall:activeWall,devices}}
-                  selectedDeviceId={selectedDevice?.id}
-                />
-                </details>
                 <details open={showInspection} onToggle={e=>setShowInspection(e.currentTarget.open)}
                   style={{border:"1px solid #346b85",borderRadius:7,marginTop:8,padding:7}}>
                   <summary style={{cursor:"pointer",color:"#a2eaff",fontWeight:700}}>Wall Circuit Inspector · Show/Hide</summary>

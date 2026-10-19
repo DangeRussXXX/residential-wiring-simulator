@@ -35,7 +35,7 @@ import {
 import Device from "../components/Device";
 import type { ServiceProject } from "./projectWorkflow";
 import { createPortal } from "react-dom";
-import CableWiringPanel, { cableKinds, type CableKind, type CableRecord } from "./CableWiringPanel";
+import CableWiringPanel, { PANEL_SOURCE_ID, cableKinds, type CableKind, type CableRecord } from "./CableWiringPanel";
 
 import type {
   ElectricalDevice,
@@ -167,15 +167,7 @@ function Workspace(
   ] = useState(false);
 
 
-  const [routeEdit, setRouteEdit] = useState(false);
-  const [activeHomeRun,setActiveHomeRun] = useState<string>("");
-  const [homeRunRoutes, setHomeRunRoutes] = useState<Record<string, {entryX:number;points:{x:number;y:number}[]}>>(() => {
-    try { return JSON.parse(localStorage.getItem(`rws-home-run-routes:${workspaceScope}`) || "{}"); }
-    catch { return {}; }
-  });
-  useEffect(() => {
-    try { localStorage.setItem(`rws-home-run-routes:${workspaceScope}`, JSON.stringify(homeRunRoutes)); } catch {}
-  }, [homeRunRoutes, workspaceScope]);
+  void liveProject; // legacy records remain stored but no longer draw pre-connected wires
   const heightToY = (height:number) => 1150 - height * 8 - 45;
   const [cables,setCables] = useState<CableRecord[]>(()=>{
     try {return JSON.parse(localStorage.getItem(`rws-cables-v1:${workspaceScope}`)||"[]");}catch{return [];}
@@ -1758,9 +1750,13 @@ function Workspace(
           <details open style={{border:"1px solid #346b85",borderRadius:7,padding:8,marginBottom:8}}>
             <summary style={{cursor:"pointer",fontWeight:700,color:"#8ee7ff"}}>New Wire Tool · Cable Wiring</summary>
             <div style={{paddingTop:8,display:"flex",flexDirection:"column",gap:8}}>
-              <div>Click the single connection dot on a device to start a cable.</div>
+              <div>Click a device's connection dot, or start a home run from Panel P1.</div>
+              {!cableSource && <button type="button" onClick={()=>{setCableSource(PANEL_SOURCE_ID);setSelectedCableId(null);setWireMode(true);}}
+                style={{padding:8,background:"#145774",color:"white",border:"1px solid #389bc1",borderRadius:5}}>
+                + Start Home Run from Panel P1
+              </button>}
               {cableSource && <>
-                <div style={{color:"#8fe9ff"}}>Starting device: {devices.find(d=>d.id===cableSource)?.name}</div>
+                <div style={{color:"#8fe9ff"}}>Starting device: {cableSource===PANEL_SOURCE_ID?"Panel P1":devices.find(d=>d.id===cableSource)?.name}</div>
                 <label>Cable type
                   <select aria-label="Cable type" value={cableType} onChange={e=>setCableType(e.target.value as CableKind)}
                     style={{width:"100%",padding:8,background:"#173d50",color:"white"}}>
@@ -1774,7 +1770,7 @@ function Workspace(
                 <select aria-label="Choose cable" value={selectedCableId??""} onChange={e=>setSelectedCableId(e.target.value||null)}
                   style={{width:"100%",padding:8,background:"#173d50",color:"white"}}>
                   <option value="">Select cable to wire</option>
-                  {cables.map(c=><option key={c.id} value={c.id}>{c.type} · {devices.find(d=>d.id===c.from)?.name||"Missing"} → {devices.find(d=>d.id===c.to)?.name||"Missing"}</option>)}
+                  {cables.map(c=><option key={c.id} value={c.id}>{c.type} · {c.from===PANEL_SOURCE_ID?"Panel P1":devices.find(d=>d.id===c.from)?.name||"Missing"} → {devices.find(d=>d.id===c.to)?.name||"Missing"}</option>)}
                 </select>
               </label>}
               {selectedCable && <CableWiringPanel key={selectedCable.id} cable={selectedCable} devices={devices}
@@ -1783,31 +1779,6 @@ function Workspace(
                   if(!window.confirm("Remove this cable and its conductor terminations?"))return;
                   setCables(prev=>prev.filter(c=>c.id!==selectedCable.id));setSelectedCableId(null);
                 }}/>}
-            </div>
-          </details>
-          <details style={{border:"1px solid #346b85",borderRadius:7,padding:8,marginBottom:8}}>
-            <summary style={{cursor:"pointer",fontWeight:700,color:"#8ee7ff"}}>Home-Run Routing · Show/Hide</summary>
-            <div style={{display:"flex",flexDirection:"column",gap:8,paddingTop:8}}>
-                      {liveProject && liveAreaId && liveWall && (liveProject.endToEndCircuits??[]).filter(c=>c.areaId===liveAreaId&&c.wall===liveWall).length>0 && (
-          <select aria-label="Home run to route" title="Select which independent home run to route"
-            value={activeHomeRun}
-            onChange={e=>setActiveHomeRun(e.target.value)}
-            style={{background:"#e7f6ff",color:"#133c52",maxWidth:200}}>
-            <option value="">Choose home run</option>
-            {(liveProject.endToEndCircuits??[]).filter(c=>c.areaId===liveAreaId&&c.wall===liveWall).map(c=>
-              <option key={`${c.slot}:${c.receptacleId}`} value={`${c.slot}:${c.receptacleId}`}>
-                Circuit #{c.slot} → {devices.find(d=>d.id===c.receptacleId)?.name??"Device"}
-              </option>)}
-          </select>
-        )}
-        <button type="button" onClick={()=>setRouteEdit(v=>!v)}
-          style={{background:routeEdit?"#9bd8ef":"#edf4f8",color:"#193747",border:"1px solid #478aa8",borderRadius:5,padding:"5px 8px"}}>
-          {routeEdit?"✓ Finish Home-Run Route":"↪ Route Home Run"}
-        </button>
-        {routeEdit && <span style={{fontSize:12,color:"#17394a",background:"#eaf5f9",padding:6}}>
-          Click wall to add cable bends for selected home run. Click a bend to remove it.
-        </span>}
-
             </div>
           </details>
           <details style={{border:"1px solid #346b85",borderRadius:7,padding:8,marginBottom:8}}>
@@ -1945,20 +1916,7 @@ function Workspace(
             backgroundRepeat: "repeat-x,no-repeat",
             backgroundColor: "#d6d2c8"
           }}
-          onClick={e=>{
-            if(!routeEdit || !liveProject || !liveAreaId || !liveWall) return;
-            if ((e.target as HTMLElement).closest(".device-component,button,input")) return;
-            const c=(liveProject.endToEndCircuits??[]).find(c=>c.areaId===liveAreaId && c.wall===liveWall && `${c.slot}:${c.receptacleId}`===activeHomeRun);
-            if(!c) {window.alert("Choose the home run to route first.");return;}
-            const key=`${c.slot}:${c.receptacleId}`;
-            const rect=e.currentTarget.getBoundingClientRect();
-            const x=e.clientX-rect.left+e.currentTarget.parentElement!.scrollLeft;
-            const y=e.clientY-rect.top+e.currentTarget.parentElement!.scrollTop;
-            setHomeRunRoutes(prev=>{
-              const old=prev[key]??{entryX:x,points:[]};
-              return {...prev,[key]:{...old,entryX:old.points.length?old.entryX:x,points:[...old.points,{x,y}]}};
-            });
-          }}
+
 
         >
 
@@ -2072,9 +2030,9 @@ function Workspace(
             style={{position:"absolute",inset:0,pointerEvents:"none",zIndex:5}}>
             {cables.map(c=>{
               const a=devices.find(d=>d.id===c.from),b=devices.find(d=>d.id===c.to);
-              if(!a||!b)return null;
-              const x1=a.x+75,y1=a.y+70,x2=b.x+75,y2=b.y+70;
-              const middle=Math.min(y1,y2)-90;
+              if((!a&&c.from!==PANEL_SOURCE_ID)||!b)return null;
+              const x1=a?a.x+75:26,y1=a?a.y+70:0,x2=b.x+75,y2=b.y+70;
+              const middle=c.from===PANEL_SOURCE_ID?Math.max(24,y2-115):Math.max(22,Math.min(y1,y2)-90);
               const d=`M ${x1} ${y1} L ${x1} ${middle} L ${x2} ${middle} L ${x2} ${y2}`;
               return <g key={c.id}>
                 <path d={d} fill="none" stroke="#6c7b84" strokeWidth="16" strokeLinejoin="round"/>
@@ -2157,58 +2115,8 @@ function Workspace(
             )
           }
 
-          {/* Live home-run conductor overlay: reflects saved right-sidebar terminations.
-              Drawn independently of user-authored workspace wires. */}
-          {liveProject && liveAreaId && liveWall && (
-            <svg width="2000" height="1200" viewBox="0 0 2000 1200"
-              aria-label="Live room home-run terminations"
-              style={{position:"absolute",inset:0,pointerEvents:"none",zIndex:20,overflow:"visible"}}>
-              {(liveProject.endToEndCircuits ?? [])
-                .filter(c => c.areaId === liveAreaId && c.wall === liveWall)
-                .map(c => {
-                  const device = devices.find(d => d.id === c.receptacleId);
-                  const isReceptacle = !!device && /receptacle/i.test(device.type);
-                  if (!device) return null;
-                  const cx = device.x + 75;
-                  const boxTop = device.y + 20;
-                  const cableX = cx - 15;
-                  const entryY = Math.max(0, boxTop - 24);
-                  const routeKey=`${c.slot}:${c.receptacleId}`;
-                  const route=homeRunRoutes[routeKey];
-                  const entryX=route?.entryX??cableX;
-                  const pathPoints=[{x:entryX,y:0},...(route?.points??[]),{x:cableX,y:entryY}];
-                  const cablePath=pathPoints.map((p,i)=>`${i?"L":"M"} ${p.x} ${p.y}`).join(" ");
-                  const ends = [
-                    {key:"hot",terminal:c.roomHot,color:"#171c23",outline:"#c8d4dc",sourceX:cableX-6},
-                    {key:"neutral",terminal:c.roomNeutral,color:"#f7f9fb",outline:"#526678",sourceX:cableX},
-                    {key:"ground",terminal:c.roomGround,color:"#bd7842",outline:"#5d361f",sourceX:cableX+6}
-                  ];
-                  const target = (terminal:string) => terminal === "brass"
-                    ? {x:cx+55,y:device.y+55}
-                    : terminal === "silver" ? {x:cx-55,y:device.y+55}
-                    : {x:cx-42,y:device.y+105};
-                  return <g key={`${c.slot}:${c.receptacleId}`}>
-                    <path d={cablePath}
-                      stroke="#727e83" strokeWidth="20" fill="none" strokeLinejoin="round"/>
-                    <path d={cablePath}
-                      stroke="#f2f0e8" strokeWidth="15" fill="none" strokeLinejoin="round"/>
-                    {routeEdit && (route?.points??[]).map((p,i)=><circle key={i} cx={p.x} cy={p.y} r="10"
-                      fill="#ffb15c" stroke="#1b4055" strokeWidth="3" style={{pointerEvents:"all",cursor:"pointer"}}
-                      onClick={e=>{e.stopPropagation();setHomeRunRoutes(prev=>({...prev,[routeKey]:{...route!,points:route!.points.filter((_,j)=>j!==i)}}));}}/>)}
-                    {ends.filter(()=>isReceptacle).map(w=>{
-                      const t=w.terminal?target(w.terminal):{x:w.sourceX+(w.key==="hot"?32:w.key==="neutral"?0:-32),y:entryY+58};
-                      const d=`M ${w.sourceX} ${entryY} C ${w.sourceX} ${entryY+32}, ${t.x} ${t.y-35}, ${t.x} ${t.y}`;
-                      return <g key={w.key}>
-                        <path d={d} fill="none" stroke={w.outline} strokeWidth="9" strokeLinecap="round"/>
-                        <path d={d} fill="none" stroke={w.color} strokeWidth="6" strokeLinecap="round"/>
-                        <circle cx={t.x} cy={t.y} r="8" fill={w.color} stroke={w.outline} strokeWidth="2"/>
-
-                      </g>;
-                    })}
-                  </g>;
-                })}
-            </svg>
-          )}
+          {/* Legacy home-run drawing intentionally retired. Old saved data remains untouched.
+              All new visible cables and conductor terminations use the unified cable records. */}
 
         </div>
 

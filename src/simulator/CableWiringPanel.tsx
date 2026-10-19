@@ -3,6 +3,7 @@ import type { ElectricalDevice } from "../electrical/types";
 
 export type CableKind = "14/2 NM-B"|"14/3 NM-B"|"12/2 NM-B"|"12/3 NM-B"|"14/2 MC"|"12/2 MC"|"12/3 MC";
 export type CableEnd = "from"|"to";
+export const PANEL_SOURCE_ID="__panel_p1__";
 export type CableRecord = {
   id:string; from:string; to:string; type:CableKind;
   ends:Record<CableEnd,Record<string,string|null>>;
@@ -50,8 +51,13 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove}:{
 }) {
   const [end,setEnd]=useState<CableEnd>("from");
   const [selected,setSelected]=useState<string|null>(null);
-  const dev=devices.find(d=>d.id===cable[end]);
-  const terms=deviceTerminals(dev);
+  const dev=devices.find(d=>d.id===cable[end]) ??
+    (cable[end]===PANEL_SOURCE_ID ? ({id:PANEL_SOURCE_ID,name:"Panel P1",type:"Distribution Panel",symbol:"breaker-panel"} as ElectricalDevice):undefined);
+  const terms=cable[end]===PANEL_SOURCE_ID?[
+    {id:"breaker-hot",label:"Breaker load terminal",color:"#c58c32"},
+    {id:"neutral-bar",label:"Neutral bar",color:"#e5e8ea"},
+    {id:"ground-bar",label:"Equipment-ground bar",color:"#3aaa76"}
+  ]:deviceTerminals(dev);
   const colorsList=conductors(cable.type);
   const attached=cable.ends[end]||{};
   const choose=(terminal:string)=>{
@@ -61,9 +67,9 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove}:{
   };
   return <section style={panel}>
     <div style={{fontWeight:700,color:"#83e5ff",marginBottom:8}}>🔌 Cable Conductor Wiring</div>
-    <div style={{fontSize:11,marginBottom:8}}>{cable.type} · {devices.find(d=>d.id===cable.from)?.name||"Missing"} → {devices.find(d=>d.id===cable.to)?.name||"Missing"}</div>
+    <div style={{fontSize:11,marginBottom:8}}>{cable.type} · {cable.from===PANEL_SOURCE_ID?"Panel P1":devices.find(d=>d.id===cable.from)?.name||"Missing"} → {devices.find(d=>d.id===cable.to)?.name||"Missing"}</div>
     <div style={{display:"flex",gap:6,marginBottom:8}}>
-      {(["from","to"] as CableEnd[]).map(e=><button key={e} type="button" onClick={()=>{setEnd(e);setSelected(null)}} style={{flex:1,padding:7,border:"1px solid #368bab",background:end===e?"#167193":"#183d51",color:"white",borderRadius:5}}>{e==="from"?"Starting device":"Destination device"}</button>)}
+      {(["from","to"] as CableEnd[]).map(e=><button key={e} type="button" onClick={()=>{setEnd(e);setSelected(null)}} style={{flex:1,padding:7,border:"1px solid #368bab",background:end===e?"#167193":"#183d51",color:"white",borderRadius:5}}>{e==="from"?"Starting device / panel":"Destination device"}</button>)}
     </div>
     <div style={{marginBottom:7,fontWeight:700}}>{dev?.name||"Device missing"}</div>
     <svg viewBox="0 0 390 235" width="100%" aria-label="Cable conductors and device terminals" style={{background:"#0b1b28",border:"1px solid #36687c",borderRadius:6}}>

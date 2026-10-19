@@ -190,6 +190,16 @@ function Workspace(
   useEffect(()=>{
     try {localStorage.setItem(`rws-cables-v1:${workspaceScope}`,JSON.stringify(cables));}catch{}
   },[workspaceScope,cables]);
+  // The project is the canonical source shared with the distribution panel.
+  // Synchronize external project edits into this wall without writing them back.
+  useEffect(()=>{
+    if(!liveProject?.wallCables || !liveAreaId || !liveWall)return;
+    const shared=liveProject.wallCables.filter(c=>c.areaId===liveAreaId&&c.wall===liveWall);
+    setCables(previous=>{
+      if(JSON.stringify(previous)===JSON.stringify(shared))return previous;
+      return shared;
+    });
+  },[liveProject?.wallCables,liveAreaId,liveWall]);
   // One-time migration of existing per-wall cable records into the project so the
   // distribution panel can see them without recreating any user connections.
   useEffect(()=>{
@@ -271,8 +281,7 @@ function Workspace(
   const [snapToStuds, setSnapToStuds] = useState(true);
 
   const [
-    wireColor,
-    setWireColor
+    wireColor
   ] = useState("black");
 
 
@@ -437,7 +446,7 @@ function Workspace(
       breakerId:
         undefined,
 
-      terminals,
+      terminals: terminals.map(t=>({...t,name:t.label,type:({LINE:"hot",HOT:"hot",LOAD:"load",NEUTRAL:"neutral",GROUND:"ground",CONTROL:"control"} as const)[t.type]})),
 
       load: {
         watts:
@@ -1832,7 +1841,13 @@ function Workspace(
                   {cables.map(c=><option key={c.id} value={c.id}>{c.type} · {c.from===PANEL_SOURCE_ID?"Panel P1":devices.find(d=>d.id===c.from)?.name||"Missing"} → {devices.find(d=>d.id===c.to)?.name||"Missing"}</option>)}
                 </select>
               </label>}
-              {selectedCable && <CableWiringPanel key={selectedCable.id} cable={selectedCable} devices={devices}
+              {selectedCable && <div style={{padding:"9px 11px",background:"#123d50",border:"1px solid #327d97",borderRadius:6,fontSize:16}}>
+                <strong>Selected cable · {selectedCable.type}</strong>
+                <div>Panel/start: {Object.values(selectedCable.ends?.from??{}).filter(Boolean).length}/{selectedCable.type.includes("/3")?4:3} conductors assigned</div>
+                <div>Device/end: {Object.values(selectedCable.ends?.to??{}).filter(Boolean).length}/{selectedCable.type.includes("/3")?4:3} conductors assigned</div>
+                <div style={{color:"#a9d9ea"}}>Connections are saved per cable end and shared with Panel P1.</div>
+              </div>}
+              {selectedCable && <CableWiringPanel key={selectedCable.id} initialEnd="to" cable={selectedCable} devices={devices}
                 allCables={cables} onChangeCables={saveCables}
                 onChange={next=>saveCables(cables.map(c=>c.id===next.id?next:c))}
                 onRemove={()=>{

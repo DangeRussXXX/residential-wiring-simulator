@@ -57,7 +57,7 @@ export default function EndToEndCircuitLab({project,onChange,location,selectedDe
   const [selectedWire,setSelectedWire]=useState<"black"|"white"|"bare"|null>(null);
   const [drag,setDrag]=useState<{wire:"black"|"white"|"bare";x:number;y:number}|null>(null);
   const diagramRef=useRef<SVGSVGElement|null>(null);
-  function position(e:React.PointerEvent<SVGSVGElement>) {
+  function position(e:React.PointerEvent<SVGElement>) {
     const r=diagramRef.current?.getBoundingClientRect();
     return r?{x:(e.clientX-r.left)*540/r.width,y:(e.clientY-r.top)*380/r.height}:{x:0,y:0};
   }
@@ -216,7 +216,7 @@ export default function EndToEndCircuitLab({project,onChange,location,selectedDe
               </g>}
             </g>;
           })}
-          {terminals.map(t=><g key={t.id} title={`${t.id} screw`} onClick={()=>{if(selectedWire)connect(selectedWire,t.id);}} style={{cursor:"pointer"}}>
+          {terminals.map(t=><g key={t.id} onClick={()=>{if(selectedWire)connect(selectedWire,t.id);}} style={{cursor:"pointer"}}>
             <circle cx={t.x} cy={t.y} r="21" fill="#203646" stroke={t.color} strokeWidth="4"/>
             <circle cx={t.x} cy={t.y} r="12" fill={t.color} stroke="#46525a" strokeWidth="1"/>
             <path d={`M ${t.x-7} ${t.y} H ${t.x+7}`} stroke="#39414b" strokeWidth="3"/>

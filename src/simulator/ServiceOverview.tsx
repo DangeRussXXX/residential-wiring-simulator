@@ -186,7 +186,13 @@ export default function ServiceOverview({ project, onChange, onOpenDestination }
             {unifiedHomeRuns.map(c=><option key={c.id} value={c.id}>Breaker #{c.breakerSlot??"?"} → {c.toName??"Device"} · {c.type}</option>)}
           </select>
         </label>
-        {activeUnifiedCable&&<CableWiringPanel key={activeUnifiedCable.id} cable={activeUnifiedCable} devices={[]}
+        {activeUnifiedCable&&<div style={{background:"#143747",border:"1px solid #327b98",padding:10,borderRadius:6,fontSize:16,marginBottom:10}}>
+          <strong>{activeUnifiedCable.type} · Breaker #{activeUnifiedCable.breakerSlot??"?"} → {activeUnifiedCable.toName??"Device"}</strong>
+          <div>Panel end: {Object.values(activeUnifiedCable.ends?.from??{}).filter(Boolean).length} conductor connections</div>
+          <div>Device end: {Object.values(activeUnifiedCable.ends?.to??{}).filter(Boolean).length} conductor connections</div>
+          <div style={{color:"#add7e7"}}>Edit either end below. Saved connections appear in both views.</div>
+        </div>}
+        {activeUnifiedCable&&<CableWiringPanel key={activeUnifiedCable.id} initialEnd="from" cable={activeUnifiedCable} devices={[]}
           allCables={project.wallCables??[]} onChangeCables={next=>onChange({...project,wallCables:next})}
           onChange={next=>onChange({...project,wallCables:(project.wallCables??[]).map(c=>c.id===next.id?next:c)})}
           onRemove={()=>{

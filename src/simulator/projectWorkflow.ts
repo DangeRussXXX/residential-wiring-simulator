@@ -2,8 +2,11 @@ export type ServiceRoute = "UNDERGROUND" | "OVERHEAD";
 export type DisconnectArrangement = "SEPARATE" | "MAIN_BREAKER";
 export type ProjectArea = { id: string; name: string; buildingId: string; kind: "ROOM" | "AREA" };
 export type ProjectBuilding = { id: string; name: string; kind: "MAIN" | "DETACHED"; panelId?: string };
+export type CircuitAssignment = { slot: number; name: string; areaIds: string[] };
 export type ServiceProject = {
   version: 1;
+  distributionPanel?: import("../electrical/breakerPanel").BreakerPanel;
+  circuitAssignments?: CircuitAssignment[];
   id: string;
   name: string;
   service: { route: ServiceRoute; amperage: number; voltage: "120/240"; arrangement: DisconnectArrangement; mainDisconnectClosed: boolean; meterLocation: string };

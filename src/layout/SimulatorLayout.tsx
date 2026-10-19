@@ -648,7 +648,7 @@ export default function SimulatorLayout() {
           </div>)}
           <button onClick={addBuilding} style={{ width: "100%" }}>+ Detached Building</button>
           <button onClick={() => { if (window.confirm("Start a new service project? The current project navigation will be replaced.")) { clearServiceProject(); clearWorkspaceScopes(); setProject(null); setActiveWall(null); } }} style={{ width: "100%", marginTop: 24, color: "#ffc3ae" }}>New Service Project</button>
-          <p style={{ fontSize: 11, color: "#9caebb" }}>Every wall has independent devices and connections. Service and rooms remain separate until feeder integration.</p>
+          <p style={{ fontSize: 11, color: "#9caebb" }}>Each wall has its own workspace. Breakers and circuit names are managed under Service & Panel; physical feeder and circuit wiring is coming next.</p>
         </aside>}
 
         {/* =============================== */}
@@ -657,6 +657,7 @@ export default function SimulatorLayout() {
 
         <div
           style={{
+            display: showService || !activeWall ? "none" : "block",
             width:
               `${componentWidth}px`,
 
@@ -692,6 +693,7 @@ export default function SimulatorLayout() {
             startComponentResize
           }
           style={{
+            display: showService || !activeWall ? "none" : "block",
             width:
               "10px",
 
@@ -748,8 +750,7 @@ export default function SimulatorLayout() {
             minWidth:
               "360px",
 
-            display:
-              "flex",
+            display: showService || !activeWall ? "none" : "flex",
 
             background:
               "#252526",

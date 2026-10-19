@@ -1,1147 +1,854 @@
-// Residential Wiring Simulator v3.1
+// Residential Wiring Simulator v2.6
 // Component Library
 //
-// BREAKER DRAG WORKFLOW:
-//
-// Component Library
-//      ↓
-// create Breaker
-//      ↓
-// put JSON into DataTransfer
-//      ↓
-// put breaker into shared window drag store/event
-//      ↓
-// BreakerPanelLayout captures breaker synchronously
-//      ↓
-// panel highlights valid slots
-//      ↓
-// drop
-//      ↓
-// breaker becomes pending
-//      ↓
-// configure
-//      ↓
-// INSTALL BREAKER
-//
-// IMPORTANT:
-// DROP DOES NOT INSTALL.
-// INSTALL BREAKER performs the actual installation.
+// Handles:
+// - component browsing
+// - search
+// - category filtering
+// - click placement
+// - drag placement preparation
+
 
 import {
   useState
 } from "react";
 
-import type {
-  DragEvent
-} from "react";
 
 import type {
   WorkspaceHandle
 } from "../simulator/Workspace";
 
+
 import {
   componentCatalog
 } from "../electrical/componentCatalog";
+
 
 import {
   createLibraryBreaker
 } from "../electrical/breaker";
 
-
-// ============================================================
-// SHARED BREAKER DRAG EVENTS
-// ============================================================
-
-export const BREAKER_DRAG_EVENT =
-  "residential-wiring-breaker-drag";
-
-export const BREAKER_DRAG_END_EVENT =
-  "residential-wiring-breaker-drag-end";
-
-
-// ============================================================
-// SHARED DRAG STORE
-// ============================================================
-//
-// This is intentionally outside React.
-//
-// Native browser dragging is not synchronized with React state
-// updates reliably enough for dragenter/dragover.
-//
-// BreakerPanelLayout reads this synchronously through the event.
-// ============================================================
-
-let activeDraggedBreaker:
-  ReturnType<typeof createLibraryBreaker> | null = null;
-
-
-// ============================================================
-// PUBLIC HELPERS
-// ============================================================
-
-export function getActiveDraggedBreaker() {
-  return activeDraggedBreaker;
-}
-
-export function clearActiveDraggedBreaker(): void {
-  activeDraggedBreaker = null;
-}
-
-
-// ============================================================
-// PROPS
-// ============================================================
-
 interface Props {
 
   workspaceRef:
-    React.RefObject<WorkspaceHandle | null>;
+  React.RefObject<WorkspaceHandle | null>;
 
 }
 
 
-// ============================================================
-// COMPONENT ITEM
-// ============================================================
+
 
 type ComponentItem = {
 
-  name: string;
+  name:string;
 
-  type: string;
+  type:string;
 
-  category: string;
+  category:string;
 
-  description: string;
+  description:string;
 
-  symbol: string;
+  symbol:string;
 
-  voltage?: number;
+  voltage?:number;
 
-  watts?: number;
+  watts?:number;
 
-  amps?: number;
+  amps?:number;
 
-  isBreaker: boolean;
+  isBreaker?:boolean;
 
 };
 
 
-// ============================================================
-// COMPONENT DESCRIPTIONS
-// ============================================================
 
-function getComponentDescription(
-  name: string
-): string {
 
-  switch (name) {
 
-    case "Service Entrance":
-      return "Main electrical service connection.";
+const components:ComponentItem[] =
 
-    case "Breaker Panel":
-      return "Residential breaker distribution panel.";
+componentCatalog.filter(c => c.category !== "Breakers" && !["Service Entrance", "Breaker Panel", "Sub Panel"].includes(c.name)).map(c=>({
 
-    case "Sub Panel":
-      return "Secondary breaker distribution panel.";
+  name:c.name,
 
-    case "15A Breaker":
-      return "15 amp single-pole circuit breaker.";
+  type:c.name,
 
-    case "20A Breaker":
-      return "20 amp single-pole circuit breaker.";
+  category:c.category,
 
-    case "30A Double Pole Breaker":
-      return "30 amp two-pole 240V circuit breaker.";
+  description:c.description,
 
-    case "Receptacle":
-      return "Standard 120V electrical receptacle.";
+  symbol:c.symbol,
 
-    case "GFCI Receptacle":
-      return "Ground-fault protected receptacle.";
+  voltage:c.electrical?.voltage,
 
-    case "Single Pole Switch":
-      return "Standard single-pole light switch.";
+  watts:c.electrical?.watts,
 
-    case "Three Way Switch":
-      return "Three-way lighting control switch.";
+  amps:c.electrical?.amps,
 
-    case "Light":
-      return "Standard 120V lighting load.";
+  isBreaker:
 
-    case "LED Light":
-      return "Low-power LED lighting load.";
+  c.category==="Breakers"
 
-    case "Motor":
-      return "120V motor load.";
+}));
 
-    case "Water Heater":
-      return "240V electric water heater.";
 
-    case "Electric Range":
-      return "240V electric cooking appliance.";
 
-    case "Dryer":
-      return "240V electric clothes dryer.";
 
-    case "HVAC":
-      return "240V HVAC equipment load.";
 
-    case "Thermostat":
-      return "Low-voltage HVAC control.";
+const categories = [
 
-    case "Junction Box":
-      return "Electrical junction and wiring point.";
+  ...new Set(
+    componentCatalog.filter(c => c.category !== "Breakers" && !["Service Entrance", "Breaker Panel", "Sub Panel"].includes(c.name)).map(c=>c.category)
+  )
 
-    default:
-      return "Electrical component.";
+];
 
-  }
+
+
+
+
+
+
+
+export default function ComponentLibrary({
+
+workspaceRef
+
+}:Props){
+
+
+
+
+
+const [search,setSearch] =
+
+useState("");
+
+
+
+
+const [openCategories,setOpenCategories] =
+
+useState<string[]>(categories);
+
+
+
+
+
+
+
+
+
+function add(type:string){
+
+workspaceRef.current?.addDevice(type);
 
 }
 
 
-// ============================================================
-// BUILD COMPONENT LIST
-// ============================================================
 
-const components: ComponentItem[] =
-  componentCatalog.map(
-    component => ({
 
-      name:
-        component.name,
 
-      type:
-        component.name,
 
-      category:
-        component.category,
 
-      description:
-        getComponentDescription(
-          component.name
-        ),
 
-      symbol:
-        component.symbol,
 
-      voltage:
-        component.electrical?.voltage,
+function toggleCategory(
 
-      watts:
-        component.electrical?.watts,
+category:string
 
-      amps:
-        component.electrical?.amps,
+){
 
-      isBreaker:
-        component.type === "Breaker"
+setOpenCategories(prev=>
 
-    })
-  );
+prev.includes(category)
 
+?
 
-// ============================================================
-// CATEGORIES
-// ============================================================
+prev.filter(c=>c!==category)
 
-const categories: string[] = [
-  ...new Set(
-    componentCatalog.map(
-      component =>
-        component.category
-    )
-  )
-];
+:
 
+[
 
-// ============================================================
-// COMPONENT LIBRARY
-// ============================================================
+...prev,
 
-export default function ComponentLibrary({
-  workspaceRef
-}: Props) {
+category
 
+]
 
-  // ==========================================================
-  // SEARCH
-  // ==========================================================
+);
 
-  const [
-    search,
-    setSearch
-  ] = useState("");
+}
 
 
-  // ==========================================================
-  // OPEN CATEGORIES
-  // ==========================================================
 
-  const [
-    openCategories,
-    setOpenCategories
-  ] = useState<string[]>(
-    categories
-  );
 
 
-  // ==========================================================
-  // ADD NORMAL COMPONENT
-  // ==========================================================
 
-  function add(
-    type: string
-  ): void {
 
-    workspaceRef.current?.addDevice(
-      type
-    );
 
-  }
 
+function dragStart(
 
-  // ==========================================================
-  // TOGGLE CATEGORY
-  // ==========================================================
+e:React.DragEvent,
 
-  function toggleCategory(
-    category: string
-  ): void {
+item:ComponentItem
 
-    setOpenCategories(
-      previous => {
+){
 
-        if (
-          previous.includes(category)
-        ) {
 
-          return previous.filter(
-            item =>
-              item !== category
-          );
 
-        }
+// BREAKER DRAG
 
-        return [
-          ...previous,
-          category
-        ];
+if(item.isBreaker){
 
-      }
-    );
 
-  }
+let breaker;
 
 
-  // ==========================================================
-  // CREATE BREAKER
-  // ==========================================================
 
-  function createBreakerFromItem(
-    item: ComponentItem
-  ) {
+if(item.name.includes("15A")){
 
-    if (
-      item.name === "15A Breaker"
-    ) {
 
-      return createLibraryBreaker(
-        15,
-        1,
-        "STANDARD"
-      );
+breaker=createLibraryBreaker(
 
-    }
+15,
 
+1,
 
-    if (
-      item.name === "20A Breaker"
-    ) {
+"STANDARD"
 
-      return createLibraryBreaker(
-        20,
-        1,
-        "STANDARD"
-      );
+);
 
-    }
 
+}
 
-    if (
-      item.name === "30A Double Pole Breaker"
-    ) {
+else if(item.name.includes("20A")){
 
-      return createLibraryBreaker(
-        30,
-        2,
-        "STANDARD"
-      );
 
-    }
+breaker=createLibraryBreaker(
 
+20,
 
-    return createLibraryBreaker(
-      item.amps ?? 20,
+1,
 
-      item.name.includes(
-        "Double Pole"
-      )
-        ? 2
-        : 1,
+"STANDARD"
 
-      "STANDARD"
-    );
+);
 
-  }
 
+}
 
-  // ==========================================================
-  // DRAG START
-  // ==========================================================
+else if(item.name.includes("30A")){
 
-  function handleDragStart(
-    event: DragEvent<HTMLDivElement>,
-    item: ComponentItem
-  ): void {
 
-    console.log(
-      "[ComponentLibrary] DRAG START:",
-      item.name
-    );
+breaker=createLibraryBreaker(
 
+30,
 
-    // ========================================================
-    // BREAKER
-    // ========================================================
+2,
 
-    if (
-      item.isBreaker
-    ) {
+"STANDARD"
 
-      const breaker =
-        createBreakerFromItem(
-          item
-        );
+);
 
 
-      console.log(
-        "[ComponentLibrary] CREATED BREAKER:",
-        breaker
-      );
+}
 
+else {
 
-      // ------------------------------------------------------
-      // CRITICAL:
-      // Store synchronously BEFORE dispatching event.
-      // ------------------------------------------------------
 
-      activeDraggedBreaker =
-        breaker;
+breaker=createLibraryBreaker(
 
+50,
 
-      // ------------------------------------------------------
-      // SERIALIZE
-      // ------------------------------------------------------
+2,
 
-      const serialized =
-        JSON.stringify(
-          breaker
-        );
+"STANDARD"
 
+);
 
-      // ------------------------------------------------------
-      // DATA TRANSFER
-      // ------------------------------------------------------
 
-      try {
+}
 
-        event.dataTransfer.clearData();
 
-      }
 
-      catch {
+e.dataTransfer.setData(
 
-        // Firefox may reject clearData in some situations.
+"breaker",
 
-      }
+JSON.stringify(breaker)
 
+);
 
-      event.dataTransfer.setData(
-        "application/json",
-        serialized
-      );
 
 
-      event.dataTransfer.setData(
-        "breaker",
-        serialized
-      );
+return;
 
+}
 
-      event.dataTransfer.setData(
-        "text/plain",
-        serialized
-      );
 
 
-      event.dataTransfer.setData(
-        "componentType",
-        item.type
-      );
 
 
-      event.dataTransfer.effectAllowed =
-        "copy";
 
+// NORMAL DEVICE DRAG
 
-      // ------------------------------------------------------
-      // CUSTOM EVENT
-      // ------------------------------------------------------
 
-      window.dispatchEvent(
-        new CustomEvent(
-          BREAKER_DRAG_EVENT,
-          {
-            detail:
-              breaker
-          }
-        )
-      );
+e.dataTransfer.setData(
 
+"componentType",
 
-      console.log(
-        "[ComponentLibrary] BREAKER EVENT DISPATCHED"
-      );
+item.type
 
+);
 
-      // ------------------------------------------------------
-      // DRAG IMAGE
-      // ------------------------------------------------------
 
-      try {
+}
 
-        const dragImage =
-          document.createElement(
-            "div"
-          );
 
 
-        dragImage.textContent =
-          `${breaker.amperage}A Breaker`;
 
 
-        dragImage.style.position =
-          "absolute";
 
-        dragImage.style.top =
-          "-1000px";
 
-        dragImage.style.left =
-          "-1000px";
 
-        dragImage.style.padding =
-          "8px 12px";
 
-        dragImage.style.background =
-          "#063b2d";
+function getIcon(symbol:string){
 
-        dragImage.style.color =
-          "#00ff99";
 
-        dragImage.style.border =
-          "2px solid #00ff99";
+switch(symbol){
 
-        dragImage.style.borderRadius =
-          "6px";
 
-        dragImage.style.fontWeight =
-          "bold";
+case "breaker-panel":
 
-        dragImage.style.pointerEvents =
-          "none";
+return "⚡";
 
-        document.body.appendChild(
-          dragImage
-        );
 
+case "switch-single":
 
-        event.dataTransfer.setDragImage(
-          dragImage,
-          10,
-          10
-        );
+return "◐";
 
 
-        window.setTimeout(
-          () => {
+case "light-ceiling":
 
-            dragImage.remove();
+return "💡";
 
-          },
-          0
-        );
 
-      }
+case "outlet":
 
-      catch (
-        error
-      ) {
+return "🔌";
 
-        console.warn(
-          "[ComponentLibrary] drag image failed:",
-          error
-        );
 
-      }
+case "gfci":
 
+return "GFCI";
 
-      return;
 
-    }
+case "range":
 
+return "🔥";
 
-    // ========================================================
-    // NORMAL COMPONENT
-    // ========================================================
 
-    activeDraggedBreaker =
-      null;
+case "fan":
 
+return "🌀";
 
-    event.dataTransfer.setData(
-      "componentType",
-      item.type
-    );
 
+case "hvac":
 
-    event.dataTransfer.effectAllowed =
-      "copy";
+return "❄";
 
-  }
 
+default:
 
-  // ==========================================================
-  // DRAG END
-  // ==========================================================
+return "▣";
 
-  function handleDragEnd(): void {
+}
 
-    console.log(
-      "[ComponentLibrary] DRAG END"
-    );
 
+}
 
-    // IMPORTANT:
-    // Do NOT call event.dataTransfer.getData().
-    //
-    // The browser protects the drag data store during dragend
-    // and getData is not reliable there.
 
-    if (
-      activeDraggedBreaker
-    ) {
 
-      console.log(
-        "[ComponentLibrary] CLEARING BREAKER DRAG"
-      );
 
-      activeDraggedBreaker =
-        null;
 
 
-      window.dispatchEvent(
-        new Event(
-          BREAKER_DRAG_END_EVENT
-        )
-      );
 
-    }
 
-  }
 
+return (
 
-  // ==========================================================
-  // ICON
-  // ==========================================================
+<div
 
-  function getIcon(
-    symbol: string
-  ): string {
+style={{
 
-    switch (symbol) {
+padding:"15px",
 
-      case "breaker-panel":
-        return "⚡";
+height:"100%",
 
-      case "switch-single":
-        return "◐";
+overflowY:"auto",
 
-      case "light-ceiling":
-        return "💡";
+overflowX:"hidden",
 
-      case "outlet":
-        return "🔌";
+background:"#252526",
 
-      case "gfci":
-        return "GFCI";
+color:"white"
 
-      case "range":
-        return "🔥";
+}}
 
-      case "fan":
-        return "🌀";
+>
 
-      case "hvac":
-        return "❄";
 
-      default:
-        return symbol || "▣";
 
-    }
 
-  }
 
+<h2
 
-  // ==========================================================
-  // FILTER
-  // ==========================================================
+style={{
 
-  function getFilteredItems(
-    category: string
-  ): ComponentItem[] {
+marginTop:0
 
-    return components.filter(
-      component => {
+}}
 
-        const matchesCategory =
-          component.category ===
-          category;
+>
 
-        const matchesSearch =
-          component.name
-            .toLowerCase()
-            .includes(
-              search.toLowerCase()
-            );
+Components
 
-        return (
-          matchesCategory &&
-          matchesSearch
-        );
+</h2>
 
-      }
-    );
 
-  }
 
 
-  // ==========================================================
-  // RENDER
-  // ==========================================================
 
-  return (
 
-    <div
-      style={{
 
-        padding:
-          "15px",
+<input
 
-        height:
-          "100%",
+placeholder="Search components..."
 
-        overflowY:
-          "auto",
+value={search}
 
-        overflowX:
-          "hidden",
+onChange={e=>
 
-        background:
-          "#252526",
+setSearch(e.target.value)
 
-        color:
-          "white"
+}
 
-      }}
-    >
+style={{
 
-      <h2
-        style={{
-          marginTop: 0
-        }}
-      >
-        Components
-      </h2>
+width:"100%",
 
+padding:"8px",
 
-      <input
-        type="text"
+marginBottom:"15px",
 
-        placeholder="Search components..."
+background:"#1e1e1e",
 
-        value={
-          search
-        }
+border:"1px solid #555",
 
-        onChange={
-          event =>
-            setSearch(
-              event.target.value
-            )
-        }
+color:"white",
 
-        style={{
+borderRadius:"4px"
 
-          width:
-            "100%",
+}}
 
-          boxSizing:
-            "border-box",
+/>
 
-          padding:
-            "8px",
 
-          marginBottom:
-            "15px",
 
-          background:
-            "#1e1e1e",
 
-          border:
-            "1px solid #555",
 
-          color:
-            "white",
 
-          borderRadius:
-            "4px"
 
-        }}
-      />
 
 
-      {categories.map(
-        category => {
+{
 
-          const items =
-            getFilteredItems(
-              category
-            );
+categories.map(category=>{
 
 
-          if (
-            items.length === 0
-          ) {
+const items =
 
-            return null;
+components.filter(c=>
 
-          }
+c.category===category &&
 
+c.name
+.toLowerCase()
+.includes(
+search.toLowerCase()
+)
 
-          const isOpen =
-            openCategories.includes(
-              category
-            );
+);
 
 
-          return (
 
-            <div
-              key={
-                category
-              }
 
-              style={{
-                marginBottom:
-                  "12px"
-              }}
-            >
+if(items.length===0)
 
-              <div
-                onClick={() =>
-                  toggleCategory(
-                    category
-                  )
-                }
+return null;
 
-                style={{
 
-                  cursor:
-                    "pointer",
 
-                  fontWeight:
-                    "bold",
 
-                  padding:
-                    "10px",
 
-                  background:
-                    "#333",
 
-                  borderRadius:
-                    "5px"
 
-                }}
-              >
+return (
 
-                {isOpen
-                  ? "▼"
-                  : "▶"
-                }
+<div
 
-                {" "}
+key={category}
 
-                {category}
+style={{
 
-              </div>
+marginBottom:"12px"
 
+}}
 
-              {isOpen &&
-                items.map(
-                  item => (
+>
 
-                    <div
-                      key={
-                        item.name
-                      }
 
-                      draggable={
-                        true
-                      }
 
-                      onDragStart={
-                        event =>
-                          handleDragStart(
-                            event,
-                            item
-                          )
-                      }
 
-                      onDragEnd={
-                        handleDragEnd
-                      }
 
-                      onClick={() => {
+<div
 
-                        if (
-                          !item.isBreaker
-                        ) {
+onClick={()=>toggleCategory(category)}
 
-                          add(
-                            item.type
-                          );
+style={{
 
-                        }
+cursor:"pointer",
 
-                      }}
+fontWeight:"bold",
 
-                      style={{
+padding:"10px",
 
-                        marginTop:
-                          "8px",
+background:"#333",
 
-                        padding:
-                          "12px",
+borderRadius:"5px"
 
-                        background:
-                          "#1e1e1e",
+}}
 
-                        border:
-                          item.isBreaker
-                            ? "1px solid #00eaff"
-                            : "1px solid #555",
+>
 
-                        borderRadius:
-                          "8px",
+{
 
-                        cursor:
-                          "grab",
+openCategories.includes(category)
 
-                        userSelect:
-                          "none",
+?
 
-                        WebkitUserSelect:
-                          "none",
+"▼"
 
-                        touchAction:
-                          "none"
+:
 
-                      }}
-                    >
+"▶"
 
-                      <div
-                        style={{
+}
 
-                          display:
-                            "flex",
+{" "}
 
-                          alignItems:
-                            "center",
+{category}
 
-                          gap:
-                            "10px"
+</div>
 
-                        }}
-                      >
 
-                        <div
-                          style={{
 
-                            width:
-                              "45px",
 
-                            height:
-                              "45px",
 
-                            background:
-                              "#ddd",
 
-                            color:
-                              "#111",
 
-                            borderRadius:
-                              "6px",
 
-                            display:
-                              "flex",
 
-                            alignItems:
-                              "center",
+{
 
-                            justifyContent:
-                              "center",
+openCategories.includes(category)
 
-                            fontSize:
-                              "22px",
+&&
 
-                            fontWeight:
-                              "bold",
+items.map(item=>(
 
-                            flexShrink:
-                              0
 
-                          }}
-                        >
 
-                          {getIcon(
-                            item.symbol
-                          )}
+<div
 
-                        </div>
+key={item.name}
 
 
-                        <div>
 
-                          <div
-                            style={{
-                              fontWeight:
-                                "bold"
-                            }}
-                          >
-                            {item.name}
-                          </div>
+draggable={true}
 
 
-                          <div
-                            style={{
 
-                              fontSize:
-                                "12px",
+onDragStart={(e)=>
 
-                              color:
-                                "#aaa",
+dragStart(
 
-                              marginTop:
-                                "3px"
+e,
 
-                            }}
-                          >
-                            {item.description}
-                          </div>
+item
 
-                        </div>
+)
 
-                      </div>
+}
 
 
-                      <div
-                        style={{
 
-                          marginTop:
-                            "8px",
+onClick={()=>add(item.type)}
 
-                          fontSize:
-                            "11px",
 
-                          color:
-                            "#888"
 
-                        }}
-                      >
+style={{
 
-                        {item.voltage !==
-                          undefined && (
-                          <span>
-                            {item.voltage}V{" "}
-                          </span>
-                        )}
+marginTop:"8px",
 
-                        {item.amps !==
-                          undefined && (
-                          <span>
-                            {item.amps}A{" "}
-                          </span>
-                        )}
+padding:"12px",
 
-                        {item.watts !==
-                          undefined && (
-                          <span>
-                            {item.watts}W
-                          </span>
-                        )}
+background:"#1e1e1e",
 
-                      </div>
+border:"1px solid #555",
 
+borderRadius:"8px",
 
-                      <div
-                        style={{
+cursor:"grab",
 
-                          marginTop:
-                            "8px",
+userSelect:"none"
 
-                          fontSize:
-                            "11px",
+}}
 
-                          color:
-                            "#00eaff"
+>
 
-                        }}
-                      >
 
-                        {item.isBreaker
-                          ? "Drag into breaker panel slot"
-                          : "Click to place • Drag to workspace"
-                        }
 
-                      </div>
 
-                    </div>
 
-                  )
-                )}
+<div
 
-            </div>
+style={{
 
-          );
+display:"flex",
 
-        }
-      )}
+alignItems:"center",
 
-    </div>
+gap:"10px"
 
-  );
+}}
+
+>
+
+
+
+<div
+
+style={{
+
+width:"45px",
+
+height:"45px",
+
+background:"#ddd",
+
+color:"#111",
+
+borderRadius:"6px",
+
+display:"flex",
+
+alignItems:"center",
+
+justifyContent:"center",
+
+fontSize:"22px",
+
+fontWeight:"bold"
+
+}}
+
+>
+
+{
+
+getIcon(item.symbol)
+
+}
+
+</div>
+
+
+
+
+
+
+
+<div>
+
+<div
+
+style={{
+
+fontWeight:"bold"
+
+}}
+
+>
+
+{item.name}
+
+</div>
+
+
+<div
+
+style={{
+
+fontSize:"12px",
+
+color:"#aaa"
+
+}}
+
+>
+
+{item.description}
+
+</div>
+
+
+</div>
+
+
+</div>
+
+
+
+
+
+
+
+
+
+<div
+
+style={{
+
+marginTop:"8px",
+
+fontSize:"11px",
+
+color:"#888"
+
+}}
+
+>
+
+
+{
+
+item.voltage
+
+&&
+
+`${item.voltage}V `
+
+}
+
+
+
+{
+
+item.amps
+
+&&
+
+`${item.amps}A `
+
+}
+
+
+
+{
+
+item.watts
+
+&&
+
+`${item.watts}W`
+
+}
+
+
+</div>
+
+
+
+
+
+
+
+<div
+
+style={{
+
+marginTop:"8px",
+
+fontSize:"11px",
+
+color:"#00eaff"
+
+}}
+
+>
+
+{
+item.isBreaker
+?
+"Drag into breaker panel slot"
+:
+"Click to place • Drag to workspace"
+}
+
+</div>
+
+
+
+
+
+</div>
+
+
+))
+
+
+}
+
+
+
+
+
+
+
+
+
+</div>
+
+
+);
+
+
+})
+
+
+}
+
+
+
+
+
+
+
+</div>
+
+);
 
 }

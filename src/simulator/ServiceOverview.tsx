@@ -1,3 +1,4 @@
+import EndToEndCircuitLab from "./EndToEndCircuitLab";
 import RealisticPanel from "./RealisticPanel";
 import ServiceConnectionView from "./ServiceConnectionView";
 import PanelWiringLab from "./PanelWiringLab";
@@ -189,6 +190,7 @@ export default function ServiceOverview({ project, onChange, onOpenDestination }
     </>)}
     {accordion("terminations", `Wire to Breaker · Position ${selected}`, <PanelWiringLab project={project} selectedSlot={selected} onChange={onChange} />)}
     {accordion("labs", "Wiring Labs · Training Exercises", <>
+      <EndToEndCircuitLab project={project} onChange={onChange} />
       <h3 style={{color:"#84e4ff",marginTop:0}}>Practice: 120V Branch Circuit</h3>
       <p>Select a breaker, add a training cable in <strong>Wire to Breaker</strong>, then terminate each conductor on a simulated breaker, neutral or equipment-ground terminal. Run the inspection in that panel to check the exercise.</p>
       <p style={{fontSize:12,color:"#aac7d7"}}>Training-only: panel feeder and room wiring are not electrically connected to the solver yet. Never use this display as instructions for working on energized service equipment.</p>

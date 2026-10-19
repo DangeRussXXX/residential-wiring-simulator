@@ -4,11 +4,22 @@ export type ProjectArea = { id: string; name: string; buildingId: string; kind: 
 export type ProjectBuilding = { id: string; name: string; kind: "MAIN" | "DETACHED"; panelId?: string };
 export type CircuitAssignment = { slot: number; name: string; areaIds: string[]; destinations?: { areaId: string; wall: "NORTH" | "SOUTH" | "EAST" | "WEST"; cable: "14/2 NM-B" | "12/2 NM-B" | "14/3 NM-B" | "12/3 NM-B" }[] };
 export type PanelWire = { id: string; slot: number; cable: "14/2 NM-B" | "14/3 NM-B" | "12/2 NM-B" | "12/3 NM-B"; conductor: "black" | "red" | "white" | "bare"; terminal: string | null; };
+export type EndToEndCircuit = {
+  slot: number;
+  areaId: string;
+  wall: "NORTH" | "SOUTH" | "EAST" | "WEST";
+  receptacleId: string;
+  cable: "14/2 NM-B";
+  roomHot: "brass" | "silver" | "green" | null;
+  roomNeutral: "brass" | "silver" | "green" | null;
+  roomGround: "brass" | "silver" | "green" | null;
+};
 export type ServiceProject = {
   version: 1;
   distributionPanel?: import("../electrical/breakerPanel").BreakerPanel;
   circuitAssignments?: CircuitAssignment[];
   panelWires?: PanelWire[];
+  endToEndCircuits?: EndToEndCircuit[];
   distributionMain?: { installed: boolean; amperage: number; closed: boolean };
   id: string;
   name: string;

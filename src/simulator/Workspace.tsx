@@ -2310,7 +2310,7 @@ function Workspace(
                 const name=e.dataTransfer.getData("componentType");
                 if (!name) return;
                 const definition=componentCatalog.find(c=>c.name===name);
-                if (!definition || !["outlet","gfci","switch-single","switch-three-way","dimmer"].includes(definition.symbol)) {
+                if (!definition || !["Receptacle", "GFCI Receptacle", "Single Pole Switch", "Three Way Switch", "Dimmer Switch"].includes(definition.name)) {
                   setPlacementMessage("Choose a wall switch or receptacle for this device box."); return;
                 }
                 const rect=e.currentTarget.getBoundingClientRect();
@@ -2332,7 +2332,7 @@ function Workspace(
               {Array.from({length:box.gangs},(_,i)=>{
                 const mounted=devices.find(d=>boxMounts[d.id]?.boxId===box.id && boxMounts[d.id]?.gang===i);
                 const symbol=mounted?.symbol || "";
-                const receptacle=symbol==="outlet"||symbol==="gfci";
+                const receptacle=mounted?.name==="Receptacle"||mounted?.name==="GFCI Receptacle";
                 return <div key={i} onMouseDown={e=>{
                     if(!mounted)return;
                     e.stopPropagation();setMovingBoxId(null);setSelectedBoxId(box.id);setSelectedDevice(mounted);onSelectDevice?.(mounted);
@@ -2340,7 +2340,7 @@ function Workspace(
                   style={{flex:1,minWidth:0,height:70,border:mounted&&selectedDevice?.id===mounted.id?"2px solid #39ff14":"1px dashed #405b6a",borderRadius:3,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",fontSize:10,color:"#183444",background:mounted?"#f0eee6":"#b4c4cb",cursor:mounted?"pointer":"default",pointerEvents:"auto"}}>
                   {mounted?<><svg viewBox="0 0 36 52" width="35" height="50" aria-label={mounted.name}>
                     <rect x="3" y="1" width="30" height="50" rx="4" fill="#f7f5ed" stroke="#667780" strokeWidth="2"/>
-                    {receptacle?<>{[15,36].map(y=><g key={y}><rect x="11" y={y-5} width="3" height="9" fill="#303638"/><rect x="22" y={y-5} width="3" height="9" fill="#303638"/><circle cx="18" cy={y+6} r="2" fill="#303638"/></g>)}{symbol==="gfci"&&<rect x="14" y="24" width="8" height="4" fill="#d24c43"/>}</>:<><rect x="13" y="13" width="10" height="26" rx="2" fill="#b8b8b0" stroke="#707f85"/><path d="M15 16 L21 13 L21 29 L15 32 Z" fill="white"/></>}
+                    {receptacle?<>{[15,36].map(y=><g key={y}><rect x="11" y={y-5} width="3" height="9" fill="#303638"/><rect x="22" y={y-5} width="3" height="9" fill="#303638"/><circle cx="18" cy={y+6} r="2" fill="#303638"/></g>)}{mounted?.name==="GFCI Receptacle"&&<rect x="14" y="24" width="8" height="4" fill="#d24c43"/>}</>:<><rect x="13" y="13" width="10" height="26" rx="2" fill="#b8b8b0" stroke="#707f85"/><path d="M15 16 L21 13 L21 29 L15 32 Z" fill="white"/></>}
                   </svg></>:<span>+ {i+1}</span>}
                 </div>;
               })}

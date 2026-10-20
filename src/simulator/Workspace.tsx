@@ -249,6 +249,19 @@ function Workspace(
     if(connected)setSelectedCableId(connected.id);
   },[selectedDevice?.id,cables,cableSource]);
   const selectedCable=cables.find(c=>c.id===selectedCableId);
+  // Update 68: bounded, wall-local editing history. Save before destructive edits.
+  type WallSnapshot = { devices: ElectricalDevice[]; cables: CableRecord[]; connections: Connection[]; wires: Wire[]; heights: Record<string,number>; nailed: Record<string,boolean>; studs: Record<string,number>; confirmed: Record<string,boolean> };
+  const undoStack = useRef<WallSnapshot[]>([]);
+  const redoStack = useRef<WallSnapshot[]>([]);
+  const [historyRevision,setHistoryRevision] = useState(0);
+  const snapshot = ():WallSnapshot => ({devices:structuredClone(devices),cables:structuredClone(cables),connections:structuredClone(connections),wires:structuredClone(wires),heights:{...mountingHeights},nailed:{...nailedDevices},studs:{...deviceStuds},confirmed:{...heightConfirmed}});
+  const checkpoint = () => {undoStack.current.push(snapshot());if(undoStack.current.length>40)undoStack.current.shift();redoStack.current=[];setHistoryRevision(v=>v+1);};
+  const restore = (s:WallSnapshot) => {setDevices(s.devices);saveCables(s.cables);setConnections(s.connections);setWires(s.wires);setMountingHeights(s.heights);setNailedDevices(s.nailed);setDeviceStuds(s.studs);setHeightConfirmed(s.confirmed);setSelectedDevice(null);setSelectedCableId(null);setDragging(null);setHistoryRevision(v=>v+1);};
+  const undoEdit = () => {const prev=undoStack.current.pop();if(!prev)return;redoStack.current.push(snapshot());restore(prev);};
+  const redoEdit = () => {const next=redoStack.current.pop();if(!next)return;undoStack.current.push(snapshot());restore(next);};
+  useEffect(()=>{undoStack.current=[];redoStack.current=[];setHistoryRevision(v=>v+1);},[workspaceScope]);
+  void historyRevision;
+
   const [selectedStud, setSelectedStud] = useState<number|null>(null);
   const [deviceStuds,setDeviceStuds] = useState<Record<string,number>>(() => {
     try { return JSON.parse(localStorage.getItem(`rws-device-studs:${workspaceScope}`) || "{}"); } catch {return {};}
@@ -273,6 +286,7 @@ function Workspace(
     const pitch = studSpacing * 8;
     const studX = stud * pitch + 13;
     const h=mountingHeights[device.id];
+    checkpoint();
     setDevices(prev => prev.map(d => d.id === device.id ? {...d,x:studX-6,y:heightToY(h)} : d));
     setNailedDevices(prev => ({...prev,[device.id]:true}));
     setDragging(null);
@@ -1783,16 +1797,25 @@ function Workspace(
           </div>
         )}
 
-              {selectedDevice && <div style={{display:"flex",gap:8}}>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                <button type="button" disabled={!undoStack.current.length} onClick={undoEdit}>↶ Undo</button>
+                <button type="button" disabled={!redoStack.current.length} onClick={redoEdit}>↷ Redo</button>
+                <span style={{fontSize:12,color:"#b8dbe9"}}>History: up to 40 edits · current wall</span>
+              </div>
+              {selectedDevice && <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
                 <button type="button" title="Install the selected device on the highlighted stud at its chosen height"
                   disabled={!!nailedDevices[selectedDevice.id] || deviceStuds[selectedDevice.id]===undefined || !heightConfirmed[selectedDevice.id]}
                   onClick={()=>nailToStud(selectedDevice)}>🔨 Hammer · Install</button>
-                <button type="button" title="Delete only the selected component from this wall"
+                <button type="button" disabled={!nailedDevices[selectedDevice.id]}
+                  title="Remove fastener; preserve device and its wiring, then drag it to reposition"
+                  onClick={()=>{checkpoint();setNailedDevices(prev=>({...prev,[selectedDevice.id]:false}));setPlacementMessage("Fastener removed. Drag device to another stud, then hammer to install.");}}>🪛 Crowbar · Unnail / Reposition</button>
+                <button type="button" title="Permanently delete the selected component and attached wiring"
                                   onClick={e=>{
                   e.stopPropagation();
                   const attached=connections.some(c=>c.from.deviceId===selectedDevice.id||c.to.deviceId===selectedDevice.id)||
                     wires.some(w=>w.from.deviceId===selectedDevice.id||w.to.deviceId===selectedDevice.id);
                   if(!window.confirm(`Remove ${selectedDevice.name||selectedDevice.type} from this wall${attached?" and delete its connected wires":""}?`))return;
+                  checkpoint();
                   setDevices(prev=>prev.filter(d=>d.id!==selectedDevice.id));
                   saveCables(cables.filter(c=>c.from!==selectedDevice.id&&c.to!==selectedDevice.id));
                   setConnections(prev=>prev.filter(c=>c.from.deviceId!==selectedDevice.id&&c.to.deviceId!==selectedDevice.id));
@@ -1804,7 +1827,7 @@ function Workspace(
                   setSelectedDevice(null);onSelectDevice?.(null);
                 }}
 
-                  >🪛 Crowbar · Remove</button>
+                  >🗑 Delete Component</button>
               </div>}
             </div>
           </details>
@@ -1841,6 +1864,20 @@ function Workspace(
                   {cables.map(c=><option key={c.id} value={c.id}>{c.type} · {c.from===PANEL_SOURCE_ID?"Panel P1":devices.find(d=>d.id===c.from)?.name||"Missing"} → {devices.find(d=>d.id===c.to)?.name||"Missing"}</option>)}
                 </select>
               </label>}
+              {selectedCable && <div style={{display:"flex",flexDirection:"column",gap:6,border:"1px solid #376c85",padding:8,borderRadius:6}}>
+                <strong>Reposition / reroute cable endpoints</strong>
+                <span style={{fontSize:12}}>Changing an endpoint clears that end’s terminal assignments and cable splices to prevent stale connections.</span>
+                {(["from","to"] as const).map(end=><label key={end}>{end==="from"?"Cable start":"Cable destination"}
+                  <select value={selectedCable[end]} onChange={e=>{
+                    const target=e.target.value;if(target===selectedCable[end]||target===selectedCable[end==="from"?"to":"from"])return;
+                    checkpoint();const next:CableRecord={...selectedCable,[end]:target,ends:{...selectedCable.ends,[end]:{}},splices:[]};
+                    saveCables(cables.map(c=>c.id===next.id?next:c));
+                  }} style={{display:"block",width:"100%",padding:6}}>
+                    {end==="from"&&<option value={PANEL_SOURCE_ID}>Panel P1</option>}
+                    {devices.map(d=><option key={d.id} value={d.id}>{d.name||d.type}</option>)}
+                  </select>
+                </label>)}
+              </div>}
               {selectedCable && <div style={{padding:"9px 11px",background:"#123d50",border:"1px solid #327d97",borderRadius:6,fontSize:16}}>
                 <strong>Selected cable · {selectedCable.type}</strong>
                 <div>Panel/start: {Object.values(selectedCable.ends?.from??{}).filter(Boolean).length}/{selectedCable.type.includes("/3")?4:3} conductors assigned</div>
@@ -1852,7 +1889,7 @@ function Workspace(
                 onChange={next=>saveCables(cables.map(c=>c.id===next.id?next:c))}
                 onRemove={()=>{
                   if(!window.confirm("Remove this cable and its conductor terminations?"))return;
-                  saveCables(cables.filter(c=>c.id!==selectedCable.id));setSelectedCableId(null);
+                  checkpoint();saveCables(cables.filter(c=>c.id!==selectedCable.id));setSelectedCableId(null);
                 }}/>}
             </div>
           </details>

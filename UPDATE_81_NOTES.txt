@@ -1,0 +1,1 @@
+Update 81: compact front-first wall devices; per-device Face/Wires toggle; neon green selection; panel endpoint selection highlights workspace device. Wiring records and renderers unchanged. Browser rendering unverified.

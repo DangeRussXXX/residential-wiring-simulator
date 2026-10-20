@@ -407,7 +407,7 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove,allCab
 }) {
   const [end,setEnd]=useState<CableEnd>(initialEnd);
   const [selected,setSelected]=useState<string|null>(null);
-  const [localView,setLocalView]=useState<"rear"|"front">("rear");
+  const [localView,setLocalView]=useState<"rear"|"front">("front");
   const view=sharedView??localView;
   const setView=(next:"rear"|"front")=>{setLocalView(next);onSharedViewChange?.(next);};
   const [spliceSelection,setSpliceSelection]=useState<string[]>([]);

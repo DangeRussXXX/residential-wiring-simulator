@@ -2174,16 +2174,16 @@ function Workspace(
             {cables.map(c=>{
               const a=devices.find(d=>d.id===c.from),b=devices.find(d=>d.id===c.to);
               if((!a&&c.from!==PANEL_SOURCE_ID)||!b)return null;
-              // Match CompactWiredDevice's actual top cable connectors.
-              // The compact SVG is 150x126, vertically centered in its 150px device,
-              // with each cable entry at SVG x=23+index*23, y=17..37.
-              // Previously +75 sent the wall cable to the middle of the box while
-              // the device connector was at +23: two visibly disconnected cables.
+              // Device origin is the top-left of its wall box. The compact
+              // preview uses 150x126 coordinates scaled by 1.2 and centered
+              // inside a 190px wide, 180px tall component.
+              // Connect the physical cable to the SAME top entry displayed
+              // in CompactWiredDevice (x=23+23*n, y=17).
               const entry=(device:ElectricalDevice)=>{
                 const attached=cables.filter(w=>w.from===device.id||w.to===device.id);
-                const index=attached.findIndex(w=>w.id===c.id);
-                return {x:device.x+23+Math.max(0,Math.min(index,2))*23,
-                  y:device.y+12+29}; // under connector and jacket, hidden by device
+                const index=Math.max(0,attached.findIndex(w=>w.id===c.id));
+                return {x:device.x+95+(23+Math.min(index,2)*23-75)*1.2,
+                  y:device.y+90+(17-63)*1.2};
               };
               const start=a?entry(a):{x:26,y:0};
               const end=entry(b);

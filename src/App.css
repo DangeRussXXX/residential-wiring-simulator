@@ -321,3 +321,11 @@
 .nova-panel-global-actions button {flex:1;padding:10px 8px !important;background:#193e50;color:#8eeaff;border:1px solid #397e99;border-radius:6px;font-size:15px !important;font-weight:700;}
 .nova-panel-drawer-toggle {font-size:18px !important;font-weight:800 !important;padding:15px 12px !important;}
 .nova-wall-location-controls {display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 0;font-size:14px;}
+
+/* Update 74: all five top-level panel headings share the same presentation. */
+.nova-unified-controls > details,
+.nova-wall-controls > details.nova-panel-section,
+.nova-unified-controls ~ details {border:1px solid #397e99 !important;border-radius:7px !important;background:#193e50 !important;margin:0 0 8px !important;padding:0 !important;overflow:hidden !important;}
+.nova-unified-controls > details > summary,
+.nova-wall-controls > details.nova-panel-section > summary,
+.nova-unified-controls ~ details > summary {display:list-item !important;list-style-position:inside !important;background:#193e50 !important;color:#8eeaff !important;font-size:18px !important;font-weight:750 !important;padding:12px 14px !important;line-height:1.35 !important;}

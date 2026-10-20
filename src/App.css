@@ -363,3 +363,49 @@
 .nova-unified-controls > details > summary::before,.nova-wall-controls > details.nova-panel-section > summary::before {content:"▶";position:absolute;left:10px;top:10px;color:#83ddf5;font-size:12px;}
 .nova-unified-controls > details[open] > summary::before,.nova-wall-controls > details.nova-panel-section[open] > summary::before {content:"▼";}
 .nova-unified-controls > details > summary:hover,.nova-wall-controls > details.nova-panel-section > summary:hover {background:#23536a!important;}
+
+/* Update 79: correct actual nested right-panel headers.
+   The earlier #rws-wall-tools-panel-target details > summary selector had
+   higher specificity than the Update 78 class rules. This ID-scoped rule
+   removes the visible inner header frame, making all five peers. */
+#rws-wall-tools-panel-target .nova-wall-controls > details.nova-panel-section {
+  box-sizing:border-box !important;
+  width:100% !important;
+  margin:0 0 8px !important;
+  padding:0 !important;
+  border:1px solid #397e99 !important;
+  border-radius:6px !important;
+  background:#193e50 !important;
+  overflow:hidden !important;
+}
+#rws-wall-tools-panel-target .nova-wall-controls > details.nova-panel-section > summary {
+  display:block !important;
+  box-sizing:border-box !important;
+  position:relative !important;
+  width:100% !important;
+  min-height:34px !important;
+  margin:0 !important;
+  padding:7px 12px 7px 28px !important;
+  border:0 !important;
+  border-radius:0 !important;
+  outline:0 !important;
+  background:#193e50 !important;
+  box-shadow:none !important;
+  color:#8eeaff !important;
+  font:700 12px/18px Arial,sans-serif !important;
+  list-style:none !important;
+  list-style-type:none !important;
+  cursor:pointer !important;
+}
+#rws-wall-tools-panel-target .nova-wall-controls > details.nova-panel-section > summary::before {
+  content:'▶' !important;
+  position:absolute !important;
+  top:8px !important;
+  left:9px !important;
+  font-size:11px !important;
+  color:#83ddf5 !important;
+}
+#rws-wall-tools-panel-target .nova-wall-controls > details.nova-panel-section[open] > summary::before { content:'▼' !important; }
+#rws-wall-tools-panel-target .nova-wall-controls > details.nova-panel-section > summary::-webkit-details-marker {display:none !important;}
+#rws-wall-tools-panel-target .nova-wall-controls > details.nova-panel-section > summary::marker {content:'' !important;}
+#rws-wall-tools-panel-target .nova-wall-controls > details.nova-panel-section > summary:hover {background:#23536a !important;}

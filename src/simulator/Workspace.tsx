@@ -284,8 +284,20 @@ function Workspace(
   },[workspaceScope,deviceStuds,heightConfirmed]);
   const [placementMessage,setPlacementMessage] = useState("");
   const [rightPanelTarget,setRightPanelTarget] = useState<HTMLElement|null>(null);
+  const [wallControlsOpen,setWallControlsOpen] = useState(true);
+  const [deviceInstallationOpen,setDeviceInstallationOpen] = useState(true);
   useEffect(() => {
-    setRightPanelTarget(document.getElementById("rws-wall-tools-panel-target"));
+    const target = document.getElementById("rws-wall-tools-panel-target");
+    setRightPanelTarget(target);
+    if (!target) return;
+    const sync = () => {
+      setWallControlsOpen(target.dataset.open !== "false");
+      setDeviceInstallationOpen(target.dataset.deviceOpen !== "false");
+    };
+    sync();
+    const observer = new MutationObserver(sync);
+    observer.observe(target,{attributes:true,attributeFilter:["data-open","data-device-open","data-revision"]});
+    return () => observer.disconnect();
   }, [liveAreaId,liveWall]);
   const nailToStud = (device:ElectricalDevice) => {
     const current = devices.find(d => d.id === device.id) ?? device;
@@ -1764,15 +1776,39 @@ function Workspace(
 
       {rightPanelTarget && createPortal(
         <div className="nova-wall-controls" style={{color:"#d9edf5",fontSize:22}}>
-          <details open style={{border:"1px solid #346b85",borderRadius:7,padding:10,marginBottom:8}}>
-            <summary style={{cursor:"pointer",fontWeight:700,color:"#8ee7ff"}}>Wall View · Show/Hide</summary>
+          <details open={wallControlsOpen} onToggle={e=>setWallControlsOpen(e.currentTarget.open)} className="nova-panel-section">
+            <summary>Wall View &amp; Tools</summary>
             <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:10}}>
               <button type="button" aria-pressed={!blueprintMode} onClick={()=>setBlueprintMode(false)}>Framed Wall</button>
               <button type="button" aria-pressed={blueprintMode} onClick={()=>setBlueprintMode(true)}>Blueprint Mode</button>
             </div>
+            <div style={{display:"flex",flexDirection:"column",gap:8,paddingTop:8}}>
+        <div style={{fontSize:11,color:"#b9dce9"}}>The old terminal-to-terminal Wire Tool has been replaced. Click the single gray dot on a device to start a cable.</div>
+        <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12 }}>
+          Studs
+          <select value={studSpacing} onChange={e => setStudSpacing(Number(e.target.value))}>
+            <option value={12}>12" O.C.</option>
+            <option value={16}>16" O.C.</option>
+            <option value={19.2}>19.2" O.C.</option>
+            <option value={24}>24" O.C.</option>
+          </select>
+        </label>
+
+        <label style={{display:"flex",alignItems:"center",gap:5,fontSize:12}}><input type="checkbox" checked={snapToStuds} onChange={e=>setSnapToStuds(e.target.checked)}/>Snap boxes to studs</label>
+
+        <button
+          onClick={
+            clearWorkspace
+          }
+        >
+          Clear
+        </button>
+
+            </div>
           </details>
-          <details open style={{border:"1px solid #346b85",borderRadius:7,padding:8,marginBottom:8}}>
-            <summary style={{cursor:"pointer",fontWeight:700,color:"#8ee7ff"}}>Device Installation · Show/Hide</summary>
+          <details open={deviceInstallationOpen} onToggle={e=>setDeviceInstallationOpen(e.currentTarget.open)} className="nova-panel-section">
+            <summary>Device Installation</summary>
+            <div className="nova-wall-tools-combined">
             <div style={{display:"flex",flexDirection:"column",gap:8,paddingTop:8}}>
               <div>Selected: {selectedDevice ? selectedDevice.name || selectedDevice.type : "Drag a component onto a stud"}</div>
               {placementMessage && <div role="status" style={{color:"#ffd3a3"}}>{placementMessage}</div>}
@@ -1904,32 +1940,7 @@ function Workspace(
                 }}/>}
             </div>
           </details>
-          <details style={{border:"1px solid #346b85",borderRadius:7,padding:8,marginBottom:8}}>
-            <summary style={{cursor:"pointer",fontWeight:700,color:"#8ee7ff"}}>Wall Tools · Show/Hide</summary>
-            <div style={{display:"flex",flexDirection:"column",gap:8,paddingTop:8}}>
-        <div style={{fontSize:11,color:"#b9dce9"}}>The old terminal-to-terminal Wire Tool has been replaced. Click the single gray dot on a device to start a cable.</div>
-        <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12 }}>
-          Studs
-          <select value={studSpacing} onChange={e => setStudSpacing(Number(e.target.value))}>
-            <option value={12}>12" O.C.</option>
-            <option value={16}>16" O.C.</option>
-            <option value={19.2}>19.2" O.C.</option>
-            <option value={24}>24" O.C.</option>
-          </select>
-        </label>
 
-        <label style={{display:"flex",alignItems:"center",gap:5,fontSize:12}}><input type="checkbox" checked={snapToStuds} onChange={e=>setSnapToStuds(e.target.checked)}/>Snap boxes to studs</label>
-
-        <button
-          onClick={
-            clearWorkspace
-          }
-        >
-          Clear
-        </button>
-
-            </div>
-          </details>
         </div>,
         rightPanelTarget
       )}

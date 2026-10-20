@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import WholeHouseBlueprint from "../simulator/WholeHouseBlueprint";
 import WallCircuitInspector from "../simulator/WallCircuitInspector";
 import ElectricalServiceWorkspace from "../simulator/ElectricalServiceWorkspace";
@@ -7,6 +8,7 @@ import ElectricalServiceWorkspace from "../simulator/ElectricalServiceWorkspace"
 
 import {
   useRef,
+  useEffect,
   useState
 } from "react";
 
@@ -61,6 +63,24 @@ export default function SimulatorLayout() {
   const [showPanelControls,setShowPanelControls]=useState(false);
   const [showProperties,setShowProperties]=useState(false);
   const [showInspection,setShowInspection]=useState(false);
+  const [showWallControls,setShowWallControls]=useState(true);
+  const [showDeviceInstallation,setShowDeviceInstallation]=useState(true);
+  const [allPanelsRevision,setAllPanelsRevision]=useState(0);
+  const [deviceInspectorTarget,setDeviceInspectorTarget]=useState<HTMLElement|null>(null);
+  useEffect(()=>{
+    if (!activeWall || showService || showBlueprint) {setDeviceInspectorTarget(null);return;}
+    const timer=window.setInterval(()=>{
+      const node=document.getElementById("rws-device-inspector-content");
+      setDeviceInspectorTarget(previous=>previous===node?previous:node);
+      if(node)window.clearInterval(timer);
+    },100);
+    return ()=>window.clearInterval(timer);
+  },[activeWall,showService,showBlueprint,workspaceScope]);
+  const toggleAllPanels = (open: boolean) => {
+    setShowExplorer(open); setShowLibrary(open); setShowPanelControls(open);
+    setShowProperties(open); setShowInspection(open); setShowWallControls(open);
+    setShowDeviceInstallation(open); setAllPanelsRevision(n => n + 1);
+  };
   const [showBlueprint, setShowBlueprint] = useState(false);
   const [showElectricalService, setShowElectricalService] = useState(false);
   const [activeWall, setActiveWall] = useState<WallSide | null>(null);
@@ -101,7 +121,7 @@ export default function SimulatorLayout() {
   const [
     propertiesWidth,
     setPropertiesWidth
-  ] = useState(400);
+  ] = useState(600);
 
 
   const [
@@ -440,7 +460,7 @@ export default function SimulatorLayout() {
 
         if (
           width >= 260 &&
-          width <= 700
+          width <= 1000
         ) {
 
           setPropertiesWidth(
@@ -579,7 +599,7 @@ export default function SimulatorLayout() {
               `${propertiesWidth}px`,
 
             minWidth:
-              "360px",
+              "420px",
 
             display: !project || !showRightColumn ? "none" : "flex",
 
@@ -618,9 +638,10 @@ export default function SimulatorLayout() {
             }}
           >
 
+            <div className="nova-panel-global-actions"><button type="button" onClick={()=>toggleAllPanels(true)}>Expand All</button><button type="button" onClick={()=>toggleAllPanels(false)}>Collapse All</button></div>
             <div className="nova-unified-controls">
               <details open={showExplorer} onToggle={e=>setShowExplorer(e.currentTarget.open)}>
-                <summary>Project Explorer · Show/Hide</summary>
+                <summary>Project Explorer</summary>
                 {project && <div className="nova-control-body">
 <section style={{background:"#101a25",padding:10,fontSize:13,borderBottom:"1px solid #29627b"}}>
           <strong style={{ color: "#72dcff" }}>PROJECT EXPLORER</strong>
@@ -648,30 +669,24 @@ export default function SimulatorLayout() {
                 </div>}
               </details>
               <details open={showLibrary} onToggle={e=>setShowLibrary(e.currentTarget.open)}>
-                <summary>Component Library · Show/Hide</summary>
+                <summary>Component Library</summary>
                 <div className="nova-control-body">
                   {!showService && !!activeWall ? <ComponentLibrary workspaceRef={workspaceRef}/> : <div style={{padding:10,fontSize:12,color:"#aacbd7"}}>Open a room wall to place components.</div>}
                 </div>
               </details>
             </div>
-            {!showService && !!activeWall && <div id="rws-wall-tools-panel-target" />}
+            {!showService && !!activeWall && <div id="rws-wall-tools-panel-target" data-open={showWallControls ? "true" : "false"} data-device-open={showDeviceInstallation ? "true" : "false"} data-revision={allPanelsRevision} />}
 
             {project && !showService && !showBlueprint && activeWall && project.activeAreaId && (
-              <>
-                <details open={showInspection} onToggle={e=>setShowInspection(e.currentTarget.open)}
-                  style={{border:"1px solid #346b85",borderRadius:7,marginTop:8,padding:7}}>
-                  <summary style={{cursor:"pointer",color:"#a2eaff",fontWeight:700}}>Wall Circuit Inspector · Show/Hide</summary>
-                <WallCircuitInspector
-                  project={project}
-                  areaId={project.activeAreaId}
-                  wall={activeWall}
-                  devices={devices}
-                  connections={connections}
-                />
-                </details>
-              </>
+
             )}
 
+            {deviceInspectorTarget && !showService && !!activeWall && createPortal(
+              <div className="nova-device-inspection">
+                {project && project.activeAreaId && <WallCircuitInspector project={project} areaId={project.activeAreaId} wall={activeWall} devices={devices} connections={connections} />}
+                {selectedDevice && <PropertiesPanel device={selectedDevice} devices={devices} circuitPaths={circuitPaths} onUpdateDevice={updated=>{updateDevice(updated);setSelectedDevice(updated);workspaceRef.current?.updateDevice(updated);}} />}
+              </div>, deviceInspectorTarget
+            )}
             {/* A single inspector replaces the redundant Update Simulation button and
                 disconnected electrical graph/debug panel on room walls. */}
 
@@ -681,7 +696,7 @@ export default function SimulatorLayout() {
 
             {panelDevices.length > 0 && <details open={showPanelControls} onToggle={e=>setShowPanelControls(e.currentTarget.open)}
               style={{border:"1px solid #346b85",borderRadius:7,marginTop:8,padding:7}}>
-              <summary style={{cursor:"pointer",color:"#a2eaff",fontWeight:700}}>Distribution Panel · Show/Hide</summary>
+              <summary style={{cursor:"pointer",color:"#a2eaff",fontWeight:700}}>Distribution Panel</summary>
             {panelDevices.length > 0 && (
 
               <div
@@ -910,44 +925,11 @@ export default function SimulatorLayout() {
             {/* PROPERTIES */}
             {/* =============================== */}
 
-            {selectedDevice && <details open={showProperties} onToggle={e=>setShowProperties(e.currentTarget.open)}
-              style={{border:"1px solid #346b85",borderRadius:7,marginTop:8,padding:7}}>
-              <summary style={{cursor:"pointer",color:"#a2eaff",fontWeight:700}}>Selected Device Properties · Show/Hide</summary>
-            <PropertiesPanel
-              device={
-                selectedDevice
-              }
-
-              devices={
-                devices
-              }
-
-              circuitPaths={
-                circuitPaths
-              }
-
-              onUpdateDevice={
-                updated => {
-
-                  updateDevice(
-                    updated
-                  );
-
-
-                  setSelectedDevice(
-                    updated
-                  );
-
-
-                  workspaceRef.current?.updateDevice(
-                    updated
-                  );
-
-                }
-              }
-
-            />
+            {selectedDevice && !activeWall && <details open={showProperties} onToggle={e=>setShowProperties(e.currentTarget.open)}>
+              <summary>Selected Device Properties</summary>
+              <PropertiesPanel device={selectedDevice} devices={devices} circuitPaths={circuitPaths} onUpdateDevice={updated=>{updateDevice(updated);setSelectedDevice(updated);workspaceRef.current?.updateDevice(updated);}} />
             </details>}
+
 
           </div>
 

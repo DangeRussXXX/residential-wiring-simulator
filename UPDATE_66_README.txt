@@ -1,1 +1,0 @@
-NOVA Update 66 — Upright twist-on wire connectors.\nThe shared box renderer now shows upright capped wire nuts, open mouths at the bottom, with incoming conductors and pigtails meeting at the mouth. Saved electrical records are unchanged.\n

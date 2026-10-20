@@ -281,13 +281,16 @@ function Workspace(
     setRightPanelTarget(document.getElementById("rws-wall-tools-panel-target"));
   }, [liveAreaId,liveWall]);
   const nailToStud = (device:ElectricalDevice) => {
-    const stud = deviceStuds[device.id];
-    if(stud === undefined || !heightConfirmed[device.id]) return;
+    const current = devices.find(d => d.id === device.id) ?? device;
+    const stud = Math.max(0, Math.round((current.x + 6) / (studSpacing * 8)));
+    if (!heightConfirmed[device.id]) return;
     const pitch = studSpacing * 8;
     const studX = stud * pitch + 13;
-    const h=mountingHeights[device.id];
+    const h = Math.max(0, Math.min(120, (1105 - current.y) / 8));
     checkpoint();
-    setDevices(prev => prev.map(d => d.id === device.id ? {...d,x:studX-6,y:heightToY(h)} : d));
+    setDeviceStuds(prev => ({...prev,[device.id]:stud}));
+    setMountingHeights(prev => ({...prev,[device.id]:Math.round(h * 10) / 10}));
+    setDevices(prev => prev.map(d => d.id === device.id ? {...d,x:studX-6,y:current.y} : d));
     setNailedDevices(prev => ({...prev,[device.id]:true}));
     setDragging(null);
   };
@@ -1976,11 +1979,17 @@ function Workspace(
           moveBoard
         }
 
-        onMouseUp={() =>
-          setDragging(
-            null
-          )
-        }
+        onMouseUp={() => {
+          if (dragging) {
+            const moved = devices.find(d => d.id === dragging);
+            if (moved) {
+              const stud = Math.max(0, Math.round((moved.x + 6) / (studSpacing * 8)));
+              setDeviceStuds(prev => ({...prev,[dragging]:stud}));
+              setMountingHeights(prev => ({...prev,[dragging]:Math.round(Math.max(0,Math.min(120,(1105-moved.y)/8))*10)/10}));
+            }
+          }
+          setDragging(null);
+        }}
 
         style={{
 

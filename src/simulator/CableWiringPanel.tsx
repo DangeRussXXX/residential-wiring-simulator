@@ -300,6 +300,12 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove,allCab
   const colorsList=conductors(cable.type);
   const attached=cable.ends[end]||{};
   const boxId=cable[end];
+  // Other cables entering the same physical box, including a panel home run.
+  // Each retains its own saved termination records and can be wired in place.
+  const boxCables=(allCables??[cable]).flatMap(c=>
+    (["from","to"] as CableEnd[]).filter(side=>c[side]===boxId)
+      .map(side=>({cable:c,side,isHomeRun:c.from===PANEL_SOURCE_ID})));
+  const otherBoxCables=boxCables.filter(item=>item.cable.id!==cable.id);
   const available=(allCables??[cable]).flatMap(c=>(["from","to"] as CableEnd[]).flatMap(e=>c[e]===boxId?
     conductors(c.type).map(conductor=>({key:`${c.id}|${e}|${conductor}`,cableId:c.id,end:e,conductor,cable:c})):[]));
   const splices=(allCables??[cable]).flatMap(c=>c.splices??[]).filter(sp=>sp.deviceId===boxId);
@@ -379,6 +385,35 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove,allCab
     </div>
     <LiveWiringDiagram cable={cable} end={end} device={dev} allCables={allCables??[cable]} front={view==="front"} onTerminate={changeConnection} onSelectConductor={setSelected} externalSelected={selected}/>
     {kind==="gfci"&&view==="rear"&&<div style={{fontSize:14,color:"#e0f3fa",marginTop:7}}>GFCI rear: top pair = LINE, lower pair = LOAD; left silver = neutral, right brass = hot. Ground is green. Follow the actual device markings when installing.</div>}
+    {!fromPanel && otherBoxCables.length>0 && <div style={{marginTop:12,padding:10,border:"1px solid #368bab",borderRadius:7,background:"#102f40"}}>
+      <div style={{fontWeight:800,color:"#8feaff",marginBottom:8}}>Other cables entering this box · {boxCables.length} total</div>
+      <div style={{fontSize:13,color:"#b9dce9",marginBottom:8}}>Home runs and outgoing cables share this box. Their conductor assignments are saved independently; splices can join conductors from different cables.</div>
+      {otherBoxCables.sort((a,b)=>Number(b.isHomeRun)-Number(a.isHomeRun)).map(item=>{
+        const source=item.isHomeRun?`FROM PANEL P1 · BREAKER #${item.cable.breakerSlot??"?"}`:
+          `${item.cable.from===boxId?"OUTGOING TO":"INCOMING FROM"} ${item.cable.from===boxId?(devices.find(d=>d.id===item.cable.to)?.name??item.cable.toName??"Device"):(devices.find(d=>d.id===item.cable.from)?.name??item.cable.fromName??"Device")}`;
+        const record=item.cable;
+        return <details key={`${record.id}-${item.side}`} open={item.isHomeRun} style={{border:"1px solid #45788e",borderRadius:6,marginBottom:8,padding:7}}>
+          <summary style={{cursor:"pointer",fontWeight:700,color:item.isHomeRun?"#ffe0a0":"#c4e7f7"}}>{item.isHomeRun?"⚡ ":"↔ "}{source} · {record.type}</summary>
+          <div style={{fontSize:12,color:"#c7dbe5",margin:"7px 0"}}>Drag conductors onto the same device terminals or use the termination controls below. Loose wires remain loose until connected.</div>
+          <LiveWiringDiagram cable={record} end={item.side} device={dev} allCables={allCables??[cable]}
+            onTerminate={changeConnection}/>
+          <div style={{display:"grid",gap:5,marginTop:7}}>
+            {conductors(record.type).map(color=><label key={color} style={{display:"flex",alignItems:"center",gap:6,fontSize:13}}>
+              <span style={{width:11,height:11,background:colors[color],border:"1px solid #9aabb5",borderRadius:6,flexShrink:0}}/>
+              <span style={{width:54,textTransform:"capitalize"}}>{color}</span>
+              <select aria-label={`${source} ${color} termination`} value={record.ends[item.side]?.[color]??""}
+                onChange={e=>changeConnection(record.id,item.side,color,e.target.value||null)}
+                style={{flex:1,minWidth:0,padding:5,background:"#173d50",color:"white",border:"1px solid #45788e",borderRadius:4}}>
+                <option value="">Loose / not connected</option>
+                {terms.map(t=><option key={t.id} value={t.id}>{t.label}</option>)}
+                <option value="cap">Individually capped</option>
+                {splices.filter(sp=>sp.members.some(m=>m.cableId===record.id&&m.end===item.side&&m.conductor===color)).map(sp=><option key={sp.id} value={`splice:${sp.id}`}>Splice · {sp.connector}</option>)}
+              </select>
+            </label>)}
+          </div>
+        </details>;
+      })}
+    </div>}
     <div style={{marginTop:12,fontSize:16,fontWeight:700,color:"#aeeaff"}}>Wire destinations & terminations</div>
     <div style={{display:"grid",gap:8,margin:"8px 0 12px"}}>
       {wireLabels.map(item=><div key={item.color} style={{border:"1px solid #52869d",background:"#173a4b",borderRadius:6,padding:"9px 10px"}}>

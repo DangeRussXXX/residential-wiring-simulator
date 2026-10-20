@@ -262,5 +262,5 @@ hr {
 
 }
 /* Update 35: readable workspace controls */
-.nova-wall-controls, .nova-wall-controls *:not(svg):not(path):not(circle):not(rect):not(text):not(g) { font-size: 22px !important; line-height: 1.35; }
+.nova-wall-controls { font-size: 14px; line-height: 1.35; }
 .nova-wall-controls button, .nova-wall-controls select, .nova-wall-controls input { min-height: 42px; }

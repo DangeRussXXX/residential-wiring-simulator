@@ -371,3 +371,12 @@
 }
 .nova-wall-controls > details.nova-panel-section > summary:hover {background:#23536a !important;}
 .nova-wall-controls > details.nova-panel-section > :not(summary) {box-sizing:border-box;}
+
+/* Panel styling fix: actual top-level accordion headers */
+.nova-wall-controls > details.nova-panel-section {width:100% !important;margin:0 0 8px !important;padding:0 !important;border:1px solid #397e99 !important;border-radius:7px !important;background:#193e50 !important;overflow:hidden !important;}
+.nova-wall-controls > details.nova-panel-section > summary {display:block !important;position:relative !important;width:100% !important;min-height:40px !important;margin:0 !important;padding:10px 12px 10px 28px !important;border:0 !important;border-radius:0 !important;background:#193e50 !important;color:#8eeaff !important;font-family:Arial,sans-serif !important;font-size:14px !important;font-weight:700 !important;line-height:20px !important;list-style:none !important;box-sizing:border-box !important;}
+.nova-wall-controls > details.nova-panel-section > summary::-webkit-details-marker {display:none !important;}
+.nova-wall-controls > details.nova-panel-section > summary::marker {content:"" !important;}
+.nova-wall-controls > details.nova-panel-section > summary::before {content:"▶";position:absolute;left:10px;top:10px;color:#83ddf5;font-size:12px;}
+.nova-wall-controls > details.nova-panel-section[open] > summary::before {content:"▼";}
+.nova-wall-controls > details.nova-panel-section > summary:hover {background:#23536a !important;}

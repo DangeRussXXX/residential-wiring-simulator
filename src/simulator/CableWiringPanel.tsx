@@ -181,14 +181,7 @@ export function LiveWiringDiagram({cable,end,device,allCables,onTerminate,front=
   const points=positions(kind,terms);
   const colorsList=conductors(cable.type);
   const attached=cable.ends[end]||{};
-  const boxId=boxMounts?.[cable[end]]?.boxId ?? cable[end];
-  const sameBox=(deviceId:string)=> (boxMounts?.[deviceId]?.boxId ?? deviceId)===boxId;
-  const boxDevices=devices.filter(d=>sameBox(d.id));
-  const terminalOptions=boxDevices.flatMap(d=>deviceTerminals(d).map(t=>({
-    ...t,id:`${d.id}::${t.id}`,label:`${d.name} · ${t.label}`
-  })));
-  const terminalKey=(key:string)=>key.includes("::")?key.split("::").slice(1).join("::"):key;
-  const targetDevice=(key:string)=>key.includes("::")?key.split("::")[0]:dev.id;
+  const boxId=cable[end];
   const splices=allCables.flatMap(c=>c.splices??[]).filter(sp=>sp.deviceId===boxId)
     .filter((sp,i,a)=>a.findIndex(x=>x.id===sp.id)===i);
   const view=front?"front":"rear";

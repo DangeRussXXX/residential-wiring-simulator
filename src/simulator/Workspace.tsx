@@ -153,6 +153,8 @@ function Workspace(
     try { localStorage.setItem(`rws-box-mounts:${workspaceScope}`, JSON.stringify(boxMounts)); } catch { /* storage disabled */ }
   }, [boxMounts, workspaceScope]);
   const [selectedBoxId, setSelectedBoxId] = useState<string | null>(null);
+  // Wiring pop-outs are workspace views, not additional wall installations.
+  const [openBoxWiringViews, setOpenBoxWiringViews] = useState<Record<string, boolean>>({});
   const [movingBoxId, setMovingBoxId] = useState<string | null>(null);
   useEffect(() => {
     try { localStorage.setItem(`rws-empty-boxes:${workspaceScope}`, JSON.stringify(wallBoxes)); } catch { /* storage disabled */ }
@@ -161,6 +163,7 @@ function Workspace(
     try { setWallBoxes(JSON.parse(localStorage.getItem(`rws-empty-boxes:${workspaceScope}`) || "[]")); }
     catch { setWallBoxes([]); }
     setSelectedBoxId(null);
+    setOpenBoxWiringViews({});
     try { setBoxMounts(JSON.parse(localStorage.getItem(`rws-box-mounts:${workspaceScope}`) || "{}")); }
     catch { setBoxMounts({}); }
   }, [workspaceScope]);
@@ -2331,7 +2334,7 @@ function Workspace(
                 if (Object.values(boxMounts).some(m=>m.boxId===box.id && m.gang===gang)) {
                   setPlacementMessage(`Gang ${gang+1} is occupied. Drop into an empty position.`); return;
                 }
-                createDevice(name,box.x+gang*52,box.y,{boxId:box.id,gang});
+                createDevice(name,box.x+boxWidth(box.gangs)+35+gang*30,Math.max(12,box.y-190),{boxId:box.id,gang});
                 setSelectedBoxId(box.id); setMovingBoxId(null); setPlacementMessage("");
               }}
               onMouseDown={e => { e.stopPropagation(); setSelectedDevice(null); setSelectedBoxId(box.id); setMovingBoxId(box.id); }}
@@ -2349,8 +2352,15 @@ function Workspace(
                 return <div key={i} onMouseDown={e=>{
                     if(!mounted)return;
                     e.stopPropagation();setMovingBoxId(null);setSelectedBoxId(box.id);setSelectedDevice(mounted);onSelectDevice?.(mounted);
+                    if(wireMode && cableSource) finishCable(mounted.id);
                   }} title={mounted?`${mounted.name} — gang ${i+1}`:`Empty gang ${i+1} — drop a device here`}
                   style={{flex:1,minWidth:0,height:70,border:mounted&&selectedDevice?.id===mounted.id?"2px solid #39ff14":"1px dashed #405b6a",borderRadius:3,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",fontSize:10,color:"#183444",background:mounted?"#f0eee6":"#b4c4cb",cursor:mounted?"pointer":"default",pointerEvents:"auto"}}>
+                  {mounted && <button type="button" title={`Open ${mounted.name} wiring pop-out`} onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();setSelectedBoxId(box.id);setSelectedDevice(mounted);onSelectDevice?.(mounted);setOpenBoxWiringViews(prev=>({...prev,[mounted.id]:!prev[mounted.id]}));
+                    // Older Stage B mounts stored their pop-out at the box itself.
+                    // Move that VIEW only; physical cable routing still uses boxMounts.
+                    if(Math.abs(mounted.x-box.x)<boxWidth(box.gangs)+10 && Math.abs(mounted.y-box.y)<100){
+                      setDevices(prev=>prev.map(d=>d.id===mounted.id?{...d,x:box.x+boxWidth(box.gangs)+35+i*30,y:Math.max(12,box.y-190)}:d));
+                    }}} style={{position:"absolute",top:-20,left:`calc(${(i+0.5)*100/box.gangs}% - 21px)`,fontSize:10,fontWeight:700,padding:"2px 4px",background:openBoxWiringViews[mounted.id]?"#26774b":"#075e80",border:"1px solid #8de0f5",borderRadius:3,color:"white",cursor:"pointer",zIndex:12}}>{openBoxWiringViews[mounted.id]?"Close":"Wires"}</button>}
                   {mounted?<><svg viewBox="0 0 36 52" width="35" height="50" aria-label={mounted.name}>
                     <rect x="3" y="1" width="30" height="50" rx="4" fill="#f7f5ed" stroke="#667780" strokeWidth="2"/>
                     {receptacle?<>{[15,36].map(y=><g key={y}><rect x="11" y={y-5} width="3" height="9" fill="#303638"/><rect x="22" y={y-5} width="3" height="9" fill="#303638"/><circle cx="18" cy={y+6} r="2" fill="#303638"/></g>)}{mounted?.name==="GFCI Receptacle"&&<rect x="14" y="24" width="8" height="4" fill="#d24c43"/>}</>:<><rect x="13" y="13" width="10" height="26" rx="2" fill="#b8b8b0" stroke="#707f85"/><path d="M15 16 L21 13 L21 29 L15 32 Z" fill="white"/></>}
@@ -2378,7 +2388,7 @@ function Workspace(
             })}
           </svg>}
           {
-            !blueprintMode && devices.filter(d=>!boxMounts[d.id] || wireMode).map(
+            !blueprintMode && devices.filter(d=>!boxMounts[d.id] || openBoxWiringViews[d.id]).map(
               device => (
 
                 <Device

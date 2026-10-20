@@ -1,0 +1,8 @@
+Stage E: Restore installed device wiring pop-outs.
+- A Wires / Close toggle is shown above each occupied gang.
+- Only explicitly opened installed-device views appear as separate wall pop-outs.
+- Clicking an installed gang while routing a cable targets that actual device ID.
+- Physical cable endpoints remain aligned with gang positions in the electrical box.
+- Newly mounted devices receive an independent initial pop-out location; older mounts are adjusted on first opening if their saved pop-out overlaps the box.
+- The original Device component and its wiring controls are reused without modifying the electrical engine.
+- No browser or TypeScript build verification was performed.

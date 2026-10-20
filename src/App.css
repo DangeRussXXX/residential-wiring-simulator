@@ -421,3 +421,26 @@
 #rws-wall-tools-panel-target .nova-wall-controls > details.nova-panel-section > summary::before {
  top:14px !important; left:10px !important; font-size:13px !important; line-height:16px !important;
 }
+
+/* Update 84 Stage J: DOUBLE text in the right-hand panel only.
+   Intentionally overrides earlier !important and inline font sizes.
+   Does not affect wall devices, wiring SVGs or project data. */
+.nova-double-text-sidebar { font-size: 28px !important; line-height: 1.5 !important; }
+.nova-double-text-sidebar :is(div,span,p,small,strong,b,em,label,li,section,article,option,td,th) {
+  font-size: 28px !important;
+  line-height: 1.5 !important;
+}
+.nova-double-text-sidebar :is(button,input,select,textarea) {
+  font-size: 28px !important;
+  line-height: 1.4 !important;
+  min-height: 52px;
+}
+.nova-double-text-sidebar :is(summary,h1,h2,h3,h4),
+.nova-double-text-sidebar .nova-unified-controls > details > summary,
+.nova-double-text-sidebar #rws-wall-tools-panel-target .nova-wall-controls > details.nova-panel-section > summary {
+  font-size: 32px !important;
+  line-height: 1.35 !important;
+  min-height: 55px !important;
+}
+.nova-double-text-sidebar .nova-panel-global-actions button {font-size:30px !important;}
+.nova-double-text-sidebar :is(svg,svg *) {font-size:inherit;}

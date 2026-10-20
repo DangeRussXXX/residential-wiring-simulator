@@ -629,7 +629,8 @@ export default function SimulatorLayout() {
 
 
           <div
-            style={{
+            className="nova-double-text-sidebar"
+          style={{
               flex: 1,
               overflowY: "auto",
               padding: "10px"

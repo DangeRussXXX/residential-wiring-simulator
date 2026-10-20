@@ -2283,7 +2283,18 @@ function Workspace(
                   const innerWidth = boxWidth(wallBox.gangs) - 14;
                   const slotWidth = (innerWidth - (wallBox.gangs - 1) * 4) / wallBox.gangs;
                   const slotCenter = wallBox.x + 7 + mount.gang * (slotWidth + 4) + slotWidth / 2;
-                  return {x:slotCenter, y:wallBox.y+3};
+                  // Spread separate cable entries within this gang instead of
+                  // piling every sheath onto the same pixel. Use cable IDs so
+                  // the layout is stable when pop-outs are opened or moved.
+                  const attachedToGang = cables
+                    .filter(w => w.from === device.id || w.to === device.id)
+                    .sort((a, b) => a.id.localeCompare(b.id));
+                  const position = Math.max(0, attachedToGang.findIndex(w => w.id === c.id));
+                  const count = Math.max(1, attachedToGang.length);
+                  const available = Math.max(0, slotWidth - 14);
+                  const spread = count === 1 ? 0 : Math.min(12, available / (count - 1));
+                  const offset = (position - (count - 1) / 2) * spread;
+                  return {x:slotCenter + offset, y:wallBox.y+3};
                 }
                 const attached=cables.filter(w=>w.from===device.id||w.to===device.id)
                   .sort((a,b)=>Number(b.from===PANEL_SOURCE_ID)-Number(a.from===PANEL_SOURCE_ID));

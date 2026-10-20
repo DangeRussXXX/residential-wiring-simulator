@@ -2177,6 +2177,8 @@ function Workspace(
                     device
                   }
                   wiringCables={cables.filter(c=>c.from===device.id||c.to===device.id)}
+                  allWiringCables={cables}
+                  onWiringTerminate={(cableId,end,conductor,terminal)=>saveCables(cables.map(c=>c.id===cableId?{...c,ends:{...c.ends,[end]:{...c.ends[end],[conductor]:terminal}}}:c))}
 
                   wireMode={
                     wireMode

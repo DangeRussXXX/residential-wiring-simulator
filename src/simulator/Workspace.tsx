@@ -2014,7 +2014,7 @@ function Workspace(
               </div>}
               {selectedCable && <CableWiringPanel key={selectedCable.id} initialEnd="to" cable={selectedCable} devices={devices}
                 sharedView={wiringFaces[selectedCable[inspectedCableEnd]]??"front"} onSharedViewChange={face=>updateWiringFace(selectedCable[inspectedCableEnd],face)} onActiveEndChange={end=>{setInspectedCableEnd(end);const id=selectedCable[end];const target=devices.find(d=>d.id===id);if(target){setSelectedDevice(target);onSelectDevice?.(target);}}}
-                allCables={cables} onChangeCables={saveCables}
+                allCables={cables} boxMounts={boxMounts} onChangeCables={saveCables}
                 onChange={next=>saveCables(cables.map(c=>c.id===next.id?next:c))}
                 onRemove={()=>{
                   if(!window.confirm("Remove this cable and its conductor terminations?"))return;
@@ -2360,14 +2360,14 @@ function Workspace(
                     // Move that VIEW only; physical cable routing still uses boxMounts.
                     if(Math.abs(mounted.x-box.x)<boxWidth(box.gangs)+10 && Math.abs(mounted.y-box.y)<100){
                       setDevices(prev=>prev.map(d=>d.id===mounted.id?{...d,x:box.x+boxWidth(box.gangs)+35+i*30,y:Math.max(12,box.y-190)}:d));
-                    }}} style={{position:"absolute",top:-20,left:`calc(${(i+0.5)*100/box.gangs}% - 21px)`,fontSize:10,fontWeight:700,padding:"2px 4px",background:openBoxWiringViews[mounted.id]?"#26774b":"#075e80",border:"1px solid #8de0f5",borderRadius:3,color:"white",cursor:"pointer",zIndex:12}}>{openBoxWiringViews[mounted.id]?"Close":"Wires"}</button>}
+                    }}} style={{position:"absolute",top:4,left:`calc(${(i+0.5)*100/box.gangs}% - 10px)`,fontSize:12,fontWeight:700,padding:"1px 3px",background:openBoxWiringViews[mounted.id]?"#26774b":"#075e80",border:"1px solid #8de0f5",borderRadius:3,color:"white",cursor:"pointer",zIndex:12}}>{openBoxWiringViews[mounted.id]?"×":"↗"}</button>}
                   {mounted?<><svg viewBox="0 0 36 52" width="35" height="50" aria-label={mounted.name}>
                     <rect x="3" y="1" width="30" height="50" rx="4" fill="#f7f5ed" stroke="#667780" strokeWidth="2"/>
                     {receptacle?<>{[15,36].map(y=><g key={y}><rect x="11" y={y-5} width="3" height="9" fill="#303638"/><rect x="22" y={y-5} width="3" height="9" fill="#303638"/><circle cx="18" cy={y+6} r="2" fill="#303638"/></g>)}{mounted?.name==="GFCI Receptacle"&&<rect x="14" y="24" width="8" height="4" fill="#d24c43"/>}</>:<><rect x="13" y="13" width="10" height="26" rx="2" fill="#b8b8b0" stroke="#707f85"/><path d="M15 16 L21 13 L21 29 L15 32 Z" fill="white"/></>}
                   </svg></>:<span>+ {i+1}</span>}
                 </div>;
               })}
-              <span style={{position:"absolute",bottom:"100%",left:0,whiteSpace:"nowrap",fontSize:12,fontWeight:700,background:"#112b43",color:"white",padding:"2px 5px"}}>{box.kind}</span>
+
               {selectedBoxId===box.id && <button type="button" title="Remove empty box" onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();if(Object.values(boxMounts).some(m=>m.boxId===box.id)){setPlacementMessage("Remove installed devices before deleting this box.");return;}setWallBoxes(prev=>prev.filter(b=>b.id!==box.id));setSelectedBoxId(null);setMovingBoxId(null);}} style={{position:"absolute",right:-13,top:-15,borderRadius:12,background:"#a31f2c",color:"white",border:"1px solid white",cursor:"pointer"}}>×</button>}
             </div>
           ))}

@@ -5,7 +5,7 @@ export type CableKind = "14/2 NM-B"|"14/3 NM-B"|"12/2 NM-B"|"12/3 NM-B"|"14/2 MC
 export type CableEnd = "from"|"to";
 export const PANEL_SOURCE_ID="__panel_p1__";
 export type SpliceMember = {cableId:string;end:CableEnd;conductor:string};
-export type SpliceRecord = {id:string;deviceId:string;members:SpliceMember[];connector:string;pigtailTerminal?:string};
+export type SpliceRecord = {id:string;deviceId:string;members:SpliceMember[];connector:string;pigtailTerminal?:string;pigtailTerminals?:string[]};
 export type CableRecord = {
   id:string; from:string; to:string; type:CableKind;
   areaId?:string; wall?:"NORTH"|"SOUTH"|"EAST"|"WEST"; breakerSlot?:number;
@@ -181,7 +181,14 @@ export function LiveWiringDiagram({cable,end,device,allCables,onTerminate,front=
   const points=positions(kind,terms);
   const colorsList=conductors(cable.type);
   const attached=cable.ends[end]||{};
-  const boxId=cable[end];
+  const boxId=boxMounts?.[cable[end]]?.boxId ?? cable[end];
+  const sameBox=(deviceId:string)=> (boxMounts?.[deviceId]?.boxId ?? deviceId)===boxId;
+  const boxDevices=devices.filter(d=>sameBox(d.id));
+  const terminalOptions=boxDevices.flatMap(d=>deviceTerminals(d).map(t=>({
+    ...t,id:`${d.id}::${t.id}`,label:`${d.name} · ${t.label}`
+  })));
+  const terminalKey=(key:string)=>key.includes("::")?key.split("::").slice(1).join("::"):key;
+  const targetDevice=(key:string)=>key.includes("::")?key.split("::")[0]:dev.id;
   const splices=allCables.flatMap(c=>c.splices??[]).filter(sp=>sp.deviceId===boxId)
     .filter((sp,i,a)=>a.findIndex(x=>x.id===sp.id)===i);
   const view=front?"front":"rear";
@@ -417,9 +424,9 @@ export function UnifiedBoxWiring({device,allCables,onTerminate,front=false}:{
   </div>;
 }
 
-export default function CableWiringPanel({cable,devices,onChange,onRemove,allCables,onChangeCables,initialEnd="from",sharedView, onSharedViewChange,onActiveEndChange}:{
+export default function CableWiringPanel({cable,devices,onChange,onRemove,allCables,onChangeCables,boxMounts,initialEnd="from",sharedView, onSharedViewChange,onActiveEndChange}:{
   cable:CableRecord;devices:ElectricalDevice[];onChange:(c:CableRecord)=>void;onRemove:()=>void;
-  allCables?:CableRecord[];onChangeCables?:(cables:CableRecord[])=>void;initialEnd?:CableEnd;
+  allCables?:CableRecord[];onChangeCables?:(cables:CableRecord[])=>void;boxMounts?:Record<string,{boxId:string;gang:number}>;initialEnd?:CableEnd;
   sharedView?:"rear"|"front";onSharedViewChange?:(view:"rear"|"front")=>void;onActiveEndChange?:(end:CableEnd)=>void;
 }) {
   const [end,setEnd]=useState<CableEnd>(initialEnd);
@@ -443,16 +450,23 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove,allCab
   ]:deviceTerminals(dev);
   const colorsList=conductors(cable.type);
   const attached=cable.ends[end]||{};
-  const boxId=cable[end];
+  const boxId=boxMounts?.[cable[end]]?.boxId ?? cable[end];
+  const sameBox=(deviceId:string)=> (boxMounts?.[deviceId]?.boxId ?? deviceId)===boxId;
+  const boxDevices=devices.filter(d=>sameBox(d.id));
+  const terminalOptions=boxDevices.flatMap(d=>deviceTerminals(d).map(t=>({
+    ...t,id:`${d.id}::${t.id}`,label:`${d.name} · ${t.label}`
+  })));
+  const terminalKey=(key:string)=>key.includes("::")?key.split("::").slice(1).join("::"):key;
+  const targetDevice=(key:string)=>key.includes("::")?key.split("::")[0]:dev.id;
   // Other cables entering the same physical box, including a panel home run.
   // Each retains its own saved termination records and can be wired in place.
   const boxCables=(allCables??[cable]).flatMap(c=>
-    (["from","to"] as CableEnd[]).filter(side=>c[side]===boxId)
+    (["from","to"] as CableEnd[]).filter(side=>sameBox(c[side]))
       .map(side=>({cable:c,side,isHomeRun:c.from===PANEL_SOURCE_ID})));
   const otherBoxCables=boxCables.filter(item=>item.cable.id!==cable.id);
-  const available=(allCables??[cable]).flatMap(c=>(["from","to"] as CableEnd[]).flatMap(e=>c[e]===boxId?
+  const available=(allCables??[cable]).flatMap(c=>(["from","to"] as CableEnd[]).flatMap(e=>sameBox(c[e])?
     conductors(c.type).map(conductor=>({key:`${c.id}|${e}|${conductor}`,cableId:c.id,end:e,conductor,cable:c})):[]));
-  const splices=(allCables??[cable]).flatMap(c=>c.splices??[]).filter(sp=>sp.deviceId===boxId);
+  const splices=(allCables??[cable]).flatMap(c=>c.splices??[]).filter(sp=>sameBox(sp.deviceId)||sp.deviceId===boxId);
   const selectedMembers=available.filter(a=>spliceSelection.includes(a.key));
   const selectedFamily=selectedMembers.length>0?selectedMembers[0].conductor==="ground"?"ground":selectedMembers[0].conductor==="white"?"neutral":"hot":null;
   // Terminal options come from the actual device, not from the selected cable.
@@ -461,23 +475,41 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove,allCab
   const terminalFamily=(id:string):"ground"|"neutral"|"hot"=>
     ["ground","ground-bar"].includes(id)?"ground":
     ["silver","neutral-bar","load-neutral","fixture-neutral","neutral-splice"].includes(id)?"neutral":"hot";
-  const compatibleTerminals=terms.filter(t=>!selectedFamily||terminalFamily(t.id)===selectedFamily);
-  const hasPigtailTo=(terminal:string,excludeId?:string)=>splices.some(sp=>sp.id!==excludeId&&sp.pigtailTerminal===terminal);
-  const terminalUsedByCable=(terminal:string)=>available.some(a=>a.cable.ends[a.end]?.[a.conductor]===terminal);
+  const compatibleTerminals=(terminalOptions.length?terminalOptions:terms).filter(t=>!selectedFamily||terminalFamily(terminalKey(t.id))===selectedFamily);
+  const spliceTargets=(sp:SpliceRecord)=>sp.pigtailTerminals?.length?sp.pigtailTerminals:(sp.pigtailTerminal?[sp.pigtailTerminal]:[]);
+  const hasPigtailTo=(terminal:string,excludeId?:string)=>splices.some(sp=>sp.id!==excludeId&&spliceTargets(sp).includes(terminal));
+  const terminalUsedByCable=(terminal:string)=>available.some(a=>
+    a.cable.ends[a.end]?.[a.conductor]===terminal ||
+    (targetDevice(terminal)===a.cable[a.end] && a.cable.ends[a.end]?.[a.conductor]===terminalKey(terminal))
+  );
+  const addSplicePigtail=(id:string,terminal:string)=>{
+    setSpliceError("");
+    const splice=splices.find(sp=>sp.id===id);
+    if(!splice||!terminal)return;
+    const family=splice.members[0]?.conductor==="ground"?"ground":splice.members[0]?.conductor==="white"?"neutral":"hot";
+    if(!compatibleTerminals.some(t=>t.id===terminal)||terminalFamily(terminalKey(terminal))!==family||
+       spliceTargets(splice).includes(terminal)||hasPigtailTo(terminal,id)||terminalUsedByCable(terminal)){
+      setSpliceError("Choose a free, compatible terminal in this box.");return;
+    }
+    const targets=[...spliceTargets(splice),terminal];
+    saveAll((allCables??[cable]).map(c=>({...c,splices:c.splices?.map(sp=>sp.id===id?{
+      ...sp,pigtailTerminal:targets[0],pigtailTerminals:targets
+    }:sp)})));
+  };
   const updateSplicePigtail=(id:string,terminal:string)=>{
     setSpliceError("");
     const splice=splices.find(sp=>sp.id===id);
     if(!splice)return;
     const first=splice.members[0];
     const family=first?.conductor==="ground"?"ground":first?.conductor==="white"?"neutral":"hot";
-    if(terminal&&(!terms.some(t=>t.id===terminal)||terminalFamily(terminal)!==family)){
+    if(terminal&&(!compatibleTerminals.some(t=>t.id===terminal)||terminalFamily(terminalKey(terminal))!==family)){
       setSpliceError("Choose a compatible terminal for the existing splice.");return;
     }
     if(terminal&&(hasPigtailTo(terminal,id)||terminalUsedByCable(terminal))){
       setSpliceError("That terminal is already occupied. Disconnect the existing wire first.");return;
     }
     saveAll((allCables??[cable]).map(c=>({...c,splices:c.splices?.map(sp=>
-      sp.id===id?{...sp,pigtailTerminal:terminal||undefined}:sp)})));
+      sp.id===id?{...sp,pigtailTerminal:terminal||undefined,pigtailTerminals:terminal?[terminal]:[]}:sp)})));
   };
   const deviceLabel=(id:string, fallback?:string)=>{
     if(id===PANEL_SOURCE_ID)return `Panel P1 · Breaker #${cable.breakerSlot??1}`;
@@ -488,7 +520,7 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove,allCab
     if(!terminal)return "Not connected";
     if(terminal==="cap")return "Individually capped";
     if(terminal.startsWith("splice:"))return "Wire-nut splice";
-    return terms.find(t=>t.id===terminal)?.label||terminal.replaceAll("-"," ");
+    return [...terminalOptions,...terms].find(t=>t.id===terminal)?.label||terminal.replaceAll("-"," ");
   };
   const otherEnd:CableEnd=end==="from"?"to":"from";
   const wireLabels=colorsList.map(color=>{
@@ -516,10 +548,10 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove,allCab
     if(families.size!==1){setSpliceError("Only splice conductors from the same hot, neutral, or ground group.");return;}
     const family=[...families][0];
     const allowed=family==="ground"?["ground","ground-bar"]:family==="neutral"?["silver","neutral-bar","load-neutral","fixture-neutral"]:["line","load","common","traveler-1","traveler-2","brass","breaker-hot","load-hot","fixture-hot"];
-    if(pigtailTerminal&&!allowed.includes(pigtailTerminal)){setSpliceError("Choose a compatible terminal for the pigtail.");return;}
+    if(pigtailTerminal&&!allowed.includes(terminalKey(pigtailTerminal))){setSpliceError("Choose a compatible terminal for the pigtail.");return;}
     if(pigtailTerminal&&(hasPigtailTo(pigtailTerminal)||terminalUsedByCable(pigtailTerminal))){setSpliceError("That terminal is already occupied. Disconnect the existing wire first.");return;}
     const id=`splice-${Date.now()}-${Math.random().toString(36).slice(2,7)}`;
-    const splice:SpliceRecord={id,deviceId:boxId,connector,members:members.map(({cableId,end,conductor})=>({cableId,end,conductor})),...(pigtailTerminal?{pigtailTerminal}: {})};
+    const splice:SpliceRecord={id,deviceId:boxId,connector,members:members.map(({cableId,end,conductor})=>({cableId,end,conductor})),...(pigtailTerminal?{pigtailTerminal,pigtailTerminals:[pigtailTerminal]}: {})};
     saveAll((allCables??[cable]).map(c=>{
       const entries=members.filter(m=>m.cableId===c.id);
       let next={...c,ends:{from:{...c.ends.from},to:{...c.ends.to}}};
@@ -621,11 +653,8 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove,allCab
     </div>)}
     {!fromPanel&&<div style={{marginTop:14,padding:10,border:"1px solid #38667b",borderRadius:6}}>
       <strong style={{color:"#83e5ff"}}>Splices & Pigtails</strong>
-      <p style={{fontSize:15,margin:"6px 0"}}>For a feed-through hot: select the incoming BLACK and outgoing BLACK from different cables, choose the device hot terminal for a pigtail, then create the splice. Use the same box for both cables.</p>
-      {(kind==="switch-single"||kind==="switch-three-way")&&<div style={{fontSize:14,color:"#ffd69b",padding:"7px 0"}}>
-        Switch-box note: only splice incoming and outgoing BLACK conductors for an always-hot feed-through.
-        The switched-hot going to a controlled light must connect to the switch LOAD terminal, not to the always-hot splice.
-      </div>}
+
+
       <div style={{maxHeight:190,overflowY:"auto"}}>{available.map(a=>{
         const val=a.cable.ends[a.end]?.[a.conductor];
         return <label key={a.key} style={{display:"flex",gap:8,alignItems:"center",fontSize:15,margin:"5px 0",opacity:val?0.55:1}}>
@@ -647,7 +676,7 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove,allCab
       <button type="button" disabled={spliceSelection.length<2} onClick={createSplice} style={{marginTop:8,padding:11,background:"#155c7c",color:"white",border:"1px solid #4b9fbc",borderRadius:5,fontSize:16}}>{pigtailTerminal?"Create splice + pigtail":"Join selected wires"}</button>
       {spliceError&&<div role="alert" style={{color:"#ffb2a5",fontSize:15,marginTop:7}}>{spliceError}</div>}
       {splices.map(sp=><div key={sp.id} style={{padding:"8px 0",borderBottom:"1px solid #35566a",fontSize:14}}>
-        🟠 {sp.connector} · {sp.members.length} cable conductors{sp.pigtailTerminal?` + pigtail → ${terms.find(t=>t.id===sp.pigtailTerminal)?.label??sp.pigtailTerminal}`:""}
+        🟠 {sp.connector} · {sp.members.length} conductors {spliceTargets(sp).map(t=>` + ${terminalLabel(t)}`).join("")}
         <label style={{display:"block",marginTop:7,color:"#bcefff"}}>
           Pigtail from this existing splice
           <select aria-label={`Pigtail terminal for splice ${sp.id}`}
@@ -655,14 +684,27 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove,allCab
             onChange={e=>updateSplicePigtail(sp.id,e.target.value)}
             style={{display:"block",width:"100%",padding:8,background:"#173d50",color:"white",border:"1px solid #52869d",borderRadius:4}}>
             <option value="">No pigtail</option>
-            {terms.filter(t=>terminalFamily(t.id)===(sp.members[0]?.conductor==="ground"?"ground":sp.members[0]?.conductor==="white"?"neutral":"hot"))
+            {(terminalOptions.length?terminalOptions:terms).filter(t=>terminalFamily(terminalKey(t.id))===(sp.members[0]?.conductor==="ground"?"ground":sp.members[0]?.conductor==="white"?"neutral":"hot"))
               .filter(t=>t.id===sp.pigtailTerminal||(!hasPigtailTo(t.id,sp.id)&&!terminalUsedByCable(t.id)))
               .map(t=><option key={t.id} value={t.id}>{t.label}</option>)}
           </select>
         </label>
+        <label style={{display:"block",marginTop:7}}>Add another device pigtail
+          <select value="" onChange={e=>addSplicePigtail(sp.id,e.target.value)} style={{display:"block",width:"100%",padding:8,background:"#173d50",color:"white"}}>
+            <option value="">Choose a free terminal…</option>
+            {(terminalOptions.length?terminalOptions:terms)
+              .filter(t=>terminalFamily(terminalKey(t.id))===(sp.members[0]?.conductor==="ground"?"ground":sp.members[0]?.conductor==="white"?"neutral":"hot"))
+              .filter(t=>!spliceTargets(sp).includes(t.id)&&!hasPigtailTo(t.id,sp.id)&&!terminalUsedByCable(t.id))
+              .map(t=><option key={t.id} value={t.id}>{t.label}</option>)}
+          </select>
+        </label>
+        {spliceTargets(sp).length>1&&<div>{spliceTargets(sp).slice(1).map(t=><div key={t} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>{terminalLabel(t)} <button type="button" onClick={()=>{
+          const targets=spliceTargets(sp).filter(x=>x!==t);
+          saveAll((allCables??[cable]).map(c=>({...c,splices:c.splices?.map(item=>item.id===sp.id?{...item,pigtailTerminal:targets[0],pigtailTerminals:targets}:item)})));
+        }}>Remove</button></div>)}</div>}
         <button type="button" onClick={()=>removeSplice(sp.id)} style={{marginTop:7,padding:5}}>Remove splice</button>
       </div>)}
-      <p style={{fontSize:13,color:"#b7cbd5"}}>Training model: connector suitability, box fill, conductor preparation, and bonding must be checked against the actual connector/device listing. Pigtails are drawn in the device-box editor and saved as splice-to-terminal connections; they are not separate wall cable runs.</p>
+
     </div>}
     <button type="button" onClick={onRemove} style={{marginTop:8,padding:8,background:"#5d2b37",color:"#fff",border:"1px solid #a85c69",borderRadius:5}}>Remove this cable</button>
   </section>;

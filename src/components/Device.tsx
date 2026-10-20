@@ -73,6 +73,37 @@ function DeviceFace({ device }: { device: ElectricalDevice }) {
 }
 
 
+/** Face and terminal markers share a single visual for both wired and newly added devices.
+ * Marker positions are instructional overlays: screws are physically on sides/rear. */
+function FaceWithTerminals({device}:{device:ElectricalDevice}) {
+  const symbol=device.symbol;
+  const isSingle=symbol==="switch-single";
+  const isThree=symbol==="switch-three-way";
+  const isFour=symbol==="switch-four-way";
+  const isSwitch=isSingle||isThree||isFour||symbol==="dimmer";
+  type Marker={label:string;x:number;y:number;color:string};
+  const brass="#e0aa4e", silver="#dbe8f0", green="#38bd81", dark="#333c46";
+  let marks:Marker[]=[];
+  if(isSingle||symbol==="dimmer")marks=[{label:"1",x:111,y:46,color:brass},{label:"2",x:111,y:91,color:brass},{label:"G",x:20,y:109,color:green}];
+  else if(isThree)marks=[{label:"COM",x:20,y:46,color:dark},{label:"T1",x:111,y:45,color:brass},{label:"T2",x:111,y:91,color:brass},{label:"G",x:20,y:109,color:green}];
+  else if(isFour)marks=[{label:"IN1",x:20,y:43,color:brass},{label:"IN2",x:20,y:87,color:brass},{label:"OUT1",x:111,y:43,color:brass},{label:"OUT2",x:111,y:87,color:brass},{label:"G",x:65,y:113,color:green}];
+  else if(symbol==="gfci")marks=[{label:"LN N",x:20,y:42,color:silver},{label:"LD N",x:20,y:85,color:silver},{label:"LN H",x:111,y:42,color:brass},{label:"LD H",x:111,y:85,color:brass},{label:"G",x:65,y:113,color:green}];
+  else if(symbol==="outlet")marks=[{label:"N1",x:20,y:43,color:silver},{label:"N2",x:20,y:86,color:silver},{label:"H1",x:111,y:43,color:brass},{label:"H2",x:111,y:86,color:brass},{label:"G",x:65,y:113,color:green}];
+  return <svg viewBox="0 0 132 136" width="132" height="136" role="img" aria-label={`${device.name} front face with terminal overlay`}>
+    <rect x="24" y="3" width="83" height="126" rx="7" fill="#e8eced" stroke="#849eab" strokeWidth="3"/>
+    <rect x="38" y="10" width="55" height="112" rx="6" fill="#f6f5ef" stroke="#afb9ba" strokeWidth="1.5"/>
+    {isSwitch ? <g>
+      <rect x="55" y="39" width="22" height="54" rx="3" fill="#d5d8d6" stroke="#9ba5a8"/>
+      <path d="M59 45 L73 41 L73 78 L59 83 Z" fill="#fffefa" stroke="#a5afb2"/>
+      <text x="66" y="102" fontSize="8" fill="#425965" textAnchor="middle">{isFour?"4-WAY":isThree?"3-WAY":symbol==="dimmer"?"DIM":"ON/OFF"}</text>
+    </g> : symbol==="gfci"||symbol==="outlet" ? <g>
+      {[33,94].map(y=><g key={y}><path d={`M 52 ${y-9} v13 M 78 ${y-9} v13`} stroke="#35444d" strokeWidth="4" strokeLinecap="round"/><path d={`M65 ${y+4} l-4 7 h8 z`} fill="#35444d"/></g>)}
+      {symbol==="gfci"&&<g><rect x="50" y="53" width="32" height="12" rx="2" fill="#be4442"/><rect x="50" y="67" width="32" height="12" rx="2" fill="#48515a"/><text x="66" y="61" fontSize="6" fill="white" textAnchor="middle">RESET</text><text x="66" y="75" fontSize="6" fill="white" textAnchor="middle">TEST</text></g>}
+    </g> : <g transform="translate(44 25) scale(.35)"><FrontDeviceArtwork symbol={symbol}/></g>}
+    {marks.map((m,i)=><g key={`${m.label}-${i}`}><circle cx={m.x} cy={m.y} r="7" fill={m.color} stroke="#284454" strokeWidth="1.5"/><title>{m.label} terminal (side/rear overlay)</title><text x={m.x} y={m.y-10} fontSize="7" fontWeight="bold" fill="#172f3d" textAnchor="middle">{m.label}</text></g>)}
+  </svg>;
+}
+
 /** Integrated open box: all conductors and connectors are drawn INSIDE the same device. */
 /** Readable expanded wiring editor visualization. Each conductor is drawn only to its
  * saved terminal; unassigned ends stop loose, caps stay isolated, and splices
@@ -169,10 +200,10 @@ export default function Device({ device, wireMode, selectedTerminal, selected, o
           {wiringCables.length>1&&<div style={{fontSize:12,color:"#245269"}}>All {wiringCables.length} cables shown together</div>}
         </div>})() :
         showWiredBox ? (face==="front" ?
-          <div title="Front device face" style={{width:142,height:130,background:"#50778a",border:"2px solid #7197a9",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{width:96,height:118,display:"flex",alignItems:"center",justifyContent:"center"}}><FrontDeviceArtwork symbol={device.symbol}/></div></div>
+          <div title="Front device face" style={{width:148,height:145,background:"#50778a",border:"2px solid #7197a9",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{width:132,height:136,display:"flex",alignItems:"center",justifyContent:"center"}}><FaceWithTerminals device={device}/></div></div>
           : <div title="Rear wiring — same diagram as the right panel" style={{width:148,height:132,overflow:"hidden",position:"relative",background:"#587586",border:"2px solid #69889a",borderRadius:7,pointerEvents:"none"}}>
               <div style={{width:370,transform:"scale(0.39)",transformOrigin:"top left"}}><UnifiedBoxWiring device={device} allCables={allWiringCables.length?allWiringCables:wiringCables} front={false} onTerminate={()=>{}}/></div>
-            </div>) : <DeviceFace device={device}/>}
+            </div>) : <FaceWithTerminals device={device}/>}
     </div>
     {showWiredBox&&<button type="button" title={`Flip to ${face==="rear"?"front":"rear"} view`} aria-label={`Flip ${device.name} to ${face==="rear"?"front":"rear"} view`} onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onWiringFaceChange?.(face==="rear"?"front":"rear");onSelect(device.id);}} style={{position:"absolute",top:2,right:isExpanded?94:36,zIndex:51,background:"#13516c",color:"#fff",border:"2px solid #7edcf0",borderRadius:5,padding:isExpanded?"4px 8px":"2px 5px",fontSize:11,cursor:"pointer"}}>{face==="rear"?"Face":"Wires"}</button>}
     {showWiredBox&&<button type="button" title={isExpanded?"Collapse wiring view":"Expand wiring on wall"} onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();setExpanded(v=>!v);onSelect(device.id);}} style={{position:"absolute",top:2,right:2,zIndex:50,background:"#13516c",color:"#fff",border:"2px solid #7edcf0",borderRadius:5,padding:"4px 8px",fontSize:isExpanded?16:12,cursor:"pointer"}}>{isExpanded?"− Close":"⤢"}</button>}

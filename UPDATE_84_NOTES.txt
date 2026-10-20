@@ -1,0 +1,15 @@
+UPDATE 84 — Electrical Box Installation (initial implementation)
+Based on Update 82.
+
+- Component Library now includes expandable Electrical Boxes catalog: device boxes, remodel, metal, fixture, junction, weatherproof, specialty.
+- Click a box to place it on the active wall, or drag and drop onto the wall.
+- Empty boxes are visible, selectable, and saved by workspace in browser localStorage.
+- Selecting a box then clicking a device in the library installs the device into the next open gang position. Capacity is checked.
+- Existing Update 82 devices, cables, and connections remain in their previous storage format.
+
+IMPORTANT LIMITATIONS:
+- This is phase one, not a completed box-first wiring engine. Existing free-standing devices remain for backward compatibility.
+- No box cable-entry, shared splice, conductor count, or box-fill validation yet.
+- Device position alignment, removal synchronization, and project export/import of box metadata still require integration.
+- Catalog volume figures are illustrative nominal examples, NOT verified specifications for a particular listed box. Check manufacturer markings and applicable code.
+- Build/browser testing not completed: package dependencies could not be installed in the execution environment.

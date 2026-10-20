@@ -1,3 +1,4 @@
+import { electricalBoxes, type InstalledBox } from "../electrical/boxCatalog";
 // Residential Wiring Simulator v2.6
 // Main simulator workspace
 //
@@ -57,6 +58,8 @@ import type {
 // ============================================================
 
 export type WorkspaceHandle = {
+
+  addBox: (boxTypeId:string, x?:number, y?:number)=>void;
 
   addDevice:
   (
@@ -130,6 +133,24 @@ function Workspace(
     workspaceScope
   } = useSimulator();
 
+
+  // Boxes are persisted separately so Update 82 device/wire records remain intact.
+  const [installedBoxes,setInstalledBoxes] = useState<InstalledBox[]>(()=>{
+    try {return JSON.parse(localStorage.getItem(`rws-installed-boxes:${workspaceScope}`)||"[]");} catch {return [];}
+  });
+  const [selectedBoxId,setSelectedBoxId] = useState<string|null>(null);
+  useEffect(()=>{
+    try {setInstalledBoxes(JSON.parse(localStorage.getItem(`rws-installed-boxes:${workspaceScope}`)||"[]"));}catch{setInstalledBoxes([]);}
+    setSelectedBoxId(null);
+  },[workspaceScope]);
+  useEffect(()=>{try{localStorage.setItem(`rws-installed-boxes:${workspaceScope}`,JSON.stringify(installedBoxes));}catch{}},[installedBoxes,workspaceScope]);
+  function addBox(boxTypeId:string,x=150,y=200){
+    const definition=electricalBoxes.find(b=>b.id===boxTypeId);
+    if(!definition)return;
+    const next={id:crypto.randomUUID(),boxTypeId,x,y,deviceIds:[]};
+    setInstalledBoxes(prev=>[...prev,next]);setSelectedBoxId(next.id);
+    setPlacementMessage(`Installed ${definition.name}. Select a device in the Component Library to install it.`);
+  }
 
   // ==========================================================
   // LOCAL WORKSPACE STATE
@@ -506,6 +527,16 @@ function Workspace(
     };
 
 
+    const targetBox=installedBoxes.find(b=>b.id===selectedBoxId);
+    const boxDef=targetBox&&electricalBoxes.find(b=>b.id===targetBox.boxTypeId);
+    if(targetBox && boxDef){
+      if(boxDef.gangs===0){setPlacementMessage("This fixture/junction box has no device gang positions.");return;}
+      if(targetBox.deviceIds.length>=boxDef.gangs){setPlacementMessage("This electrical box has no free gang positions.");return;}
+      const slot=targetBox.deviceIds.length;
+      device.x=targetBox.x+slot*110;
+      device.y=targetBox.y;
+      setInstalledBoxes(prev=>prev.map(b=>b.id===targetBox.id?{...b,deviceIds:[...b.deviceIds,device.id]}:b));
+    }
     setDevices(prev => [...prev, device]);
     const pitch = studSpacing * 8;
     const stud = Math.round((dropX + 6 - 13) / pitch);
@@ -562,6 +593,8 @@ function Workspace(
   useImperativeHandle(
     ref,
     () => ({
+
+      addBox,
 
       addDevice:
         createDevice,
@@ -1725,6 +1758,8 @@ function Workspace(
     e.preventDefault();
 
 
+    const boxType=e.dataTransfer.getData("electricalBoxType");
+    if(boxType){const rect=e.currentTarget.getBoundingClientRect();addBox(boxType,e.clientX-rect.left,e.clientY-rect.top);return;}
     const componentName =
       e.dataTransfer.getData(
         "componentType"
@@ -1757,12 +1792,12 @@ function Workspace(
     const pitch=studSpacing*8;
     const nearest=Math.round((x-13)/pitch);
     const studX=nearest*pitch+13;
-    if(Math.abs(x-studX)>26) {
+    if(!selectedBoxId && Math.abs(x-studX)>26) {
       setPlacementMessage("Drop the component directly on a stud to place it.");
       return;
     }
     setPlacementMessage("");
-    createDevice(componentName,studX-6,y);
+    createDevice(componentName,selectedBoxId?x:studX-6,y);
 
   }
 
@@ -2210,6 +2245,17 @@ function Workspace(
                 border:selectedStud===index?"3px solid #20d8ff":"1px solid transparent",
                 background:selectedStud===index?"rgba(17,212,255,.19)":"transparent",
                 cursor:"pointer",zIndex:2,padding:0}}/>;
+          })}
+          {!blueprintMode && installedBoxes.map(box=>{
+            const def=electricalBoxes.find(b=>b.id===box.boxTypeId);
+            if(!def)return null;
+            const width=Math.max(100,def.gangs*110);
+            return <div key={box.id} onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();setSelectedBoxId(box.id);setPlacementMessage(`${def.name}: ${box.deviceIds.length}/${def.gangs} positions occupied. Choose a device to install.`);}}
+              title={`${def.name} — ${box.deviceIds.length}/${def.gangs} device positions used`}
+              style={{position:"absolute",left:box.x,top:box.y,width,height:145,zIndex:3,pointerEvents:"auto",cursor:"pointer",border:selectedBoxId===box.id?"3px solid #3df778":"3px solid #8495a4",borderRadius:9,background:"rgba(45,69,91,.38)",boxSizing:"border-box"}}>
+              <div style={{position:"absolute",top:-28,left:0,whiteSpace:"nowrap",color:"#e8f7ff",background:"#172536",padding:"3px 7px",fontSize:12}}>{def.name} · {box.deviceIds.length}/{def.gangs}</div>
+              {Array.from({length:def.gangs||1},(_,i)=><div key={i} style={{position:"absolute",left:i*110+8,top:12,width:82,height:115,border:"1px dashed #8fa8b6",borderRadius:6,opacity:box.deviceIds[i]?.length?0.25:0.9,display:"grid",placeItems:"center",fontSize:11,color:"#b8d5e5"}}>{box.deviceIds[i]?"":"EMPTY"}</div>)}
+            </div>;
           })}
           {/* =================================================
               DEVICES

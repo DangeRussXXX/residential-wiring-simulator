@@ -1,3 +1,4 @@
+import { electricalBoxes } from "../electrical/boxCatalog";
 export const BREAKER_DRAG_EVENT = "rws-breaker-drag";
 export const BREAKER_DRAG_END_EVENT = "rws-breaker-drag-end";
 // Residential Wiring Simulator v2.6
@@ -120,6 +121,8 @@ workspaceRef
 
 
 
+
+const [boxOpen,setBoxOpen] = useState(true);
 
 const [search,setSearch] =
 
@@ -465,8 +468,20 @@ borderRadius:"4px"
 
 
 
-{
 
+<div style={{marginBottom:14}}>
+  <div onClick={()=>setBoxOpen(v=>!v)} style={{cursor:"pointer",fontWeight:"bold",padding:10,background:"#333",borderRadius:5}}>{boxOpen?"▼":"▶"} Electrical Boxes</div>
+  {boxOpen && electricalBoxes.filter(b=>`${b.name} ${b.category}`.toLowerCase().includes(search.toLowerCase())).map(box=>(
+    <div key={box.id} draggable onDragStart={e=>e.dataTransfer.setData("electricalBoxType",box.id)}
+      onClick={()=>workspaceRef.current?.addBox(box.id)}
+      style={{marginTop:8,padding:12,background:"#1e1e1e",border:"1px solid #555",borderRadius:8,cursor:"grab"}}>
+      <strong>▣ {box.name}</strong><div style={{fontSize:12,color:"#aaa"}}>{box.category} · {box.gangs ? `${box.gangs}-gang` : "Fixture / junction"}{box.volume ? ` · nominal ${box.volume} cu in` : ""}</div>
+      <div style={{fontSize:12,color:"#bbb"}}>{box.note}</div>
+    </div>
+  ))}
+</div>
+
+{
 categories.map(category=>{
 
 

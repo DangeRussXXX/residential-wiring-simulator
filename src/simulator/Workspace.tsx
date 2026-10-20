@@ -2174,16 +2174,15 @@ function Workspace(
             {cables.map(c=>{
               const a=devices.find(d=>d.id===c.from),b=devices.find(d=>d.id===c.to);
               if((!a&&c.from!==PANEL_SOURCE_ID)||!b)return null;
-              // Device origin is the top-left of its wall box. The compact
-              // preview uses 150x126 coordinates scaled by 1.2 and centered
-              // inside a 190px wide, 180px tall component.
-              // Connect the physical cable to the SAME top entry displayed
-              // in CompactWiredDevice (x=23+23*n, y=17).
+              // Match the actual CompactWiredDevice drawing (150x126 scaled 1.6)
+              // centered in the 250x208 wall preview, inside the 260x228 device.
+              // Sorting must agree with the preview so home runs enter the same port.
               const entry=(device:ElectricalDevice)=>{
-                const attached=cables.filter(w=>w.from===device.id||w.to===device.id);
+                const attached=cables.filter(w=>w.from===device.id||w.to===device.id)
+                  .sort((a,b)=>Number(b.from===PANEL_SOURCE_ID)-Number(a.from===PANEL_SOURCE_ID));
                 const index=Math.max(0,attached.findIndex(w=>w.id===c.id));
-                return {x:device.x+95+(23+Math.min(index,2)*23-75)*1.2,
-                  y:device.y+90+(17-63)*1.2};
+                return {x:device.x+130+(23+Math.min(index,2)*23-75)*1.6,
+                  y:device.y+114+(17-63)*1.6};
               };
               const start=a?entry(a):{x:26,y:0};
               const end=entry(b);

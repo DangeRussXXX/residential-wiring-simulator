@@ -80,7 +80,7 @@ function DeviceFace({ device }: { device: ElectricalDevice }) {
 /** Compact wall wiring uses the SAME saved terminations as the detailed diagram.
  * Wires terminate at a screw only when an actual saved terminal exists. */
 function CompactWiredDevice({device,cables}:{device:ElectricalDevice;cables:CableRecord[]}) {
-  const shown=cables.slice(0,3);
+  const shown=[...cables].sort((a,b)=>Number(b.from==="__panel_p1__")-Number(a.from==="__panel_p1__")).slice(0,3);
   const isSwitch=["switch-single","switch-three-way","dimmer"].includes(device.symbol);
   const isGfci=device.symbol==="gfci";
   const isLight=device.symbol.startsWith("light");
@@ -168,9 +168,11 @@ export default function Device({ device, wireMode, selectedTerminal, selected, o
           <UnifiedBoxWiring device={device} allCables={allWiringCables.length?allWiringCables:wiringCables} front={face==="front"} onTerminate={onWiringTerminate??(()=>{})}/>
           {wiringCables.length>1&&<div style={{fontSize:12,color:"#245269"}}>All {wiringCables.length} cables shown together</div>}
         </div>})() :
-        showWiredBox ? <div title="Same wiring diagram as the master editor — expand to interact" style={{width:256,height:200,overflow:"hidden",position:"relative",background:"#587586",border:"2px solid #69889a",borderRadius:8,pointerEvents:"none"}}>
-          <div style={{width:720,transform:"scale(0.35)",transformOrigin:"top left"}}>
-            <UnifiedBoxWiring device={device} allCables={allWiringCables.length?allWiringCables:wiringCables} front={face==="front"} onTerminate={()=>{}}/>
+        showWiredBox ? <div title="Readable wall wiring preview — expand to edit all connections" style={{width:250,height:208,overflow:"hidden",position:"relative",background:"#587586",border:"2px solid #69889a",borderRadius:8,pointerEvents:"none",display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <div style={{width:240,height:202,display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <div style={{transform:"scale(1.6)",transformOrigin:"center center",width:150,height:126,flexShrink:0}}>
+              <CompactWiredDevice device={device} cables={wiringCables}/>
+            </div>
           </div>
         </div> : <DeviceFace device={device}/>}
     </div>

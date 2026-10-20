@@ -465,5 +465,10 @@
 
 
 /* Keep control text large, but preserve each wiring diagram's own SVG label sizes. */
+/* Keep wiring SVG labels at their authored sizes, not 28px panel text. */
 .nova-double-text-sidebar svg text,
-.nova-double-text-service svg text { font-size: revert !important; }
+.nova-double-text-service svg text { font-size: 10px !important; line-height: normal !important; }
+.nova-double-text-sidebar svg text[font-size="14"],
+.nova-double-text-service svg text[font-size="14"] { font-size: 14px !important; }
+.nova-double-text-sidebar svg text[font-size="9"],
+.nova-double-text-service svg text[font-size="9"] { font-size: 9px !important; }

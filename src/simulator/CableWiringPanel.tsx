@@ -349,7 +349,7 @@ export function UnifiedBoxWiring({device,allCables,onTerminate,front=false,boxMo
     setPicked(null);
   };
   return <div style={{width:"100%"}}>
-    <svg ref={svgRef} viewBox={`0 0 720 ${canvasHeight}`} width="100%"
+    <svg ref={svgRef} viewBox={`0 0 720 ${canvasHeight}`} width="100%" height="auto"
       aria-label={`Complete wiring box for ${device.name}, including home runs and outgoing cables`}
       style={{background:"#587586",border:"2px solid #9fc4d6",borderRadius:6,touchAction:"none"}}
       onPointerUp={e=>{
@@ -374,9 +374,9 @@ export function UnifiedBoxWiring({device,allCables,onTerminate,front=false,boxMo
         const otherName=home?`PANEL P1 · #${c.breakerSlot??"?"}`:
           (end==="from"?"TO ":"FROM ")+(c[end==="from"?"toName":"fromName"]??other.slice(0,12));
         return <g key={`${c.id}-${end}`}>
-          <text x={x} y={y-35} fontSize="10" fill={home?"#ffe2a3":"#e1f5ff"} textAnchor="middle" fontWeight="bold">{home?"⚡ HOME RUN":`CABLE ${i+1}`}</text>
-          <text x={x} y={y-22} fontSize="9" fill="#f1f5fa" textAnchor="middle">{otherName.slice(0,23)}</text>
-          <text x={x} y={y-9} fontSize="9" fill="#d9ebf3" textAnchor="middle">{c.type}</text>
+          <text x={x} y={y-45} fontSize="10" fill={home?"#ffe2a3":"#e1f5ff"} textAnchor="middle" fontWeight="bold">{home?"⚡ HOME RUN":`CABLE ${i+1}`}</text>
+          <text x={x} y={y-32} fontSize="9" fill="#f1f5fa" textAnchor="middle">{otherName.slice(0,23)}</text>
+          <text x={x} y={y-19} fontSize="9" fill="#d9ebf3" textAnchor="middle">{c.type}</text>
           <path d={`M ${x} ${y+36} V ${y+73}`} stroke="#374d58" strokeWidth="24" strokeLinecap="round"/>
           <path d={`M ${x} ${y+36} V ${y+73}`} stroke={c.type.includes("MC")?"#b8c2c8":home?"#1e2229":"#ece8db"} strokeWidth="17" strokeLinecap="round"/>
           <rect x={x-12} y={y+68} width="24" height="9" rx="3" fill="#a6b9c2" stroke="#355568" strokeWidth="1.5"/>

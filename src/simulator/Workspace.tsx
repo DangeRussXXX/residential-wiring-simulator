@@ -1876,6 +1876,7 @@ function Workspace(
                   >🗑 Delete Component</button>
               </div>}
             </div>
+            </div>
           </details>
           <details open style={{border:"1px solid #346b85",borderRadius:7,padding:8,marginBottom:8}}>
             <summary style={{cursor:"pointer",fontWeight:700,color:"#8ee7ff"}}>New Wire Tool · Cable Wiring</summary>
@@ -1939,6 +1940,7 @@ function Workspace(
                   checkpoint();saveCables(cables.filter(c=>c.id!==selectedCable.id));setSelectedCableId(null);
                 }}/>}
             </div>
+            <div id="rws-device-inspector-content" />
           </details>
 
         </div>,

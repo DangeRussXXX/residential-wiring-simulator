@@ -67,15 +67,6 @@ export default function SimulatorLayout() {
   const [showDeviceInstallation,setShowDeviceInstallation]=useState(true);
   const [allPanelsRevision,setAllPanelsRevision]=useState(0);
   const [deviceInspectorTarget,setDeviceInspectorTarget]=useState<HTMLElement|null>(null);
-  useEffect(()=>{
-    if (!activeWall || showService || showBlueprint) {setDeviceInspectorTarget(null);return;}
-    const timer=window.setInterval(()=>{
-      const node=document.getElementById("rws-device-inspector-content");
-      setDeviceInspectorTarget(previous=>previous===node?previous:node);
-      if(node)window.clearInterval(timer);
-    },100);
-    return ()=>window.clearInterval(timer);
-  },[activeWall,showService,showBlueprint,workspaceScope]);
   const toggleAllPanels = (open: boolean) => {
     setShowExplorer(open); setShowLibrary(open); setShowPanelControls(open);
     setShowProperties(open); setShowInspection(open); setShowWallControls(open);
@@ -116,6 +107,17 @@ export default function SimulatorLayout() {
     setSelectedDevice,
     workspaceScope, setWorkspaceScope, clearWorkspaceScopes
   } = useSimulator();
+
+  useEffect(()=>{
+    if (!activeWall || showService || showBlueprint) {setDeviceInspectorTarget(null);return;}
+    const timer=window.setInterval(()=>{
+      const node=document.getElementById("rws-device-inspector-content");
+      setDeviceInspectorTarget(previous=>previous===node?previous:node);
+      if(node)window.clearInterval(timer);
+    },100);
+    return ()=>window.clearInterval(timer);
+  },[activeWall,showService,showBlueprint,workspaceScope]);
+
 
 
   const [
@@ -676,10 +678,6 @@ export default function SimulatorLayout() {
               </details>
             </div>
             {!showService && !!activeWall && <div id="rws-wall-tools-panel-target" data-open={showWallControls ? "true" : "false"} data-device-open={showDeviceInstallation ? "true" : "false"} data-revision={allPanelsRevision} />}
-
-            {project && !showService && !showBlueprint && activeWall && project.activeAreaId && (
-
-            )}
 
             {deviceInspectorTarget && !showService && !!activeWall && createPortal(
               <div className="nova-device-inspection">

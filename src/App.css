@@ -352,3 +352,22 @@
 .nova-wall-controls > details > summary:hover,
 .nova-unified-controls ~ details > summary:hover {background:#23536a !important;}
 .nova-wall-controls > details > :not(summary) {box-sizing:border-box;}
+
+/* Update 77: match the three wall controls to Project Explorer and Component Library.
+   Scoped to top-level wall controls; wiring/terminal visuals are unchanged. */
+.nova-wall-controls {width:100% !important;box-sizing:border-box !important;font-size:14px !important;}
+.nova-wall-controls > details.nova-panel-section {
+  display:block !important;box-sizing:border-box !important;width:100% !important;
+  margin:0 0 9px !important;padding:0 !important;
+  background:#193e50 !important;border:1px solid #397e99 !important;
+  border-radius:7px !important;overflow:hidden !important;
+}
+.nova-wall-controls > details.nova-panel-section > summary {
+  display:list-item !important;box-sizing:border-box !important;width:100% !important;
+  margin:0 !important;padding:12px 14px !important;
+  background:#193e50 !important;border:0 !important;border-radius:0 !important;
+  color:#8eeaff !important;font:750 18px/1.35 Arial,sans-serif !important;
+  list-style-position:inside !important;cursor:pointer !important;
+}
+.nova-wall-controls > details.nova-panel-section > summary:hover {background:#23536a !important;}
+.nova-wall-controls > details.nova-panel-section > :not(summary) {box-sizing:border-box;}

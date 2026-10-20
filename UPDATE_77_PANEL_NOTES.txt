@@ -1,0 +1,1 @@
+Panel-only visual update. Modified src/App.css. No wiring or component logic changed. Browser appearance not yet verified.

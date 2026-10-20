@@ -1,0 +1,6 @@
+UPDATE 76 - MATCHED WORKSPACE/RIGHT PANEL WIRING VIEWS
+Changed: src/components/Device.tsx
+The compact wall wiring preview now uses the same UnifiedBoxWiring renderer as the detailed right-hand Device Wiring panel, with the same full cable list, saved splices, terminal locations and routing. Front/Rear selection is preserved. The compact view is read-only; expanded/right views remain interactive.
+TypeScript: tsc -b PASSED.
+Browser build: NOT verified (missing native rolldown optional dependency in the build environment).
+This is a targeted view-consistency fix, not completion of every other Update 76 visual issue.

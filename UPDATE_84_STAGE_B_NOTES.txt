@@ -1,0 +1,10 @@
+Update 84 Stage B — Device-to-box drag/drop prototype
+Base: working Update 84 Stage A drag-to-stud/optional-height project.
+- Drag a wall switch or receptacle from Component Library onto an empty gang in an installed box.
+- Gang occupancy is tracked independently from device wiring records, keyed by device ID.
+- Box slots show compact device symbols; clicking a populated slot selects the original device.
+- Occupied gang drops are rejected; unsupported device types are rejected.
+- Remove the device first before removing its box.
+- Box membership is saved in localStorage under rws-box-mounts:<workspaceScope>.
+- The existing wiring engine and device records are not rewritten.
+KNOWN LIMITATIONS: Wiring mode still renders the legacy full device view; box wiring integration, project export/import of box mounts, and realistic device face scaling are not finished. Browser testing and TypeScript build not verified (npm dependencies unavailable offline).

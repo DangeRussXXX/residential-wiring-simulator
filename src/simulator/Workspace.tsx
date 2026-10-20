@@ -143,6 +143,15 @@ function Workspace(
     try { return JSON.parse(localStorage.getItem(`rws-empty-boxes:${workspaceScope}`) || "[]") as WallBox[]; }
     catch { return []; }
   });
+  // Box membership is separate from electrical device records. Terminals and IDs stay intact.
+  type BoxMount = { boxId: string; gang: number };
+  const [boxMounts, setBoxMounts] = useState<Record<string, BoxMount>>(() => {
+    try { return JSON.parse(localStorage.getItem(`rws-box-mounts:${workspaceScope}`) || "{}"); }
+    catch { return {}; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem(`rws-box-mounts:${workspaceScope}`, JSON.stringify(boxMounts)); } catch { /* storage disabled */ }
+  }, [boxMounts, workspaceScope]);
   const [selectedBoxId, setSelectedBoxId] = useState<string | null>(null);
   const [movingBoxId, setMovingBoxId] = useState<string | null>(null);
   useEffect(() => {
@@ -152,6 +161,8 @@ function Workspace(
     try { setWallBoxes(JSON.parse(localStorage.getItem(`rws-empty-boxes:${workspaceScope}`) || "[]")); }
     catch { setWallBoxes([]); }
     setSelectedBoxId(null);
+    try { setBoxMounts(JSON.parse(localStorage.getItem(`rws-box-mounts:${workspaceScope}`) || "{}")); }
+    catch { setBoxMounts({}); }
   }, [workspaceScope]);
   const installEmptyBox = (kind: string, x = 240, y = 300) => {
     const gangs = Math.max(1, Math.min(6, Number(kind.match(/(\d+)-gang/i)?.[1] || 1)));
@@ -417,7 +428,8 @@ function Workspace(
   function createDevice(
     name: string,
     dropX: number = 150,
-    dropY: number = 120
+    dropY: number = 120,
+    mount?: BoxMount
   ) {
 
     const definition =
@@ -534,6 +546,7 @@ function Workspace(
 
 
     setDevices(prev => [...prev, device]);
+    if (mount) setBoxMounts(prev => ({...prev, [device.id]: mount}));
     const pitch = studSpacing * 8;
     const stud = Math.round((dropX + 6 - 13) / pitch);
     setDeviceStuds(prev => ({...prev,[device.id]:stud}));
@@ -1873,7 +1886,7 @@ function Workspace(
                     onChange={e=>{const height=Number(e.target.value);if(e.target.value!=="" && Number.isFinite(height) && height>=0 && height<=120) setWallBoxes(prev=>prev.map(b=>b.id===selectedWallBox.id?{...b,y:Math.max(30,Math.min(1100,1105-height*8))}:b));}}
                     style={{width:65,marginLeft:4}} />
                 </label>
-                <button type="button" onClick={()=>{setWallBoxes(prev=>prev.filter(b=>b.id!==selectedWallBox.id));setSelectedBoxId(null);}}>Remove Box</button>
+                <button type="button" onClick={()=>{if(Object.values(boxMounts).some(m=>m.boxId===selectedWallBox.id)){setPlacementMessage("Remove installed devices before deleting this box.");return;}setWallBoxes(prev=>prev.filter(b=>b.id!==selectedWallBox.id));setSelectedBoxId(null);}}>Remove Box</button>
               </div>}
               {placementMessage && <div role="status" style={{color:"#ffd3a3"}}>{placementMessage}</div>}
               {selectedDevice && <div style={{color:"#8fe9ff"}}>Drop stud: {deviceStuds[selectedDevice.id]===undefined?"not assigned":`#${deviceStuds[selectedDevice.id]+1}`} · {nailedDevices[selectedDevice.id]?"Installed":heightConfirmed[selectedDevice.id]?"Ready to hammer":"Enter height to enable hammer"}</div>}
@@ -1927,6 +1940,7 @@ function Workspace(
                   if(!window.confirm(`Remove ${selectedDevice.name||selectedDevice.type} from this wall${attached?" and delete its connected wires":""}?`))return;
                   checkpoint();
                   setDevices(prev=>prev.filter(d=>d.id!==selectedDevice.id));
+                  setBoxMounts(prev=>{const next={...prev};delete next[selectedDevice.id];return next;});
                   saveCables(cables.filter(c=>c.from!==selectedDevice.id&&c.to!==selectedDevice.id));
                   setConnections(prev=>prev.filter(c=>c.from.deviceId!==selectedDevice.id&&c.to.deviceId!==selectedDevice.id));
                   setWires(prev=>prev.filter(w=>w.from.deviceId!==selectedDevice.id&&w.to.deviceId!==selectedDevice.id));
@@ -2290,17 +2304,48 @@ function Workspace(
           {/* Update 84A: independent empty boxes, deliberately not tied to device geometry. */}
           {!blueprintMode && wallBoxes.map(box => (
             <div key={box.id}
+              onDragOver={e => { if (e.dataTransfer.types.includes("componentType")) { e.preventDefault(); e.dataTransfer.dropEffect="copy"; } }}
+              onDrop={e => {
+                e.preventDefault(); e.stopPropagation();
+                const name=e.dataTransfer.getData("componentType");
+                if (!name) return;
+                const definition=componentCatalog.find(c=>c.name===name);
+                if (!definition || !["outlet","gfci","switch-single","switch-three-way","dimmer"].includes(definition.symbol)) {
+                  setPlacementMessage("Choose a wall switch or receptacle for this device box."); return;
+                }
+                const rect=e.currentTarget.getBoundingClientRect();
+                const gang=Math.min(box.gangs-1,Math.max(0,Math.floor((e.clientX-rect.left)/rect.width*box.gangs)));
+                if (Object.values(boxMounts).some(m=>m.boxId===box.id && m.gang===gang)) {
+                  setPlacementMessage(`Gang ${gang+1} is occupied. Drop into an empty position.`); return;
+                }
+                createDevice(name,box.x+gang*52,box.y,{boxId:box.id,gang});
+                setSelectedBoxId(box.id); setMovingBoxId(null); setPlacementMessage("");
+              }}
               onMouseDown={e => { e.stopPropagation(); setSelectedDevice(null); setSelectedBoxId(box.id); setMovingBoxId(box.id); }}
               onClick={e => { e.stopPropagation(); setSelectedBoxId(box.id); }}
-              title={`${box.kind} • empty • drag to move`}
+              title={`${box.kind} • drag a switch or receptacle into an empty gang`}
               style={{ position:"absolute", left:box.x, top:box.y,
                 width:boxWidth(box.gangs), height:96, boxSizing:"border-box", zIndex:5,
                 border:selectedBoxId===box.id?"3px solid #24ff57":"3px solid #356b87",
                 borderRadius:7, background:"#8199a6e8", cursor:"move",
                 boxShadow:"inset 0 0 0 5px #b9c8ce, 0 3px 10px #0004", display:"flex", alignItems:"center", padding:7, gap:4 }}>
-              {Array.from({length:box.gangs},(_,i)=><div key={i} style={{flex:1,height:70,border:"1px dashed #405b6a",borderRadius:3,display:"grid",placeItems:"center",fontSize:10,color:"#183444"}}>{i+1}</div>)}
+              {Array.from({length:box.gangs},(_,i)=>{
+                const mounted=devices.find(d=>boxMounts[d.id]?.boxId===box.id && boxMounts[d.id]?.gang===i);
+                const symbol=mounted?.symbol || "";
+                const receptacle=symbol==="outlet"||symbol==="gfci";
+                return <div key={i} onMouseDown={e=>{
+                    if(!mounted)return;
+                    e.stopPropagation();setMovingBoxId(null);setSelectedBoxId(box.id);setSelectedDevice(mounted);onSelectDevice?.(mounted);
+                  }} title={mounted?`${mounted.name} — gang ${i+1}`:`Empty gang ${i+1} — drop a device here`}
+                  style={{flex:1,minWidth:0,height:70,border:mounted&&selectedDevice?.id===mounted.id?"2px solid #39ff14":"1px dashed #405b6a",borderRadius:3,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",fontSize:10,color:"#183444",background:mounted?"#f0eee6":"#b4c4cb",cursor:mounted?"pointer":"default",pointerEvents:"auto"}}>
+                  {mounted?<><svg viewBox="0 0 36 52" width="35" height="50" aria-label={mounted.name}>
+                    <rect x="3" y="1" width="30" height="50" rx="4" fill="#f7f5ed" stroke="#667780" strokeWidth="2"/>
+                    {receptacle?<>{[15,36].map(y=><g key={y}><rect x="11" y={y-5} width="3" height="9" fill="#303638"/><rect x="22" y={y-5} width="3" height="9" fill="#303638"/><circle cx="18" cy={y+6} r="2" fill="#303638"/></g>)}{symbol==="gfci"&&<rect x="14" y="24" width="8" height="4" fill="#d24c43"/>}</>:<><rect x="13" y="13" width="10" height="26" rx="2" fill="#b8b8b0" stroke="#707f85"/><path d="M15 16 L21 13 L21 29 L15 32 Z" fill="white"/></>}
+                  </svg></>:<span>+ {i+1}</span>}
+                </div>;
+              })}
               <span style={{position:"absolute",bottom:"100%",left:0,whiteSpace:"nowrap",fontSize:12,fontWeight:700,background:"#112b43",color:"white",padding:"2px 5px"}}>{box.kind}</span>
-              {selectedBoxId===box.id && <button type="button" title="Remove empty box" onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();setWallBoxes(prev=>prev.filter(b=>b.id!==box.id));setSelectedBoxId(null);setMovingBoxId(null);}} style={{position:"absolute",right:-13,top:-15,borderRadius:12,background:"#a31f2c",color:"white",border:"1px solid white",cursor:"pointer"}}>×</button>}
+              {selectedBoxId===box.id && <button type="button" title="Remove empty box" onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();if(Object.values(boxMounts).some(m=>m.boxId===box.id)){setPlacementMessage("Remove installed devices before deleting this box.");return;}setWallBoxes(prev=>prev.filter(b=>b.id!==box.id));setSelectedBoxId(null);setMovingBoxId(null);}} style={{position:"absolute",right:-13,top:-15,borderRadius:12,background:"#a31f2c",color:"white",border:"1px solid white",cursor:"pointer"}}>×</button>}
             </div>
           ))}
           {/* =================================================
@@ -2320,7 +2365,7 @@ function Workspace(
             })}
           </svg>}
           {
-            !blueprintMode && devices.map(
+            !blueprintMode && devices.filter(d=>!boxMounts[d.id] || wireMode).map(
               device => (
 
                 <Device

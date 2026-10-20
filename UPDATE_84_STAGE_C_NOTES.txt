@@ -1,0 +1,12 @@
+Update 84 Stage C — Cable routes to installed electrical boxes
+
+- Installed devices retain their existing electrical IDs and terminal records.
+- Home-run and branch cable routes to mounted devices now terminate at the
+  physical box's upper center rather than the device wiring pop-out.
+- The independent wiring pop-outs remain visible in wiring mode and retain
+  their original wiring controls and position.
+- Legacy devices outside boxes still use their existing cable routing.
+- This is a routing-layer correction only. Shared in-box splices and complete
+  box wiring visualization are future work.
+
+Changed file: src/simulator/Workspace.tsx

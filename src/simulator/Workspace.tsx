@@ -2269,6 +2269,15 @@ function Workspace(
               // centered in the 250x208 wall preview, inside the 260x228 device.
               // Sorting must agree with the preview so home runs enter the same port.
               const entry=(device:ElectricalDevice)=>{
+                // Installed devices are wired through their physical box, never
+                // through the movable device wiring pop-out coordinates.
+                const mount=boxMounts[device.id];
+                const wallBox=mount && wallBoxes.find(box=>box.id===mount.boxId);
+                if (wallBox) {
+                  // One cable entry per physical box. Keep the endpoint tied to
+                  // box geometry when the box moves or its devices are changed.
+                  return {x:wallBox.x+boxWidth(wallBox.gangs)/2, y:wallBox.y+3};
+                }
                 const attached=cables.filter(w=>w.from===device.id||w.to===device.id)
                   .sort((a,b)=>Number(b.from===PANEL_SOURCE_ID)-Number(a.from===PANEL_SOURCE_ID));
                 const index=Math.max(0,attached.findIndex(w=>w.id===c.id));

@@ -68,6 +68,13 @@ function positions(kind:string,terminals:Terminal[]):Record<string,{x:number;y:n
   terminals.forEach((t,i)=>{coords[t.id]=maps[kind]?.[t.id]??{x:310,y:70+i*40};});
   return coords;
 }
+/** Shared face artwork for the wall and the wiring inspector. */
+export function FrontDeviceArtwork({symbol}:{symbol:string}) {
+  const kind = symbol === "gfci" ? "gfci" : symbol.startsWith("switch") || symbol === "dimmer" ? symbol : symbol.startsWith("light") ? "light" : symbol === "breaker-panel" || symbol === "sub-panel" ? "panel" : symbol;
+  return <svg viewBox={kind === "light" ? "205 35 210 215" : kind === "panel" ? "238 15 150 254" : "255 17 111 248"} width="100%" height="100%" preserveAspectRatio="xMidYMid meet" aria-label={`${symbol} front appearance`}>
+    <DeviceArtwork kind={kind} front={true}/>
+  </svg>;
+}
 function DeviceArtwork({kind,breakerSlot,front}:{kind:string;breakerSlot?:number;front:boolean}){
   const isSwitch=kind==="switch-single"||kind==="switch-three-way"||kind==="dimmer";
   if(kind==="panel")return <g>
@@ -101,6 +108,16 @@ function DeviceArtwork({kind,breakerSlot,front}:{kind:string;breakerSlot?:number
         <><rect x="295" y="71" width="30" height="43" rx="4" fill="#cbd1d0" stroke="#929da0"/>
           <rect x="295" y="156" width="30" height="43" rx="4" fill="#cbd1d0" stroke="#929da0"/></>}
       </>}
+    {front&&kind==="gfci"&&<g>
+      <rect x="287" y="123" width="46" height="39" rx="4" fill="#d3d6d2" stroke="#8b999e"/>
+      <rect x="293" y="127" width="34" height="12" rx="3" fill="#bb3938"/>
+      <text x="310" y="136" textAnchor="middle" fontSize="8" fill="white" fontWeight="bold">RESET</text>
+      <rect x="293" y="143" width="34" height="12" rx="3" fill="#37434c"/>
+      <text x="310" y="152" textAnchor="middle" fontSize="8" fill="white" fontWeight="bold">TEST</text>
+    </g>}
+    {front&&kind==="switch-three-way"&&<text x="310" y="202" textAnchor="middle" fontSize="12" fill="#52616a">3-WAY</text>}
+    {front&&kind==="switch-single"&&<text x="310" y="202" textAnchor="middle" fontSize="12" fill="#52616a">ON / OFF</text>}
+    {front&&kind==="dimmer"&&<g><rect x="288" y="77" width="44" height="125" rx="6" fill="#deded7" stroke="#9ca7a9"/><rect x="301" y="92" width="18" height="96" rx="9" fill="#9ca6aa"/><circle cx="310" cy="145" r="14" fill="#f4f2e9" stroke="#677780" strokeWidth="3"/></g>}
     <circle cx="310" cy="39" r="4" fill="#778b95"/>
     <circle cx="310" cy="242" r="4" fill="#778b95"/>
     {kind==="outlet"&&!front&&<><rect x="345" y="118" width="6" height="22" fill="#d5b36c" stroke="#886a2c"/>

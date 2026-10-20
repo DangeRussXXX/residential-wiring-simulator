@@ -1,0 +1,1 @@
+Update 82: workspace wired-device front faces reuse the exact same DeviceArtwork component as right-side wiring panel. GFCI TEST/RESET and distinct switch labels/dimmer artwork added. No saved wiring data, terminal routing, or panel CSS changed.

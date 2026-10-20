@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { ElectricalDevice } from "../electrical/types";
-import { UnifiedBoxWiring, type CableRecord, type CableEnd } from "../simulator/CableWiringPanel";
+import { UnifiedBoxWiring, FrontDeviceArtwork, type CableRecord, type CableEnd } from "../simulator/CableWiringPanel";
 
 type Props = {
   device: ElectricalDevice;
@@ -169,7 +169,7 @@ export default function Device({ device, wireMode, selectedTerminal, selected, o
           {wiringCables.length>1&&<div style={{fontSize:12,color:"#245269"}}>All {wiringCables.length} cables shown together</div>}
         </div>})() :
         showWiredBox ? (face==="front" ?
-          <div title="Front device face" style={{width:142,height:130,background:"#50778a",border:"2px solid #7197a9",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center"}}><DeviceFace device={device}/></div>
+          <div title="Front device face" style={{width:142,height:130,background:"#50778a",border:"2px solid #7197a9",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{width:96,height:118,display:"flex",alignItems:"center",justifyContent:"center"}}><FrontDeviceArtwork symbol={device.symbol}/></div></div>
           : <div title="Rear wiring — same diagram as the right panel" style={{width:148,height:132,overflow:"hidden",position:"relative",background:"#587586",border:"2px solid #69889a",borderRadius:7,pointerEvents:"none"}}>
               <div style={{width:370,transform:"scale(0.39)",transformOrigin:"top left"}}><UnifiedBoxWiring device={device} allCables={allWiringCables.length?allWiringCables:wiringCables} front={false} onTerminate={()=>{}}/></div>
             </div>) : <DeviceFace device={device}/>}

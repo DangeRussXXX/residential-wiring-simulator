@@ -433,8 +433,30 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove,allCab
   const splices=(allCables??[cable]).flatMap(c=>c.splices??[]).filter(sp=>sp.deviceId===boxId);
   const selectedMembers=available.filter(a=>spliceSelection.includes(a.key));
   const selectedFamily=selectedMembers.length>0?selectedMembers[0].conductor==="ground"?"ground":selectedMembers[0].conductor==="white"?"neutral":"hot":null;
-  const compatibleTerminals=terms.filter(t=>selectedFamily==="ground"?["ground","ground-bar"].includes(t.id):selectedFamily==="neutral"?["silver","neutral-bar","load-neutral","fixture-neutral"].includes(t.id):["line","load","common","traveler-1","traveler-2","brass","breaker-hot","load-hot","fixture-hot"].includes(t.id));
-  const hasPigtailTo=(terminal:string)=>splices.some(sp=>sp.pigtailTerminal===terminal);
+  // Terminal options come from the actual device, not from the selected cable.
+  // When no loose wires are checked, keep choices visible for editing an
+  // existing splice; a new splice still requires compatible selected wires.
+  const terminalFamily=(id:string):"ground"|"neutral"|"hot"=>
+    ["ground","ground-bar"].includes(id)?"ground":
+    ["silver","neutral-bar","load-neutral","fixture-neutral","neutral-splice"].includes(id)?"neutral":"hot";
+  const compatibleTerminals=terms.filter(t=>!selectedFamily||terminalFamily(t.id)===selectedFamily);
+  const hasPigtailTo=(terminal:string,excludeId?:string)=>splices.some(sp=>sp.id!==excludeId&&sp.pigtailTerminal===terminal);
+  const terminalUsedByCable=(terminal:string)=>available.some(a=>a.cable.ends[a.end]?.[a.conductor]===terminal);
+  const updateSplicePigtail=(id:string,terminal:string)=>{
+    setSpliceError("");
+    const splice=splices.find(sp=>sp.id===id);
+    if(!splice)return;
+    const first=splice.members[0];
+    const family=first?.conductor==="ground"?"ground":first?.conductor==="white"?"neutral":"hot";
+    if(terminal&&(!terms.some(t=>t.id===terminal)||terminalFamily(terminal)!==family)){
+      setSpliceError("Choose a compatible terminal for the existing splice.");return;
+    }
+    if(terminal&&(hasPigtailTo(terminal,id)||terminalUsedByCable(terminal))){
+      setSpliceError("That terminal is already occupied. Disconnect the existing wire first.");return;
+    }
+    saveAll((allCables??[cable]).map(c=>({...c,splices:c.splices?.map(sp=>
+      sp.id===id?{...sp,pigtailTerminal:terminal||undefined}:sp)})));
+  };
   const deviceLabel=(id:string, fallback?:string)=>{
     if(id===PANEL_SOURCE_ID)return `Panel P1 · Breaker #${cable.breakerSlot??1}`;
     const matching=devices.find(d=>d.id===id);
@@ -473,7 +495,7 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove,allCab
     const family=[...families][0];
     const allowed=family==="ground"?["ground","ground-bar"]:family==="neutral"?["silver","neutral-bar","load-neutral","fixture-neutral"]:["line","load","common","traveler-1","traveler-2","brass","breaker-hot","load-hot","fixture-hot"];
     if(pigtailTerminal&&!allowed.includes(pigtailTerminal)){setSpliceError("Choose a compatible terminal for the pigtail.");return;}
-    if(pigtailTerminal&&hasPigtailTo(pigtailTerminal)){setSpliceError("That terminal already has a pigtail in this box.");return;}
+    if(pigtailTerminal&&(hasPigtailTo(pigtailTerminal)||terminalUsedByCable(pigtailTerminal))){setSpliceError("That terminal is already occupied. Disconnect the existing wire first.");return;}
     const id=`splice-${Date.now()}-${Math.random().toString(36).slice(2,7)}`;
     const splice:SpliceRecord={id,deviceId:boxId,connector,members:members.map(({cableId,end,conductor})=>({cableId,end,conductor})),...(pigtailTerminal?{pigtailTerminal}: {})};
     saveAll((allCables??[cable]).map(c=>{
@@ -597,14 +619,26 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove,allCab
       </label>
       <label style={{display:"block",fontSize:16,marginTop:8}}>Pigtail to device (optional)
         <select value={pigtailTerminal} onChange={e=>{setPigtailTerminal(e.target.value);setSpliceError("");}} style={{display:"block",width:"100%",padding:10,background:"#173d50",color:"white",fontSize:16}}>
-          <option value="">Join wires only — no pigtail</option>{compatibleTerminals.filter(t=>!hasPigtailTo(t.id)).map(t=><option key={t.id} value={t.id}>{t.label}</option>)}
+          <option value="">Join wires only — no pigtail</option>{compatibleTerminals.filter(t=>!hasPigtailTo(t.id)&&!terminalUsedByCable(t.id)).map(t=><option key={t.id} value={t.id}>{t.label}</option>)}
         </select>
       </label>
       <button type="button" disabled={spliceSelection.length<2} onClick={createSplice} style={{marginTop:8,padding:11,background:"#155c7c",color:"white",border:"1px solid #4b9fbc",borderRadius:5,fontSize:16}}>{pigtailTerminal?"Create splice + pigtail":"Join selected wires"}</button>
       {spliceError&&<div role="alert" style={{color:"#ffb2a5",fontSize:15,marginTop:7}}>{spliceError}</div>}
       {splices.map(sp=><div key={sp.id} style={{padding:"8px 0",borderBottom:"1px solid #35566a",fontSize:14}}>
         🟠 {sp.connector} · {sp.members.length} cable conductors{sp.pigtailTerminal?` + pigtail → ${terms.find(t=>t.id===sp.pigtailTerminal)?.label??sp.pigtailTerminal}`:""}
-        <button type="button" onClick={()=>removeSplice(sp.id)} style={{marginLeft:8,padding:5}}>Remove splice</button>
+        <label style={{display:"block",marginTop:7,color:"#bcefff"}}>
+          Pigtail from this existing splice
+          <select aria-label={`Pigtail terminal for splice ${sp.id}`}
+            value={sp.pigtailTerminal??""}
+            onChange={e=>updateSplicePigtail(sp.id,e.target.value)}
+            style={{display:"block",width:"100%",padding:8,background:"#173d50",color:"white",border:"1px solid #52869d",borderRadius:4}}>
+            <option value="">No pigtail</option>
+            {terms.filter(t=>terminalFamily(t.id)===(sp.members[0]?.conductor==="ground"?"ground":sp.members[0]?.conductor==="white"?"neutral":"hot"))
+              .filter(t=>t.id===sp.pigtailTerminal||(!hasPigtailTo(t.id,sp.id)&&!terminalUsedByCable(t.id)))
+              .map(t=><option key={t.id} value={t.id}>{t.label}</option>)}
+          </select>
+        </label>
+        <button type="button" onClick={()=>removeSplice(sp.id)} style={{marginTop:7,padding:5}}>Remove splice</button>
       </div>)}
       <p style={{fontSize:13,color:"#b7cbd5"}}>Training model: connector suitability, box fill, conductor preparation, and bonding must be checked against the actual connector/device listing. Pigtails are drawn in the device-box editor and saved as splice-to-terminal connections; they are not separate wall cable runs.</p>
     </div>}

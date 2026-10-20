@@ -275,6 +275,128 @@ export function LiveWiringDiagram({cable,end,device,allCables,onTerminate,front=
   );
 }
 
+
+/** One box, one drawing: every cable end (including panel home runs) and every
+ * saved splice is drawn together. Reused unchanged by the right panel and wall. */
+export function UnifiedBoxWiring({device,allCables,onTerminate,front=false}:{
+  device:ElectricalDevice;allCables:CableRecord[];
+  onTerminate:(cableId:string,end:CableEnd,conductor:string,terminal:string)=>void;
+  front?:boolean;
+}) {
+  const entries=allCables.flatMap(c=>(["from","to"] as CableEnd[])
+    .filter(end=>c[end]===device.id).map(end=>({c,end})))
+    .sort((a,b)=>Number(b.c.from===PANEL_SOURCE_ID)-Number(a.c.from===PANEL_SOURCE_ID));
+  const uniqueSplices=allCables.flatMap(c=>c.splices??[])
+    .filter(sp=>sp.deviceId===device.id)
+    .filter((sp,i,arr)=>arr.findIndex(v=>v.id===sp.id)===i);
+  const terms=deviceTerminals(device);
+  const kind=kindFor(device,false);
+  const localPoints=positions(kind,terms);
+  const terminalXY=(id:string)=>localPoints[id]?{x:290+localPoints[id].x*.9,y:64+localPoints[id].y*.9}:undefined;
+  const [picked,setPicked]=useState<{cableId:string;end:CableEnd;conductor:string}|null>(null);
+  const svgRef=useRef<SVGSVGElement>(null);
+  const canvasHeight=Math.max(410,180+Math.ceil(entries.length/4)*140,180+uniqueSplices.length*100);
+  const cableX=(i:number)=>62+(i%4)*104;
+  const cableY=(i:number)=>42+Math.floor(i/4)*130;
+  const spliceXY=(i:number)=>({x:420,y:160+i*100});
+  const memberSplice=(id:string,end:CableEnd,conductor:string)=>
+    uniqueSplices.find(sp=>sp.members.some(m=>m.cableId===id&&m.end===end&&m.conductor===conductor));
+  const getPoint=(e:React.PointerEvent<SVGSVGElement>)=>{
+    const rect=svgRef.current?.getBoundingClientRect();if(!rect)return null;
+    const scale=Math.min(rect.width/720,rect.height/canvasHeight);
+    return {x:(e.clientX-rect.left-(rect.width-720*scale)/2)/scale,
+      y:(e.clientY-rect.top-(rect.height-canvasHeight*scale)/2)/scale};
+  };
+  const commit=(id:string)=>{
+    if(!picked)return;
+    const isGround=picked.conductor==="ground",isNeutral=picked.conductor==="white";
+    const ground=id==="ground"||id==="ground-bar";
+    const neutral=["silver","load-neutral","neutral-bar","fixture-neutral","neutral-splice"].includes(id);
+    if(isGround!==ground||(!isGround&&isNeutral!==neutral))return;
+    onTerminate(picked.cableId,picked.end,picked.conductor,id);
+    setPicked(null);
+  };
+  return <div style={{width:"100%"}}>
+    <svg ref={svgRef} viewBox={`0 0 720 ${canvasHeight}`} width="100%"
+      aria-label={`Complete wiring box for ${device.name}, including home runs and outgoing cables`}
+      style={{background:"#587586",border:"2px solid #9fc4d6",borderRadius:6,touchAction:"none"}}
+      onPointerUp={e=>{
+        if(!picked)return;
+        const pt=getPoint(e);if(!pt)return;
+        const near=terms.map(t=>({id:t.id,p:terminalXY(t.id)})).filter(v=>v.p)
+          .sort((a,b)=>Math.hypot(a.p!.x-pt.x,a.p!.y-pt.y)-Math.hypot(b.p!.x-pt.x,b.p!.y-pt.y))[0];
+        if(near?.p&&Math.hypot(near.p.x-pt.x,near.p.y-pt.y)<24)commit(near.id);
+      }}>
+      <text x="15" y="17" fontSize="14" fill="#f3fbff" fontWeight="bold">
+        {front?"FRONT · DEVICE IDENTIFICATION":"REAR · ALL CABLES IN THIS BOX"}
+      </text>
+      <g transform="translate(290 64) scale(.9)">
+        <DeviceArtwork kind={kind} front={front}/>
+      </g>
+      {!front&&entries.map(({c,end},i)=>{
+        const x=cableX(i),y=cableY(i);
+        const home=c.from===PANEL_SOURCE_ID;
+        const other=end==="from"?c.to:c.from;
+        const otherName=home?`PANEL P1 · #${c.breakerSlot??"?"}`:
+          (end==="from"?"TO ":"FROM ")+(c[end==="from"?"toName":"fromName"]??other.slice(0,12));
+        return <g key={`${c.id}-${end}`}>
+          <text x={x} y={y+3} fontSize="10" fill={home?"#ffe2a3":"#e1f5ff"} textAnchor="middle" fontWeight="bold">{home?"⚡ HOME RUN":`CABLE ${i+1}`}</text>
+          <text x={x} y={y+16} fontSize="9" fill="#f1f5fa" textAnchor="middle">{otherName.slice(0,23)}</text>
+          <text x={x} y={y+29} fontSize="9" fill="#d9ebf3" textAnchor="middle">{c.type}</text>
+          <path d={`M ${x} ${y+36} V ${y+73}`} stroke="#374d58" strokeWidth="24" strokeLinecap="round"/>
+          <path d={`M ${x} ${y+36} V ${y+73}`} stroke={c.type.includes("MC")?"#b8c2c8":home?"#1e2229":"#ece8db"} strokeWidth="17" strokeLinecap="round"/>
+          <rect x={x-12} y={y+68} width="24" height="9" rx="3" fill="#a6b9c2" stroke="#355568" strokeWidth="1.5"/>
+          {conductors(c.type).map((color,j)=>{
+            const n=conductors(c.type).length;
+            const sx=x+(j-(n-1)/2)*6,sy=y+76;
+            const saved=c.ends[end]?.[color];
+            const sp=saved?.startsWith("splice:")?memberSplice(c.id,end,color):undefined;
+            const spIdx=sp?uniqueSplices.findIndex(v=>v.id===sp.id):-1;
+            const target=spIdx>=0?spliceXY(spIdx):saved?terminalXY(saved):undefined;
+            const cap=saved==="cap";
+            const tx=target?.x??(x+(j-(n-1)/2)*20);
+            const ty=target?.y??(y+132+j*5);
+            const d=`M ${sx} ${sy} C ${sx} ${sy+42} ${tx-36} ${ty-28} ${tx} ${ty}`;
+            const active=picked?.cableId===c.id&&picked.end===end&&picked.conductor===color;
+            return <g key={color} onPointerDown={e=>{e.stopPropagation();setPicked({cableId:c.id,end,conductor:color});e.currentTarget.ownerSVGElement?.setPointerCapture(e.pointerId);}}
+              onClick={()=>setPicked({cableId:c.id,end,conductor:color})} style={{cursor:"pointer"}}>
+              <path d={d} stroke={active?"#1ef1ff":"#2b4655"} strokeWidth={active?12:9} fill="none" strokeLinecap="round"/>
+              <path d={d} stroke={colors[color]} strokeWidth="5" fill="none" strokeLinecap="round"/>
+              {!target&&!cap&&<circle cx={tx} cy={ty} r="4" fill={colors[color]} stroke="#8da8b7" strokeWidth="1.5"/>}
+              {cap&&<WireConnector x={tx} y={ty} />}
+              <title>{home?"Home run":otherName} · {color} · {saved??"loose"}</title>
+            </g>;
+          })}
+        </g>;
+      })}
+      {!front&&uniqueSplices.map((sp,i)=>{
+        const pt=spliceXY(i),t=sp.pigtailTerminal?terminalXY(sp.pigtailTerminal):undefined;
+        const family=sp.members[0]?.conductor==="white"?"white":sp.members[0]?.conductor==="ground"?"ground":"black";
+        return <g key={sp.id}>
+          {t&&<>
+            <path d={`M ${pt.x} ${pt.y} C ${pt.x+45} ${pt.y+40} ${t.x-55} ${t.y+45} ${t.x} ${t.y}`} fill="none" stroke="#2b4655" strokeWidth="10" strokeLinecap="round"/>
+            <path d={`M ${pt.x} ${pt.y} C ${pt.x+45} ${pt.y+40} ${t.x-55} ${t.y+45} ${t.x} ${t.y}`} fill="none" stroke={colors[family]} strokeWidth="5" strokeLinecap="round"/>
+            <text x={pt.x+14} y={pt.y+40} fontSize="10" fill="#ffe0a4">PIGTAIL → {sp.pigtailTerminal}</text>
+          </>}
+          <WireConnector x={pt.x} y={pt.y} splice/>
+          <text x={pt.x} y={pt.y-26} textAnchor="middle" fontSize="10" fill="#ffe0a4">{sp.members.length} wires + {t?"pigtail":"no pigtail"}</text>
+        </g>;
+      })}
+      {!front&&terms.map(t=>{
+        const p=terminalXY(t.id);if(!p)return null;
+        return <g key={t.id} onClick={()=>commit(t.id)} style={{cursor:"pointer"}}>
+          <circle cx={p.x} cy={p.y} r="12" fill={t.color} stroke={picked?"#12e8ff":"#304d5a"} strokeWidth={picked?4:2}/>
+          <path d={`M ${p.x-5} ${p.y} h10`} stroke="#344c5b" strokeWidth="2"/>
+          <title>{t.label} · click to connect selected conductor</title>
+        </g>;
+      })}
+    </svg>
+    {!front&&<div style={{fontSize:12,color:"#bcdce9",marginTop:4}}>
+      {entries.length} cable{entries.length===1?"":"s"} in this box · Select a conductor, then click or drag to a compatible terminal. Splices and pigtails use saved records.
+    </div>}
+  </div>;
+}
+
 export default function CableWiringPanel({cable,devices,onChange,onRemove,allCables,onChangeCables,initialEnd="from"}:{
   cable:CableRecord;devices:ElectricalDevice[];onChange:(c:CableRecord)=>void;onRemove:()=>void;
   allCables?:CableRecord[];onChangeCables?:(cables:CableRecord[])=>void;initialEnd?:CableEnd;
@@ -383,7 +505,9 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove,allCab
       <button type="button" onClick={()=>setView("front")} aria-pressed={view==="front"}
         style={{flex:1,padding:9,background:view==="front"?"#167193":"#183d51",color:"white",border:"1px solid #368bab",borderRadius:5}}>Front · Identify</button>
     </div>
-    <LiveWiringDiagram cable={cable} end={end} device={dev} allCables={allCables??[cable]} front={view==="front"} onTerminate={changeConnection} onSelectConductor={setSelected} externalSelected={selected}/>
+    {fromPanel
+      ? <LiveWiringDiagram cable={cable} end={end} device={dev} allCables={allCables??[cable]} front={view==="front"} onTerminate={changeConnection} onSelectConductor={setSelected} externalSelected={selected}/>
+      : <UnifiedBoxWiring device={dev} allCables={allCables??[cable]} front={view==="front"} onTerminate={changeConnection}/>}
     {kind==="gfci"&&view==="rear"&&<div style={{fontSize:14,color:"#e0f3fa",marginTop:7}}>GFCI rear: top pair = LINE, lower pair = LOAD; left silver = neutral, right brass = hot. Ground is green. Follow the actual device markings when installing.</div>}
     {!fromPanel && otherBoxCables.length>0 && <div style={{marginTop:12,padding:10,border:"1px solid #368bab",borderRadius:7,background:"#102f40"}}>
       <div style={{fontWeight:800,color:"#8feaff",marginBottom:8}}>Other cables entering this box · {boxCables.length} total</div>
@@ -395,8 +519,7 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove,allCab
         return <details key={`${record.id}-${item.side}`} open={item.isHomeRun} style={{border:"1px solid #45788e",borderRadius:6,marginBottom:8,padding:7}}>
           <summary style={{cursor:"pointer",fontWeight:700,color:item.isHomeRun?"#ffe0a0":"#c4e7f7"}}>{item.isHomeRun?"⚡ ":"↔ "}{source} · {record.type}</summary>
           <div style={{fontSize:12,color:"#c7dbe5",margin:"7px 0"}}>Drag conductors onto the same device terminals or use the termination controls below. Loose wires remain loose until connected.</div>
-          <LiveWiringDiagram cable={record} end={item.side} device={dev} allCables={allCables??[cable]}
-            onTerminate={changeConnection}/>
+          <div style={{fontSize:12,color:"#9de8f6",padding:"5px 0"}}>Shown in the shared box drawing above.</div>
           <div style={{display:"grid",gap:5,marginTop:7}}>
             {conductors(record.type).map(color=><label key={color} style={{display:"flex",alignItems:"center",gap:6,fontSize:13}}>
               <span style={{width:11,height:11,background:colors[color],border:"1px solid #9aabb5",borderRadius:6,flexShrink:0}}/>

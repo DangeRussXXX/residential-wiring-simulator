@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { ElectricalDevice } from "../electrical/types";
-import { LiveWiringDiagram, type CableRecord, type CableEnd } from "../simulator/CableWiringPanel";
+import { UnifiedBoxWiring, type CableRecord, type CableEnd } from "../simulator/CableWiringPanel";
 
 type Props = {
   device: ElectricalDevice;
@@ -147,7 +147,6 @@ function CompactWiredDevice({device,cables}:{device:ElectricalDevice;cables:Cabl
 export default function Device({ device, wireMode, selectedTerminal, selected, onSelect, onTerminalClick, onStartDrag, onCableStart, onCableDestination, cableSource, wiringCables=[], onWiringTerminate, allWiringCables=[] }: Props) {
   void selectedTerminal; void onTerminalClick;
   const [expanded,setExpanded]=useState(false);
-  const [cableIndex,setCableIndex]=useState(0);
   const showWiredBox=wiringCables.length>0;
   // Keep the wall footprint fixed. The detailed wiring is available on demand,
   // without moving the device or obscuring neighboring boxes.
@@ -160,10 +159,9 @@ export default function Device({ device, wireMode, selectedTerminal, selected, o
     style={{position:"absolute",left:device.x-(wallWidth-150)/2,top:device.y-(wallHeight-150)/2,width:wallWidth,height:wallHeight,boxSizing:"border-box",border:selected?"2px solid #00c9f3":"2px solid transparent",borderRadius:8,boxShadow:isExpanded?"0 14px 36px #0009, 0 0 0 3px #00c9f3":"none",background:isExpanded?"#c9d0d1":"transparent",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:wireMode?"crosshair":"grab",userSelect:"none",zIndex:isExpanded?45:10}}>
     {!showWiredBox&&wallMounted && <div title="Electrical device box" style={{position:"absolute",top:10,left:18,width:114,height:120,background:"#174e87",border:"4px solid #12375c",borderRadius:9,boxShadow:"inset 0 0 0 3px #4680ad, 2px 4px 7px #0005"}}/>}
     <div style={{position:"relative",zIndex:1,transform:"none",filter:"drop-shadow(1px 3px 2px #0005)",pointerEvents:isExpanded?"auto":"none"}}>
-      {isExpanded ? (()=>{const c=wiringCables[cableIndex%wiringCables.length];const end:CableEnd=c.from===device.id?"from":"to";
-        return <div style={{width:500,height:360,pointerEvents:"auto"}} onPointerDown={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()}>
-          <LiveWiringDiagram cable={c} end={end} device={device} allCables={allWiringCables.length?allWiringCables:wiringCables} onTerminate={onWiringTerminate??(()=>{})}/>
-          {wiringCables.length>1&&<button type="button" onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();setCableIndex(i=>i+1)}} style={{background:"#13516c",color:"white",padding:5}}>Next cable ({cableIndex%wiringCables.length+1}/{wiringCables.length})</button>}
+      {isExpanded ? (()=>{return <div style={{width:500,height:360,pointerEvents:"auto"}} onPointerDown={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()}>
+          <UnifiedBoxWiring device={device} allCables={allWiringCables.length?allWiringCables:wiringCables} onTerminate={onWiringTerminate??(()=>{})}/>
+          {wiringCables.length>1&&<div style={{fontSize:12,color:"#245269"}}>All {wiringCables.length} cables shown together</div>}
         </div>})() :
         showWiredBox ? <CompactWiredDevice device={device} cables={wiringCables}/> : <DeviceFace device={device}/>}
     </div>

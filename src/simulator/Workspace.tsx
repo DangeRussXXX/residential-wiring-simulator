@@ -326,8 +326,8 @@ function Workspace(
   },[workspaceScope,deviceStuds,heightConfirmed]);
   const [placementMessage,setPlacementMessage] = useState("");
   const [rightPanelTarget,setRightPanelTarget] = useState<HTMLElement|null>(null);
-  const [wallControlsOpen,setWallControlsOpen] = useState(true);
-  const [deviceInstallationOpen,setDeviceInstallationOpen] = useState(true);
+  const [wallControlsOpen,setWallControlsOpen] = useState(false);
+  const [deviceInstallationOpen,setDeviceInstallationOpen] = useState(false);
   useEffect(() => {
     const target = document.getElementById("rws-wall-tools-panel-target");
     setRightPanelTarget(target);
@@ -1959,7 +1959,7 @@ function Workspace(
             </div>
             </div>
           </details>
-          <details open className="nova-panel-section">
+          <details className="nova-panel-section">
             <summary style={{cursor:"pointer",fontWeight:700,color:"#8ee7ff"}}>New Wire Tool · Cable Wiring</summary>
             <div style={{paddingTop:8,display:"flex",flexDirection:"column",gap:8}}>
               <div>Click a device's connection dot, or start a home run from Panel P1.</div>

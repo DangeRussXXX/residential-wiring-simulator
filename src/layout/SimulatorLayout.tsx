@@ -58,12 +58,12 @@ export default function SimulatorLayout() {
   const [project, setProject] = useState<ServiceProject | null>(() => loadServiceProject());
   const [showService, setShowService] = useState(true);
   const [showRightColumn,setShowRightColumn]=useState(true);
-  const [showExplorer,setShowExplorer]=useState(true);
-  const [showLibrary,setShowLibrary]=useState(true);
+  const [showExplorer,setShowExplorer]=useState(false);
+  const [showLibrary,setShowLibrary]=useState(false);
   const [showPanelControls,setShowPanelControls]=useState(false);
   const [showProperties,setShowProperties]=useState(false);
-  const [showWallControls,setShowWallControls]=useState(true);
-  const [showDeviceInstallation,setShowDeviceInstallation]=useState(true);
+  const [showWallControls,setShowWallControls]=useState(false);
+  const [showDeviceInstallation,setShowDeviceInstallation]=useState(false);
   const [allPanelsRevision,setAllPanelsRevision]=useState(0);
   const [deviceInspectorTarget,setDeviceInspectorTarget]=useState<HTMLElement|null>(null);
   const [wallLocationTarget,setWallLocationTarget]=useState<HTMLElement|null>(null);

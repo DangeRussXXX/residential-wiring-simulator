@@ -120,16 +120,18 @@ function DeviceArtwork({kind,breakerSlot,front}:{kind:string;breakerSlot?:number
       </>}
   </g>;
 }
-function WireConnector({x,y,splice=false,selected=false,upright=false}:{x:number;y:number;splice?:boolean;selected?:boolean;upright?:boolean}) {
-  // Upright connectors have a CLOSED tip above and an OPEN mouth below.
-  // Conductors enter independently from below; the pigtail exits beside the bundle.
-  return <g transform={`translate(${x} ${y}) rotate(${upright?-90:0})`} pointerEvents="none">
-    <path d="M -2 -10 L 9 -10 Q 14 -10 17 -8 L 26 -5 Q 30 0 26 5 L 17 8 Q 14 10 9 10 L -2 10 Z"
-      fill={splice?"#e69a2f":"#ecaa38"} stroke="#ffe1a3" strokeWidth="1.7"/>
-    <rect x="-2" y="-11" width="7" height="22" rx="2" fill="#bb7124" stroke="#ffe1a3" strokeWidth="1.3"/>
-    {[8,12,16,20].map((v,i)=><path key={v} d={`M ${v} ${-9+i*0.5} L ${v+2} ${9-i*0.5}`} stroke="#a65b1e" strokeWidth="1.7" opacity=".8"/>)}
-    <path d="M 22 -4 Q 27 0 22 4" fill="none" stroke="#ffd48b" strokeWidth="1.2"/>
-    {selected&&<path d="M -5 -15 H 30 V 15 H -5 Z" fill="none" stroke="#1ee8ff" strokeWidth="2" strokeDasharray="4 3"/>}
+function WireConnector({x,y,splice=false,selected=false,upright=true}:{x:number;y:number;splice?:boolean;selected?:boolean;upright?:boolean}) {
+  // A twist-on wire connector is a CLOSED, tapered cap with an OPEN bottom.
+  // Its reference point is the center of the mouth (x,y), where wires enter.
+  // Keep upright in the complete-box diagram; legacy diagrams may opt out.
+  return <g transform={`translate(${x} ${y}) rotate(${upright?0:90})`} pointerEvents="none">
+    <path d="M -11 0 L -10 -11 Q -9 -16 -7 -20 Q -4 -27 0 -28 Q 4 -27 7 -20 Q 9 -16 10 -11 L 11 0 Z"
+      fill={splice?"#e99728":"#eea438"} stroke="#ffdc90" strokeWidth="1.8" strokeLinejoin="round"/>
+    <path d="M -10 -4 H 10 V 1 H -10 Z" fill="#b86d23" stroke="#ffd38a" strokeWidth="1.1"/>
+    {[-17,-13,-9].map(v=><path key={v} d={`M -8 ${v} Q 0 ${v-3} 8 ${v}`} fill="none" stroke="#ac601c" strokeWidth="1.6" opacity=".9"/>)}
+    <path d="M -4 -24 Q 0 -27 4 -24" fill="none" stroke="#ffe1a3" strokeWidth="1.3"/>
+    <path d="M -7 1 H 7" stroke="#583c24" strokeWidth="2" strokeLinecap="round"/>
+    {selected&&<rect x="-15" y="-32" width="30" height="37" rx="4" fill="none" stroke="#1ee8ff" strokeWidth="2" strokeDasharray="4 3"/>}
   </g>;
 }
 function kindFor(device:ElectricalDevice|undefined,fromPanel:boolean){
@@ -356,7 +358,7 @@ export function UnifiedBoxWiring({device,allCables,onTerminate,front=false}:{
             const cap=saved==="cap";
             const tx=target?.x??(x+(j-(n-1)/2)*20);
             const ty=target?.y??(y+132+j*5);
-            const d=`M ${sx} ${sy} C ${sx} ${sy+42} ${tx-36} ${ty-28} ${tx} ${ty}`;
+            const d=`M ${sx} ${sy} C ${sx} ${sy+42} ${tx-40} ${ty+34} ${tx} ${ty}`;
             const active=picked?.cableId===c.id&&picked.end===end&&picked.conductor===color;
             return <g key={color} onPointerDown={e=>{e.stopPropagation();setPicked({cableId:c.id,end,conductor:color});e.currentTarget.ownerSVGElement?.setPointerCapture(e.pointerId);}}
               onClick={()=>setPicked({cableId:c.id,end,conductor:color})} style={{cursor:"pointer"}}>
@@ -374,12 +376,12 @@ export function UnifiedBoxWiring({device,allCables,onTerminate,front=false}:{
         const family=sp.members[0]?.conductor==="white"?"white":sp.members[0]?.conductor==="ground"?"ground":"black";
         return <g key={sp.id}>
           {t&&<>
-            <path d={`M ${pt.x} ${pt.y} C ${pt.x+45} ${pt.y+40} ${t.x-55} ${t.y+45} ${t.x} ${t.y}`} fill="none" stroke="#2b4655" strokeWidth="10" strokeLinecap="round"/>
-            <path d={`M ${pt.x} ${pt.y} C ${pt.x+45} ${pt.y+40} ${t.x-55} ${t.y+45} ${t.x} ${t.y}`} fill="none" stroke={colors[family]} strokeWidth="5" strokeLinecap="round"/>
-            <text x={pt.x+14} y={pt.y+40} fontSize="10" fill="#ffe0a4">PIGTAIL → {sp.pigtailTerminal}</text>
+            <path d={`M ${pt.x} ${pt.y} C ${pt.x+28} ${pt.y+45} ${t.x-55} ${t.y+45} ${t.x} ${t.y}`} fill="none" stroke="#2b4655" strokeWidth="10" strokeLinecap="round"/>
+            <path d={`M ${pt.x} ${pt.y} C ${pt.x+28} ${pt.y+45} ${t.x-55} ${t.y+45} ${t.x} ${t.y}`} fill="none" stroke={colors[family]} strokeWidth="5" strokeLinecap="round"/>
+            <text x={pt.x+20} y={pt.y+53} fontSize="10" fill="#ffe0a4">PIGTAIL → {sp.pigtailTerminal}</text>
           </>}
-          <WireConnector x={pt.x} y={pt.y} splice/>
-          <text x={pt.x} y={pt.y-26} textAnchor="middle" fontSize="10" fill="#ffe0a4">{sp.members.length} wires + {t?"pigtail":"no pigtail"}</text>
+          <WireConnector x={pt.x} y={pt.y} splice upright/>
+          <text x={pt.x} y={pt.y-38} textAnchor="middle" fontSize="10" fill="#ffe0a4">{sp.members.length} wires + {t?"pigtail":"no pigtail"}</text>
         </g>;
       })}
       {!front&&terms.map(t=>{

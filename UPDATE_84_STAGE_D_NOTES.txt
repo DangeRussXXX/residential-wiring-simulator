@@ -1,0 +1,8 @@
+Update 84 Stage D — Cable entry alignment per gang
+
+Source: Stage C full project.
+Changed: src/simulator/Workspace.tsx
+
+Mounted device cable endpoints are now computed from the mounted gang index and the box's actual flex-slot geometry. Left, center, and right gangs receive separate cable drops instead of every cable entering at the box center. The endpoint moves with its parent box. Unboxed device cable routing and device wiring pop-outs are unchanged.
+
+This is a wall-view routing representation. All cables physically enter the shared electrical box, and future box wiring/splice views must represent internal conductor routing separately.

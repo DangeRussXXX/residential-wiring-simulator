@@ -2274,9 +2274,13 @@ function Workspace(
                 const mount=boxMounts[device.id];
                 const wallBox=mount && wallBoxes.find(box=>box.id===mount.boxId);
                 if (wallBox) {
-                  // One cable entry per physical box. Keep the endpoint tied to
-                  // box geometry when the box moves or its devices are changed.
-                  return {x:wallBox.x+boxWidth(wallBox.gangs)/2, y:wallBox.y+3};
+                  // Each mounted device has its own cable drop aligned with
+                  // its physical gang slot. Do not use pop-out coordinates.
+                  // Box padding is 7px and the gap between slots is 4px.
+                  const innerWidth = boxWidth(wallBox.gangs) - 14;
+                  const slotWidth = (innerWidth - (wallBox.gangs - 1) * 4) / wallBox.gangs;
+                  const slotCenter = wallBox.x + 7 + mount.gang * (slotWidth + 4) + slotWidth / 2;
+                  return {x:slotCenter, y:wallBox.y+3};
                 }
                 const attached=cables.filter(w=>w.from===device.id||w.to===device.id)
                   .sort((a,b)=>Number(b.from===PANEL_SOURCE_ID)-Number(a.from===PANEL_SOURCE_ID));

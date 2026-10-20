@@ -135,6 +135,13 @@ function Workspace(
   // LOCAL WORKSPACE STATE
   // ==========================================================
 
+  // Shared front/rear selection for the wall device and panel wiring editor.
+  // Keep this state in Workspace so both views receive the same value.
+  const [wiringFaces, setWiringFaces] = useState<Record<string, "front" | "rear">>({});
+  const updateWiringFace = (deviceId: string, face: "front" | "rear") => {
+    setWiringFaces(previous => ({ ...previous, [deviceId]: face }));
+  };
+
   const [
     wires,
     setWires

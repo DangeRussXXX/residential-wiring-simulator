@@ -362,10 +362,35 @@ export function UnifiedBoxWiring({device,allCables,onTerminate,front=false,boxMo
       <text x="18" y="28" fontSize="14" fill="#f3fbff" fontWeight="bold">
         {front?"FRONT · DEVICE IDENTIFICATION":"REAR · ALL CABLES IN THIS BOX"}
       </text>
-      {mountedBox ? boxDevices.map((d,i)=><g key={d.id} transform={`translate(${500+i*70} 128) scale(.29)`}>
-        <DeviceArtwork kind={kindFor(d,false)} front={front}/>
-      </g>) : <g transform={front?"translate(-150 -26) scale(1.65)":"translate(290 64) scale(.9)"}>
-        <DeviceArtwork kind={kind} front={front}/>
+      {front ? (
+        <g>
+          {boxDevices.map((d,i)=>{
+            const count=boxDevices.length;
+            // Each device is drawn at a readable size in its own gang column.
+            // Rear terminal coordinates and cable geometry are unchanged.
+            const cell=720/count;
+            const scale=Math.min(1.1, Math.max(.48,(cell-22)/115));
+            const centerX=cell*(i+.5);
+            const topY=76;
+            const tx=centerX-310*scale;
+            const ty=topY-24*scale;
+            return <g key={d.id}>
+              <rect x={i*cell+8} y="59" width={cell-16} height="324" rx="9"
+                fill="#4c6c7e" stroke="#a0c2d3" strokeWidth="1.5"/>
+              <g transform={`translate(${tx} ${ty}) scale(${scale})`}>
+                <DeviceArtwork kind={kindFor(d,false)} front={true}/>
+              </g>
+              <text x={centerX} y="357" textAnchor="middle" fill="#f4faff"
+                fontSize="15" fontWeight="bold">{d.name.length>23?d.name.slice(0,21)+"…":d.name}</text>
+              <text x={centerX} y="376" textAnchor="middle" fill="#c5e3f1"
+                fontSize="12">{mountedBox?`GANG ${i+1}`:"DEVICE"}</text>
+            </g>;
+          })}
+        </g>
+      ) : mountedBox ? boxDevices.map((d,i)=><g key={d.id} transform={`translate(${500+i*70} 128) scale(.29)`}>
+        <DeviceArtwork kind={kindFor(d,false)} front={false}/>
+      </g>) : <g transform="translate(290 64) scale(.9)">
+        <DeviceArtwork kind={kind} front={false}/>
       </g>}
       {!front&&entries.map(({c,end},i)=>{
         const x=cableX(i),y=cableY(i);

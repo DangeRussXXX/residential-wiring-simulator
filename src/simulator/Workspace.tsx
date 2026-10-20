@@ -2102,11 +2102,24 @@ function Workspace(
 
           {/* Physical cables between device boxes; conductor terminations are edited in the right panel. */}
           <svg viewBox="0 0 2000 1200" width="2000" height="1200"
-            style={{position:"absolute",inset:0,pointerEvents:"none",zIndex:15}}>
+            style={{position:"absolute",inset:0,pointerEvents:"none",zIndex:5}}>
             {cables.map(c=>{
               const a=devices.find(d=>d.id===c.from),b=devices.find(d=>d.id===c.to);
               if((!a&&c.from!==PANEL_SOURCE_ID)||!b)return null;
-              const x1=a?a.x+75:26,y1=a?a.y+12:0,x2=b.x+75,y2=b.y+12;
+              // Match CompactWiredDevice's actual top cable connectors.
+              // The compact SVG is 150x126, vertically centered in its 150px device,
+              // with each cable entry at SVG x=23+index*23, y=17..37.
+              // Previously +75 sent the wall cable to the middle of the box while
+              // the device connector was at +23: two visibly disconnected cables.
+              const entry=(device:ElectricalDevice)=>{
+                const attached=cables.filter(w=>w.from===device.id||w.to===device.id);
+                const index=attached.findIndex(w=>w.id===c.id);
+                return {x:device.x+23+Math.max(0,Math.min(index,2))*23,
+                  y:device.y+12+29}; // under connector and jacket, hidden by device
+              };
+              const start=a?entry(a):{x:26,y:0};
+              const end=entry(b);
+              const x1=start.x,y1=start.y,x2=end.x,y2=end.y;
               const middle=c.from===PANEL_SOURCE_ID?Math.max(24,y2-115):Math.max(22,Math.min(y1,y2)-90);
               const d=`M ${x1} ${y1} L ${x1} ${middle} L ${x2} ${middle} L ${x2} ${y2}`;
               const homeRun=c.from===PANEL_SOURCE_ID;

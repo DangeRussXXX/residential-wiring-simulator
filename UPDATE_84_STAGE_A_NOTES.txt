@@ -1,0 +1,17 @@
+NOVA Update 84 Stage A - Empty Boxes Only
+Based on Update 82.
+
+Changed:
+- src/components/ComponentLibrary.tsx: Electrical Boxes section, click or drag empty box types.
+- src/simulator/Workspace.tsx: independently positioned empty boxes, drag to move, selection, remove, scoped localStorage persistence.
+
+Not changed: existing device placement, wiring, terminal logic, panel styles.
+
+Known limitations:
+- No device installation in boxes yet (planned Stage B).
+- No wiring or cable entries into boxes yet (planned Stage C).
+- Box type sizes are schematic; not physical manufacturer dimensions.
+- Boxes saved in browser localStorage by workspace, not embedded in project export.
+- Build/browser test not completed: dependencies absent in environment.
+
+Test: place empty box by dragging from Electrical Boxes onto wall, select, move, delete, reload. Confirm legacy devices and wires remain unchanged.

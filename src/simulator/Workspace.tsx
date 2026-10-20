@@ -58,6 +58,8 @@ import type {
 
 export type WorkspaceHandle = {
 
+  addBox: (boxType: string, x?: number, y?: number) => void;
+
   addDevice:
   (
     name: string,
@@ -134,6 +136,28 @@ function Workspace(
   // ==========================================================
   // LOCAL WORKSPACE STATE
   // ==========================================================
+
+  // Update 84A: boxes are independent wall fixtures; no device or wire state is modified.
+  type WallBox = { id: string; kind: string; gangs: number; x: number; y: number };
+  const [wallBoxes, setWallBoxes] = useState<WallBox[]>(() => {
+    try { return JSON.parse(localStorage.getItem(`rws-empty-boxes:${workspaceScope}`) || "[]") as WallBox[]; }
+    catch { return []; }
+  });
+  const [selectedBoxId, setSelectedBoxId] = useState<string | null>(null);
+  const [movingBoxId, setMovingBoxId] = useState<string | null>(null);
+  useEffect(() => {
+    try { localStorage.setItem(`rws-empty-boxes:${workspaceScope}`, JSON.stringify(wallBoxes)); } catch { /* storage disabled */ }
+  }, [wallBoxes, workspaceScope]);
+  useEffect(() => {
+    try { setWallBoxes(JSON.parse(localStorage.getItem(`rws-empty-boxes:${workspaceScope}`) || "[]")); }
+    catch { setWallBoxes([]); }
+    setSelectedBoxId(null);
+  }, [workspaceScope]);
+  const installEmptyBox = (kind: string, x = 240, y = 300) => {
+    const gangs = Math.max(1, Math.min(6, Number(kind.match(/(\d+)-gang/i)?.[1] || 1)));
+    setWallBoxes(prev => [...prev, { id: `box-${Date.now()}-${Math.random().toString(36).slice(2,7)}`, kind, gangs, x, y }]);
+  };
+  const boxWidth = (gangs: number) => 58 + (gangs - 1) * 52;
 
   // Shared front/rear selection for the wall device and panel wiring editor.
   // Keep this state in Workspace so both views receive the same value.
@@ -562,6 +586,8 @@ function Workspace(
   useImperativeHandle(
     ref,
     () => ({
+
+      addBox: installEmptyBox,
 
       addDevice:
         createDevice,
@@ -1725,6 +1751,13 @@ function Workspace(
     e.preventDefault();
 
 
+    const boxType = e.dataTransfer.getData("novaEmptyBox");
+    if (boxType) {
+      const bounds = e.currentTarget.getBoundingClientRect();
+      installEmptyBox(boxType, e.clientX - bounds.left + e.currentTarget.scrollLeft, e.clientY - bounds.top + e.currentTarget.scrollTop);
+      return;
+    }
+
     const componentName =
       e.dataTransfer.getData(
         "componentType"
@@ -1966,6 +1999,7 @@ function Workspace(
         }
 
         onMouseDown={e => {
+          setSelectedBoxId(null);
 
           const target =
             e.target as HTMLElement;
@@ -1998,11 +2032,20 @@ function Workspace(
 
         }}
 
-        onMouseMove={
-          moveBoard
-        }
+        onMouseMove={e => {
+          if (movingBoxId && (e.buttons & 1)) {
+            const r=e.currentTarget.getBoundingClientRect();
+            const x=Math.max(0,Math.min(2000-70,e.clientX-r.left+e.currentTarget.scrollLeft-25));
+            const y=Math.max(30,Math.min(1100,e.clientY-r.top+e.currentTarget.scrollTop-35));
+            setWallBoxes(prev=>prev.map(b=>b.id===movingBoxId?{...b,x,y}:b));
+            return;
+          }
+          moveBoard(e);
+        }}
 
+        onMouseLeave={() => setMovingBoxId(null)}
         onMouseUp={() => {
+          setMovingBoxId(null);
           if (dragging) {
             const moved = devices.find(d => d.id === dragging);
             if (moved) {
@@ -2211,6 +2254,22 @@ function Workspace(
                 background:selectedStud===index?"rgba(17,212,255,.19)":"transparent",
                 cursor:"pointer",zIndex:2,padding:0}}/>;
           })}
+          {/* Update 84A: independent empty boxes, deliberately not tied to device geometry. */}
+          {!blueprintMode && wallBoxes.map(box => (
+            <div key={box.id}
+              onMouseDown={e => { e.stopPropagation(); setSelectedBoxId(box.id); setMovingBoxId(box.id); }}
+              onClick={e => { e.stopPropagation(); setSelectedBoxId(box.id); }}
+              title={`${box.kind} • empty • drag to move`}
+              style={{ position:"absolute", left:box.x, top:box.y,
+                width:boxWidth(box.gangs), height:96, boxSizing:"border-box", zIndex:5,
+                border:selectedBoxId===box.id?"3px solid #24ff57":"3px solid #356b87",
+                borderRadius:7, background:"#8199a6e8", cursor:"move",
+                boxShadow:"inset 0 0 0 5px #b9c8ce, 0 3px 10px #0004", display:"flex", alignItems:"center", padding:7, gap:4 }}>
+              {Array.from({length:box.gangs},(_,i)=><div key={i} style={{flex:1,height:70,border:"1px dashed #405b6a",borderRadius:3,display:"grid",placeItems:"center",fontSize:10,color:"#183444"}}>{i+1}</div>)}
+              <span style={{position:"absolute",bottom:"100%",left:0,whiteSpace:"nowrap",fontSize:12,fontWeight:700,background:"#112b43",color:"white",padding:"2px 5px"}}>{box.kind}</span>
+              {selectedBoxId===box.id && <button type="button" title="Remove empty box" onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();setWallBoxes(prev=>prev.filter(b=>b.id!==box.id));setSelectedBoxId(null);setMovingBoxId(null);}} style={{position:"absolute",right:-13,top:-15,borderRadius:12,background:"#a31f2c",color:"white",border:"1px solid white",cursor:"pointer"}}>×</button>}
+            </div>
+          ))}
           {/* =================================================
               DEVICES
               ================================================= */}

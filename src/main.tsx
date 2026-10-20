@@ -9,6 +9,7 @@ import {
 
 
 import "./index.css";
+import "./App.css";
 
 
 ReactDOM

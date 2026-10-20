@@ -144,8 +144,6 @@ function Workspace(
     catch { return []; }
   });
   const [selectedBoxId, setSelectedBoxId] = useState<string | null>(null);
-  const [pendingBoxKind, setPendingBoxKind] = useState<string | null>(null);
-  const [pendingBoxHeight, setPendingBoxHeight] = useState<string>("18");
   const [movingBoxId, setMovingBoxId] = useState<string | null>(null);
   useEffect(() => {
     try { localStorage.setItem(`rws-empty-boxes:${workspaceScope}`, JSON.stringify(wallBoxes)); } catch { /* storage disabled */ }
@@ -155,19 +153,14 @@ function Workspace(
     catch { setWallBoxes([]); }
     setSelectedBoxId(null);
   }, [workspaceScope]);
-  const installEmptyBox = (kind: string, x?: number, y?: number) => {
-    // Choosing a box starts the same stud + mounting-height workflow used for devices.
-    // No box is created until the installer explicitly confirms its location.
-    if (x === undefined || y === undefined) {
-      setPendingBoxKind(kind);
-      setSelectedBoxId(null);
-      setPlacementMessage("Choose a stud, set mounting height, then click Install Box.");
-      return;
-    }
+  const installEmptyBox = (kind: string, x = 240, y = 300) => {
     const gangs = Math.max(1, Math.min(6, Number(kind.match(/(\d+)-gang/i)?.[1] || 1)));
     setWallBoxes(prev => [...prev, { id: `box-${Date.now()}-${Math.random().toString(36).slice(2,7)}`, kind, gangs, x, y }]);
   };
   const boxWidth = (gangs: number) => 58 + (gangs - 1) * 52;
+  const selectedWallBox = wallBoxes.find(box => box.id === selectedBoxId);
+  const boxHeightInches = (y: number) => Math.round(Math.max(0, Math.min(120, (1105 - y) / 8)) * 10) / 10;
+
 
   // Shared front/rear selection for the wall device and panel wiring editor.
   // Keep this state in Workspace so both views receive the same value.
@@ -1763,7 +1756,23 @@ function Workspace(
 
     const boxType = e.dataTransfer.getData("novaEmptyBox");
     if (boxType) {
-      installEmptyBox(boxType);
+      const bounds = e.currentTarget.getBoundingClientRect();
+      const x = e.clientX - bounds.left + e.currentTarget.scrollLeft;
+      const y = e.clientY - bounds.top + e.currentTarget.scrollTop;
+      const pitch = studSpacing * 8;
+      const nearest = Math.max(0, Math.round((x - 13) / pitch));
+      const studX = nearest * pitch + 13;
+      if (Math.abs(x - studX) > 26) {
+        setPlacementMessage("Drop the electrical box directly on a stud, just like a device.");
+        return;
+      }
+      const gangs = Math.max(1, Math.min(6, Number(boxType.match(/(\d+)-gang/i)?.[1] || 1)));
+      const id = `box-${Date.now()}-${Math.random().toString(36).slice(2,7)}`;
+      setWallBoxes(prev => [...prev, { id, kind: boxType, gangs, x: studX - 6, y: Math.max(30, Math.min(1100, y)) }]);
+      setSelectedBoxId(id);
+      setSelectedDevice(null);
+      setSelectedStud(nearest);
+      setPlacementMessage("");
       return;
     }
 
@@ -1854,29 +1863,18 @@ function Workspace(
             <summary>Device Installation</summary>
             <div className="nova-wall-tools-combined">
             <div style={{display:"flex",flexDirection:"column",gap:8,paddingTop:8}}>
-              {pendingBoxKind && <div style={{padding:10,border:"1px solid #6da1b8",borderRadius:6,background:"#17364b",display:"flex",flexDirection:"column",gap:8}}>
-                <strong>Install Electrical Box: {pendingBoxKind}</strong>
-                <span>1. Click the mounting stud on the wall. 2. Enter box height. 3. Install.</span>
-                <span>Stud: {selectedStud === null ? "Not selected" : `#${selectedStud+1}`}</span>
-                <label>Mounting height (inches)
-                  <input aria-label="Box mounting height in inches" type="number" min="0" max="120" step="1"
-                    value={pendingBoxHeight} onChange={e=>setPendingBoxHeight(e.target.value)}
-                    style={{width:80,marginLeft:8}} />
+              <div>Selected: {selectedWallBox ? selectedWallBox.kind : selectedDevice ? selectedDevice.name || selectedDevice.type : "Drag a component or box onto a stud"}</div>
+              {selectedWallBox && <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",padding:"6px 8px",border:"1px solid #7a9aab",borderRadius:6,background:"#f5f8fa",color:"#172b36",fontSize:12}}>
+                <strong>{selectedWallBox.kind}</strong>
+                <span>Stud #{Math.max(1,Math.round((selectedWallBox.x+6-13)/(studSpacing*8))+1)}</span>
+                <label>Height (in)
+                  <input aria-label="Electrical box mounting height in inches" type="number" min="0" max="120" step="0.5"
+                    value={boxHeightInches(selectedWallBox.y)}
+                    onChange={e=>{const height=Number(e.target.value);if(e.target.value!=="" && Number.isFinite(height) && height>=0 && height<=120) setWallBoxes(prev=>prev.map(b=>b.id===selectedWallBox.id?{...b,y:Math.max(30,Math.min(1100,1105-height*8))}:b));}}
+                    style={{width:65,marginLeft:4}} />
                 </label>
-                <div style={{display:"flex",gap:8}}>
-                  <button type="button" disabled={selectedStud===null || pendingBoxHeight.trim()==="" || !Number.isFinite(Number(pendingBoxHeight)) || Number(pendingBoxHeight)<0 || Number(pendingBoxHeight)>120}
-                    onClick={()=>{
-                      if(selectedStud===null || !pendingBoxKind) return;
-                      const x=selectedStud*studSpacing*8+13-6;
-                      const y=heightToY(Number(pendingBoxHeight));
-                      installEmptyBox(pendingBoxKind,x,y);
-                      setPendingBoxKind(null);
-                      setPlacementMessage("Electrical box installed. Select another box to continue.");
-                    }}>🔨 Install Box</button>
-                  <button type="button" onClick={()=>{setPendingBoxKind(null);setPlacementMessage("");}}>Cancel</button>
-                </div>
+                <button type="button" onClick={()=>{setWallBoxes(prev=>prev.filter(b=>b.id!==selectedWallBox.id));setSelectedBoxId(null);}}>Remove Box</button>
               </div>}
-              <div>Selected: {pendingBoxKind ? `Box: ${pendingBoxKind}` : selectedDevice ? selectedDevice.name || selectedDevice.type : "Select a box in Component Library"}</div>
               {placementMessage && <div role="status" style={{color:"#ffd3a3"}}>{placementMessage}</div>}
               {selectedDevice && <div style={{color:"#8fe9ff"}}>Drop stud: {deviceStuds[selectedDevice.id]===undefined?"not assigned":`#${deviceStuds[selectedDevice.id]+1}`} · {nailedDevices[selectedDevice.id]?"Installed":heightConfirmed[selectedDevice.id]?"Ready to hammer":"Enter height to enable hammer"}</div>}
                       <span title="Click a stud on the wall to highlight it before installing a device"
@@ -2076,6 +2074,10 @@ function Workspace(
 
         onMouseLeave={() => setMovingBoxId(null)}
         onMouseUp={() => {
+          if (movingBoxId) {
+            const pitch = studSpacing * 8;
+            setWallBoxes(prev=>prev.map(b=>b.id===movingBoxId?{...b,x:Math.max(0,Math.round((b.x+6-13)/pitch)*pitch+13-6)}:b));
+          }
           setMovingBoxId(null);
           if (dragging) {
             const moved = devices.find(d => d.id === dragging);
@@ -2288,7 +2290,7 @@ function Workspace(
           {/* Update 84A: independent empty boxes, deliberately not tied to device geometry. */}
           {!blueprintMode && wallBoxes.map(box => (
             <div key={box.id}
-              onMouseDown={e => { e.stopPropagation(); setSelectedBoxId(box.id); setMovingBoxId(box.id); }}
+              onMouseDown={e => { e.stopPropagation(); setSelectedDevice(null); setSelectedBoxId(box.id); setMovingBoxId(box.id); }}
               onClick={e => { e.stopPropagation(); setSelectedBoxId(box.id); }}
               title={`${box.kind} • empty • drag to move`}
               style={{ position:"absolute", left:box.x, top:box.y,

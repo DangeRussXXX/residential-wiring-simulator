@@ -1888,6 +1888,7 @@ function Workspace(
                 <div style={{color:"#a9d9ea"}}>Connections are saved per cable end and shared with Panel P1.</div>
               </div>}
               {selectedCable && <CableWiringPanel key={selectedCable.id} initialEnd="to" cable={selectedCable} devices={devices}
+                sharedView={wiringFaces[selectedCable.to]??"rear"} onSharedViewChange={face=>updateWiringFace(selectedCable.to,face)}
                 allCables={cables} onChangeCables={saveCables}
                 onChange={next=>saveCables(cables.map(c=>c.id===next.id?next:c))}
                 onRemove={()=>{
@@ -2224,6 +2225,8 @@ function Workspace(
                   }
                   wiringCables={cables.filter(c=>c.from===device.id||c.to===device.id)}
                   allWiringCables={cables}
+                  wiringFace={wiringFaces[device.id]??"rear"}
+                  onWiringFaceChange={face=>updateWiringFace(device.id,face)}
                   onWiringTerminate={(cableId,end,conductor,terminal)=>saveCables(cables.map(c=>c.id===cableId?{...c,ends:{...c.ends,[end]:{...c.ends[end],[conductor]:terminal}}}:c))}
 
                   wireMode={

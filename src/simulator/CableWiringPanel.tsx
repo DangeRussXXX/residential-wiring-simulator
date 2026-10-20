@@ -399,13 +399,16 @@ export function UnifiedBoxWiring({device,allCables,onTerminate,front=false}:{
   </div>;
 }
 
-export default function CableWiringPanel({cable,devices,onChange,onRemove,allCables,onChangeCables,initialEnd="from"}:{
+export default function CableWiringPanel({cable,devices,onChange,onRemove,allCables,onChangeCables,initialEnd="from",sharedView, onSharedViewChange}:{
   cable:CableRecord;devices:ElectricalDevice[];onChange:(c:CableRecord)=>void;onRemove:()=>void;
   allCables?:CableRecord[];onChangeCables?:(cables:CableRecord[])=>void;initialEnd?:CableEnd;
+  sharedView?:"rear"|"front";onSharedViewChange?:(view:"rear"|"front")=>void;
 }) {
   const [end,setEnd]=useState<CableEnd>(initialEnd);
   const [selected,setSelected]=useState<string|null>(null);
-  const [view,setView]=useState<"rear"|"front">("rear");
+  const [localView,setLocalView]=useState<"rear"|"front">("rear");
+  const view=sharedView??localView;
+  const setView=(next:"rear"|"front")=>{setLocalView(next);onSharedViewChange?.(next);};
   const [spliceSelection,setSpliceSelection]=useState<string[]>([]);
   const [connector,setConnector]=useState("Listed twist-on connector");
   const [pigtailTerminal,setPigtailTerminal]=useState("");

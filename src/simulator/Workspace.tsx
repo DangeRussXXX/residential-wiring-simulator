@@ -2294,12 +2294,26 @@ function Workspace(
               const start=a?entry(a):{x:26,y:0};
               const end=entry(b);
               const x1=start.x,y1=start.y,x2=end.x,y2=end.y;
-              const middle=c.from===PANEL_SOURCE_ID?Math.max(24,y2-115):Math.max(22,Math.min(y1,y2)-90);
+              // Assign each cable a distinct overhead lane. Without this,
+              // multiple runs to one multi-gang box draw directly on top of
+              // each other, obscuring the individual left/center/right drops.
+              const destinationMount=boxMounts[b.id];
+              const destinationBox=destinationMount && wallBoxes.find(box=>box.id===destinationMount.boxId);
+              const siblings=destinationBox
+                ? cables.filter(other=>boxMounts[other.to]?.boxId===destinationBox.id)
+                : cables.filter(other=>other.to===c.to);
+              const lane=Math.max(0,siblings.findIndex(other=>other.id===c.id));
+              // Keep the cable routes above the box, with different horizontal
+              // tracks for each gang. The final vertical drop stays centered
+              // on that device's own gang position.
+              const middle=c.from===PANEL_SOURCE_ID
+                ? Math.max(24,y2-115-lane*26)
+                : Math.max(22,Math.min(y1,y2)-90-lane*26);
               const d=`M ${x1} ${y1} L ${x1} ${middle} L ${x2} ${middle} L ${x2} ${y2}`;
               const homeRun=c.from===PANEL_SOURCE_ID;
               return <g key={c.id}>
-                <path d={d} fill="none" stroke={homeRun?"#000000":"#6c7b84"} strokeWidth="17" strokeLinejoin="round"/>
-                <path d={d} fill="none" stroke={homeRun?"#191b20":c.type.includes("MC")?"#a5afb7":"#f4f0e6"} strokeWidth="12" strokeLinejoin="round"
+                <path d={d} fill="none" stroke={homeRun?"#000000":"#6c7b84"} strokeWidth="9" strokeLinejoin="round"/>
+                <path d={d} fill="none" stroke={homeRun?"#191b20":c.type.includes("MC")?"#a5afb7":"#f4f0e6"} strokeWidth="6" strokeLinejoin="round"
                   strokeDasharray={c.type.includes("MC")?"8 3":undefined}/>
               </g>;
             })}

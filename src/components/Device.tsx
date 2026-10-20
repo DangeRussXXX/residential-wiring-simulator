@@ -16,6 +16,8 @@ type Props = {
   wiringCables?: CableRecord[];
   onWiringTerminate?: (cableId:string,end:CableEnd,conductor:string,terminal:string)=>void;
   allWiringCables?: CableRecord[];
+  boxMounts?: Record<string,{boxId:string;gang:number}>;
+  boxDevices?: ElectricalDevice[];
   wiringFace?: "rear"|"front";
   onWiringFaceChange?: (face:"rear"|"front")=>void;
 };
@@ -148,7 +150,7 @@ function CompactWiredDevice({device,cables}:{device:ElectricalDevice;cables:Cabl
 
 void CompactWiredDevice;
 
-export default function Device({ device, wireMode, selectedTerminal, selected, onSelect, onTerminalClick, onStartDrag, onCableStart, onCableDestination, cableSource, wiringCables=[], onWiringTerminate, allWiringCables=[], wiringFace="rear", onWiringFaceChange }: Props) {
+export default function Device({ device, wireMode, selectedTerminal, selected, onSelect, onTerminalClick, onStartDrag, onCableStart, onCableDestination, cableSource, wiringCables=[], onWiringTerminate, allWiringCables=[], boxMounts, boxDevices, wiringFace="rear", onWiringFaceChange }: Props) {
   void selectedTerminal; void onTerminalClick;
   const [expanded,setExpanded]=useState(false);
   const face=wiringFace;
@@ -165,13 +167,13 @@ export default function Device({ device, wireMode, selectedTerminal, selected, o
     {!showWiredBox&&wallMounted && <div title="Electrical device box" style={{position:"absolute",top:10,left:18,width:114,height:120,background:"#174e87",border:"4px solid #12375c",borderRadius:9,boxShadow:"inset 0 0 0 3px #4680ad, 2px 4px 7px #0005"}}/>}
     <div style={{position:"relative",zIndex:1,transform:"none",filter:"drop-shadow(1px 3px 2px #0005)",pointerEvents:isExpanded?"auto":"none"}}>
       {isExpanded ? (()=>{return <div style={{width:720,height:440,pointerEvents:"auto",overflow:"auto"}} onPointerDown={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()}>
-          <UnifiedBoxWiring device={device} allCables={allWiringCables.length?allWiringCables:wiringCables} front={face==="front"} onTerminate={onWiringTerminate??(()=>{})}/>
+          <UnifiedBoxWiring device={device} allCables={allWiringCables.length?allWiringCables:wiringCables} boxMounts={boxMounts} devices={boxDevices} front={face==="front"} onTerminate={onWiringTerminate??(()=>{})}/>
           {wiringCables.length>1&&<div style={{fontSize:12,color:"#245269"}}>All {wiringCables.length} cables shown together</div>}
         </div>})() :
         showWiredBox ? (face==="front" ?
           <div title="Front device face" style={{width:142,height:130,background:"#50778a",border:"2px solid #7197a9",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{width:96,height:118,display:"flex",alignItems:"center",justifyContent:"center"}}><FrontDeviceArtwork symbol={device.symbol}/></div></div>
           : <div title="Rear wiring — same diagram as the right panel" style={{width:148,height:132,overflow:"hidden",position:"relative",background:"#587586",border:"2px solid #69889a",borderRadius:7,pointerEvents:"none"}}>
-              <div style={{width:370,transform:"scale(0.39)",transformOrigin:"top left"}}><UnifiedBoxWiring device={device} allCables={allWiringCables.length?allWiringCables:wiringCables} front={false} onTerminate={()=>{}}/></div>
+              <div style={{width:370,transform:"scale(0.39)",transformOrigin:"top left"}}><UnifiedBoxWiring device={device} allCables={allWiringCables.length?allWiringCables:wiringCables} boxMounts={boxMounts} devices={boxDevices} front={false} onTerminate={()=>{}}/></div>
             </div>) : <DeviceFace device={device}/>}
     </div>
     {showWiredBox&&<button type="button" title={`Flip to ${face==="rear"?"front":"rear"} view`} aria-label={`Flip ${device.name} to ${face==="rear"?"front":"rear"} view`} onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onWiringFaceChange?.(face==="rear"?"front":"rear");onSelect(device.id);}} style={{position:"absolute",top:2,right:isExpanded?94:36,zIndex:51,background:"#13516c",color:"#fff",border:"2px solid #7edcf0",borderRadius:5,padding:isExpanded?"4px 8px":"2px 5px",fontSize:11,cursor:"pointer"}}>{face==="rear"?"Face":"Wires"}</button>}

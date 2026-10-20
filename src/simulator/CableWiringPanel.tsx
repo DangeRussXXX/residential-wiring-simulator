@@ -297,27 +297,40 @@ export function LiveWiringDiagram({cable,end,device,allCables,onTerminate,front=
 
 /** One box, one drawing: every cable end (including panel home runs) and every
  * saved splice is drawn together. Reused unchanged by the right panel and wall. */
-export function UnifiedBoxWiring({device,allCables,onTerminate,front=false}:{
-  device:ElectricalDevice;allCables:CableRecord[];
+export function UnifiedBoxWiring({device,allCables,onTerminate,front=false,boxMounts,devices}:{
+  device:ElectricalDevice;allCables:CableRecord[];boxMounts?:Record<string,{boxId:string;gang:number}>;devices?:ElectricalDevice[];
   onTerminate:(cableId:string,end:CableEnd,conductor:string,terminal:string)=>void;
   front?:boolean;
 }) {
+  const mountedBox=boxMounts?.[device.id]?.boxId;
+  const inBox=(id:string)=>mountedBox ? boxMounts?.[id]?.boxId===mountedBox : id===device.id;
+  const boxDevices=mountedBox ? (devices??[device]).filter(d=>inBox(d.id)).sort((a,b)=>(boxMounts?.[a.id]?.gang??0)-(boxMounts?.[b.id]?.gang??0)) : [device];
   const entries=allCables.flatMap(c=>(["from","to"] as CableEnd[])
-    .filter(end=>c[end]===device.id).map(end=>({c,end})))
+    .filter(end=>inBox(c[end])).map(end=>({c,end})))
     .sort((a,b)=>Number(b.c.from===PANEL_SOURCE_ID)-Number(a.c.from===PANEL_SOURCE_ID));
   const uniqueSplices=allCables.flatMap(c=>c.splices??[])
-    .filter(sp=>sp.deviceId===device.id)
+    .filter(sp=>sp.deviceId===mountedBox||inBox(sp.deviceId))
     .filter((sp,i,arr)=>arr.findIndex(v=>v.id===sp.id)===i);
   const terms=deviceTerminals(device);
   const kind=kindFor(device,false);
   const localPoints=positions(kind,terms);
-  const terminalXY=(id:string)=>localPoints[id]?{x:290+localPoints[id].x*.9,y:64+localPoints[id].y*.9}:undefined;
+  const terminalXY=(id:string)=>{
+    const [targetId,terminalId]=id.includes("::")?id.split("::",2):[device.id,id];
+    const target=boxDevices.find(d=>d.id===targetId);
+    if(!target)return undefined;
+    const targetTerms=deviceTerminals(target);
+    const point=positions(kindFor(target,false),targetTerms)[terminalId];
+    if(!point)return undefined;
+    if(!mountedBox)return {x:290+point.x*.9,y:64+point.y*.9};
+    const index=boxDevices.findIndex(d=>d.id===targetId);
+    return {x:345+index*125+point.x*.48,y:64+point.y*.48};
+  };
   const [picked,setPicked]=useState<{cableId:string;end:CableEnd;conductor:string}|null>(null);
   const svgRef=useRef<SVGSVGElement>(null);
   const canvasHeight=front?410:Math.max(410,180+Math.ceil(entries.length/4)*155,180+uniqueSplices.length*100);
   const cableX=(i:number)=>65+(i%4)*86;
   const cableY=(i:number)=>58+Math.floor(i/4)*155;
-  const spliceXY=(i:number)=>({x:420,y:160+i*100});
+  const spliceXY=(i:number)=>({x:mountedBox?320:420,y:160+i*100});
   const memberSplice=(id:string,end:CableEnd,conductor:string)=>
     uniqueSplices.find(sp=>sp.members.some(m=>m.cableId===id&&m.end===end&&m.conductor===conductor));
   const getPoint=(e:React.PointerEvent<SVGSVGElement>)=>{
@@ -349,9 +362,11 @@ export function UnifiedBoxWiring({device,allCables,onTerminate,front=false}:{
       <text x="15" y="17" fontSize="14" fill="#f3fbff" fontWeight="bold">
         {front?"FRONT · DEVICE IDENTIFICATION":"REAR · ALL CABLES IN THIS BOX"}
       </text>
-      <g transform={front?"translate(-150 -26) scale(1.65)":"translate(290 64) scale(.9)"}>
+      {mountedBox ? boxDevices.map((d,i)=><g key={d.id} transform={`translate(${345+i*125} 64) scale(.48)`}>
+        <DeviceArtwork kind={kindFor(d,false)} front={front}/>
+      </g>) : <g transform={front?"translate(-150 -26) scale(1.65)":"translate(290 64) scale(.9)"}>
         <DeviceArtwork kind={kind} front={front}/>
-      </g>
+      </g>}
       {!front&&entries.map(({c,end},i)=>{
         const x=cableX(i),y=cableY(i);
         const home=c.from===PANEL_SOURCE_ID;
@@ -390,26 +405,33 @@ export function UnifiedBoxWiring({device,allCables,onTerminate,front=false}:{
         </g>;
       })}
       {!front&&uniqueSplices.map((sp,i)=>{
-        const pt=spliceXY(i),t=sp.pigtailTerminal?terminalXY(sp.pigtailTerminal):undefined;
+        const pt=spliceXY(i);
+        const targets=sp.pigtailTerminals?.length?sp.pigtailTerminals:(sp.pigtailTerminal?[sp.pigtailTerminal]:[]);
         const family=sp.members[0]?.conductor==="white"?"white":sp.members[0]?.conductor==="ground"?"ground":"black";
         return <g key={sp.id}>
-          {t&&<>
-            <path d={`M ${pt.x} ${pt.y} C ${pt.x+28} ${pt.y+45} ${t.x-55} ${t.y+45} ${t.x} ${t.y}`} fill="none" stroke="#2b4655" strokeWidth="10" strokeLinecap="round"/>
-            <path d={`M ${pt.x} ${pt.y} C ${pt.x+28} ${pt.y+45} ${t.x-55} ${t.y+45} ${t.x} ${t.y}`} fill="none" stroke={colors[family]} strokeWidth="5" strokeLinecap="round"/>
-            <text x={pt.x+20} y={pt.y+53} fontSize="10" fill="#ffe0a4">PIGTAIL → {sp.pigtailTerminal}</text>
-          </>}
+          {targets.map((terminal,j)=>{
+            const t=terminalXY(terminal);
+            if(!t)return null;
+            const path=`M ${pt.x+j*5} ${pt.y} C ${pt.x+28+j*9} ${pt.y+45+j*10} ${t.x-55} ${t.y+45} ${t.x} ${t.y}`;
+            return <g key={`${terminal}-${j}`}>
+              <path d={path} fill="none" stroke="#2b4655" strokeWidth="10" strokeLinecap="round"/>
+              <path d={path} fill="none" stroke={colors[family]} strokeWidth="5" strokeLinecap="round"/>
+              <title>Pigtail to {terminal}</title>
+            </g>;
+          })}
           <WireConnector x={pt.x} y={pt.y} splice upright/>
-          <text x={pt.x} y={pt.y-38} textAnchor="middle" fontSize="10" fill="#ffe0a4">{sp.members.length} wires + {t?"pigtail":"no pigtail"}</text>
+          <text x={pt.x} y={pt.y-38} textAnchor="middle" fontSize="10" fill="#ffe0a4">{sp.members.length} wires + {targets.length} pigtail(s)</text>
         </g>;
       })}
-      {!front&&terms.map(t=>{
-        const p=terminalXY(t.id);if(!p)return null;
-        return <g key={t.id} onClick={()=>commit(t.id)} style={{cursor:"pointer"}}>
-          <circle cx={p.x} cy={p.y} r="12" fill={t.color} stroke={picked?"#12e8ff":"#304d5a"} strokeWidth={picked?4:2}/>
-          <path d={`M ${p.x-5} ${p.y} h10`} stroke="#344c5b" strokeWidth="2"/>
-          <title>{t.label} · click to connect selected conductor</title>
+      {!front&&boxDevices.flatMap(d=>deviceTerminals(d).map(t=>{
+        const key=mountedBox?`${d.id}::${t.id}`:t.id;
+        const p=terminalXY(key);if(!p)return null;
+        return <g key={key} onClick={()=>commit(t.id)} style={{cursor:"pointer"}}>
+          <circle cx={p.x} cy={p.y} r="9" fill={t.color} stroke={picked?"#12e8ff":"#304d5a"} strokeWidth={picked?3:2}/>
+          <path d={`M ${p.x-4} ${p.y} h8`} stroke="#344c5b" strokeWidth="2"/>
+          <title>{d.name}: {t.label}</title>
         </g>;
-      })}
+      }))}
     </svg>
     {!front&&<div style={{fontSize:12,color:"#bcdce9",marginTop:4}}>
       {entries.length} cable{entries.length===1?"":"s"} in this box · Select a conductor, then click or drag to a compatible terminal. Splices and pigtails use saved records.
@@ -567,7 +589,7 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove,allCab
     </div>
     {fromPanel
       ? <LiveWiringDiagram cable={cable} end={end} device={dev} allCables={allCables??[cable]} front={view==="front"} onTerminate={changeConnection} onSelectConductor={setSelected} externalSelected={selected}/>
-      : <UnifiedBoxWiring device={dev} allCables={allCables??[cable]} front={view==="front"} onTerminate={changeConnection}/>}
+      : <UnifiedBoxWiring device={dev} allCables={allCables??[cable]} devices={devices} boxMounts={boxMounts} front={view==="front"} onTerminate={changeConnection}/>}
     {kind==="gfci"&&view==="rear"&&<div style={{fontSize:14,color:"#e0f3fa",marginTop:7}}>GFCI rear: top pair = LINE, lower pair = LOAD; left silver = neutral, right brass = hot. Ground is green. Follow the actual device markings when installing.</div>}
     {!fromPanel && otherBoxCables.length>0 && <div style={{marginTop:12,padding:10,border:"1px solid #368bab",borderRadius:7,background:"#102f40"}}>
       <div style={{fontWeight:800,color:"#8feaff",marginBottom:8}}>Other cables entering this box · {boxCables.length} total</div>

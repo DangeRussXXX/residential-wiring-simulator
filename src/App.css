@@ -182,3 +182,14 @@
     border-right-color: var(--border);
   }
 }
+
+/* Update 60: unified right-side tool drawer */
+.nova-unified-controls details, #rws-wall-tools-panel-target ~ details {
+  border:1px solid #346b85; border-radius:7px; margin:8px 0; padding:7px;
+  background:#252526; color:#e4f5fc;
+}
+.nova-unified-controls summary, #rws-wall-tools-panel-target ~ details > summary {
+  cursor:pointer; color:#a2eaff; font-weight:700; padding:6px 4px;
+}
+.nova-unified-controls summary:hover, #rws-wall-tools-panel-target ~ details > summary:hover {background:#193e50;}
+.nova-control-body {padding:8px 2px;}

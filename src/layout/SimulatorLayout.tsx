@@ -55,7 +55,6 @@ export default function SimulatorLayout() {
 
   const [project, setProject] = useState<ServiceProject | null>(() => loadServiceProject());
   const [showService, setShowService] = useState(true);
-  const [showLeftColumn,setShowLeftColumn]=useState(true);
   const [showRightColumn,setShowRightColumn]=useState(true);
   const [showExplorer,setShowExplorer]=useState(true);
   const [showLibrary,setShowLibrary]=useState(true);
@@ -88,9 +87,6 @@ export default function SimulatorLayout() {
   const resizing =
     useRef(false);
 
-  const componentResizing =
-    useRef(false);
-
 
   const {
     devices,
@@ -106,12 +102,6 @@ export default function SimulatorLayout() {
     propertiesWidth,
     setPropertiesWidth
   ] = useState(400);
-
-
-  const [
-    componentWidth,
-    setComponentWidth
-  ] = useState(220);
 
 
   const [
@@ -497,94 +487,6 @@ export default function SimulatorLayout() {
 
 
   // ---------------------------------
-  // RESIZE COMPONENT LIBRARY
-  // ---------------------------------
-
-  function startComponentResize(
-    e: React.MouseEvent
-  ) {
-
-    e.preventDefault();
-
-    componentResizing.current =
-      true;
-
-
-    const startX =
-      e.clientX;
-
-
-    const startWidth =
-      componentWidth;
-
-
-    const handleMouseMove =
-      (event: MouseEvent) => {
-
-        if (
-          !componentResizing.current
-        ) {
-          return;
-        }
-
-
-        const width =
-          startWidth +
-          (
-            event.clientX -
-            startX
-          );
-
-
-        if (
-          width >= 160 &&
-          width <= 500
-        ) {
-
-          setComponentWidth(
-            width
-          );
-
-        }
-
-      };
-
-
-    const stopResize = () => {
-
-      componentResizing.current =
-        false;
-
-
-      window.removeEventListener(
-        "mousemove",
-        handleMouseMove
-      );
-
-
-      window.removeEventListener(
-        "mouseup",
-        stopResize
-      );
-
-    };
-
-
-    window.addEventListener(
-      "mousemove",
-      handleMouseMove
-    );
-
-
-    window.addEventListener(
-      "mouseup",
-      stopResize
-    );
-
-  }
-
-
-  // ---------------------------------
   // RENDER
   // ---------------------------------
 
@@ -629,74 +531,6 @@ export default function SimulatorLayout() {
         }}
       >
 
-        <div style={{display:"flex",flexDirection:"column",width:showLeftColumn?`${componentWidth}px`:38,flexShrink:0,background:"#252526",minHeight:0,borderRight:"1px solid #29627b"}}>
-          <button type="button" onClick={()=>setShowLeftColumn(v=>!v)}
-            title={showLeftColumn?"Hide Components column":"Show Components column"}
-            style={{width:"100%",background:"#12384c",color:"#7ce4ff",padding:"9px 5px",textAlign:"left",fontWeight:700,border:"none"}}>
-            {showLeftColumn?"◀ Hide Components":"▶"}
-          </button>
-          {showLeftColumn && <div style={{overflowY:"auto",minHeight:0,flex:1}}>
-            <button type="button" onClick={()=>setShowExplorer(v=>!v)} title="Show or hide Project Explorer"
-              style={{width:"100%",textAlign:"left",background:"#193e50",color:"#8ee7ff",border:"1px solid #36758e",padding:9}}>
-              {showExplorer?"▼":"▶"} Project Explorer · {showExplorer?"Hide":"Show"}
-            </button>
-        {project && showExplorer && <section style={{background:"#101a25",padding:10,fontSize:13,borderBottom:"1px solid #29627b"}}>
-          <strong style={{ color: "#72dcff" }}>PROJECT EXPLORER</strong>
-          <div style={{ margin: "8px 0", overflowWrap: "anywhere" }}>{project.name}</div>
-          <button onClick={() => { setShowBlueprint(true); setShowService(false); setShowElectricalService(false); setActiveWall(null); setWorkspaceScope("BLUEPRINT"); }} style={{width:"100%",margin:"6px 0 12px",padding:10,background:showBlueprint?"#087f9f":"#24475a",border:"1px solid #3585a2",color:"white",borderRadius:5,fontWeight:700,textAlign:"left"}}>▦ Whole-House Blueprint</button>
-          <div style={{borderTop:"1px solid #2c4553",paddingTop:8,marginBottom:12}}>
-            <strong style={{color:"#72dcff"}}>⚡ Electrical Service</strong>
-            <button onClick={() => { setShowBlueprint(false); setShowElectricalService(true); setShowService(true); setWorkspaceScope("SERVICE_SETUP"); setActiveWall(null); }} style={{width:"100%",marginTop:7,marginBottom:5,background:showElectricalService?"#146d8d":"#243c4b",textAlign:"left"}}>▸ Service Setup & Simulation</button>
-            <button onClick={() => { setShowBlueprint(false); setShowElectricalService(false); setShowService(true); setWorkspaceScope("SERVICE"); setActiveWall(null); }} style={{ width: "100%", marginTop: 7, marginBottom: 5, background: showService&&!showElectricalService ? "#146d8d" : "#243c4b", textAlign:"left" }}>▸ Main Distribution Panel</button>
-            <div style={{fontSize:11,color:"#a4c8d8",paddingLeft:6}}>{project.service.route === "UNDERGROUND" ? "Underground" : "Overhead"} · {project.service.amperage}A</div>
-            <div style={{fontSize:11,color:"#a4c8d8",paddingLeft:6}}>Distribution main: {project.distributionMain?.installed ? `${project.distributionMain.amperage}A` : "Main lugs"}</div>
-          </div>
-          {project.buildings.map(building => <div key={building.id} style={{ marginBottom: 12, borderTop: "1px solid #2c4553", paddingTop: 8 }}>
-            <strong>{building.kind === "MAIN" ? "🏠" : "🏗"} {building.name}</strong>
-            {building.kind === "DETACHED" && <div style={{ color: "#f1b96e", fontSize: 11 }}>Subpanel / feeder: not yet configured</div>}
-            {project.areas.filter(area => area.buildingId === building.id).map(area => <button key={area.id} onClick={() => { changeProject({ ...project, activeAreaId: area.id }); setWorkspaceScope(`${project.id}:${area.id}:OVERVIEW`); setActiveWall(null); setShowBlueprint(false); setShowService(false); setShowElectricalService(false); }} style={{ display: "block", width: "100%", marginTop: 5, textAlign: "left", background: !showService && project.activeAreaId === area.id ? "#146d8d" : "#243442" }}>▸ {area.name}</button>)}
-            <button onClick={() => addArea(building.id)} style={{ marginTop: 6, width: "100%" }}>+ Add Room / Area</button>
-          </div>)}
-          <button onClick={addBuilding} style={{ width: "100%" }}>+ Detached Building</button>
-          <button onClick={() => { if (window.confirm("Start a new service project? The current project navigation will be replaced.")) { clearServiceProject(); clearWorkspaceScopes(); setProject(null); setActiveWall(null); } }} style={{ width: "100%", marginTop: 24, color: "#ffc3ae" }}>New Service Project</button>
-          <p style={{ fontSize: 11, color: "#9caebb" }}>Each wall has its own workspace. Breakers and circuit names are managed under Service & Panel; physical feeder and circuit wiring is coming next.</p>
-        </section>}
-
-
-            <button type="button" onClick={()=>setShowLibrary(v=>!v)} title="Show or hide Component Library"
-              style={{width:"100%",textAlign:"left",background:"#193e50",color:"#8ee7ff",border:"1px solid #36758e",padding:9}}>
-              {showLibrary?"▼":"▶"} Component Library · {showLibrary?"Hide":"Show"}
-            </button>
-            {showLibrary && !showService && !!activeWall && <ComponentLibrary workspaceRef={workspaceRef}/>}
-            {showLibrary && (showService || !activeWall) && <div style={{padding:10,fontSize:12,color:"#aacbd7"}}>Open a room wall to place components.</div>}
-          </div>}
-        </div>
-
-        {/* =============================== */}
-        {/* COMPONENT RESIZE */}
-        {/* =============================== */}
-
-        <div
-          onMouseDown={
-            startComponentResize
-          }
-          style={{
-            display: showLeftColumn ? "block" : "none",
-            width:
-              "10px",
-
-            cursor:
-              "col-resize",
-
-            background:
-              "#444",
-
-            flexShrink:
-              0
-          }}
-        />
-
-
         {/* =============================== */}
         {/* WORKSPACE */}
         {/* =============================== */}
@@ -733,7 +567,7 @@ export default function SimulatorLayout() {
         {/* =============================== */}
         {/* RIGHT PANEL */}
         {/* =============================== */}
-        {!showService && !!activeWall && <button type="button"
+        {project && <button type="button"
           title={showRightColumn?"Hide wiring and inspection panels":"Show wiring and inspection panels"}
           onClick={()=>setShowRightColumn(v=>!v)}
           style={{background:"#12384c",color:"#8ee7ff",border:"1px solid #36758e",writingMode:"vertical-rl",padding:7}}>
@@ -747,7 +581,7 @@ export default function SimulatorLayout() {
             minWidth:
               "360px",
 
-            display: showService || !activeWall || !showRightColumn ? "none" : "flex",
+            display: !project || !showRightColumn ? "none" : "flex",
 
             background:
               "#252526",
@@ -784,6 +618,42 @@ export default function SimulatorLayout() {
             }}
           >
 
+            <div className="nova-unified-controls">
+              <details open={showExplorer} onToggle={e=>setShowExplorer(e.currentTarget.open)}>
+                <summary>Project Explorer · Show/Hide</summary>
+                {project && <div className="nova-control-body">
+<section style={{background:"#101a25",padding:10,fontSize:13,borderBottom:"1px solid #29627b"}}>
+          <strong style={{ color: "#72dcff" }}>PROJECT EXPLORER</strong>
+          <div style={{ margin: "8px 0", overflowWrap: "anywhere" }}>{project.name}</div>
+          <button onClick={() => { setShowBlueprint(true); setShowService(false); setShowElectricalService(false); setActiveWall(null); setWorkspaceScope("BLUEPRINT"); }} style={{width:"100%",margin:"6px 0 12px",padding:10,background:showBlueprint?"#087f9f":"#24475a",border:"1px solid #3585a2",color:"white",borderRadius:5,fontWeight:700,textAlign:"left"}}>▦ Whole-House Blueprint</button>
+          <div style={{borderTop:"1px solid #2c4553",paddingTop:8,marginBottom:12}}>
+            <strong style={{color:"#72dcff"}}>⚡ Electrical Service</strong>
+            <button onClick={() => { setShowBlueprint(false); setShowElectricalService(true); setShowService(true); setWorkspaceScope("SERVICE_SETUP"); setActiveWall(null); }} style={{width:"100%",marginTop:7,marginBottom:5,background:showElectricalService?"#146d8d":"#243c4b",textAlign:"left"}}>▸ Service Setup & Simulation</button>
+            <button onClick={() => { setShowBlueprint(false); setShowElectricalService(false); setShowService(true); setWorkspaceScope("SERVICE"); setActiveWall(null); }} style={{ width: "100%", marginTop: 7, marginBottom: 5, background: showService&&!showElectricalService ? "#146d8d" : "#243c4b", textAlign:"left" }}>▸ Main Distribution Panel</button>
+            <div style={{fontSize:11,color:"#a4c8d8",paddingLeft:6}}>{project.service.route === "UNDERGROUND" ? "Underground" : "Overhead"} · {project.service.amperage}A</div>
+            <div style={{fontSize:11,color:"#a4c8d8",paddingLeft:6}}>Distribution main: {project.distributionMain?.installed ? `${project.distributionMain.amperage}A` : "Main lugs"}</div>
+          </div>
+          {project.buildings.map(building => <div key={building.id} style={{ marginBottom: 12, borderTop: "1px solid #2c4553", paddingTop: 8 }}>
+            <strong>{building.kind === "MAIN" ? "🏠" : "🏗"} {building.name}</strong>
+            {building.kind === "DETACHED" && <div style={{ color: "#f1b96e", fontSize: 11 }}>Subpanel / feeder: not yet configured</div>}
+            {project.areas.filter(area => area.buildingId === building.id).map(area => <button key={area.id} onClick={() => { changeProject({ ...project, activeAreaId: area.id }); setWorkspaceScope(`${project.id}:${area.id}:OVERVIEW`); setActiveWall(null); setShowBlueprint(false); setShowService(false); setShowElectricalService(false); }} style={{ display: "block", width: "100%", marginTop: 5, textAlign: "left", background: !showService && project.activeAreaId === area.id ? "#146d8d" : "#243442" }}>▸ {area.name}</button>)}
+            <button onClick={() => addArea(building.id)} style={{ marginTop: 6, width: "100%" }}>+ Add Room / Area</button>
+          </div>)}
+          <button onClick={addBuilding} style={{ width: "100%" }}>+ Detached Building</button>
+          <button onClick={() => { if (window.confirm("Start a new service project? The current project navigation will be replaced.")) { clearServiceProject(); clearWorkspaceScopes(); setProject(null); setActiveWall(null); } }} style={{ width: "100%", marginTop: 24, color: "#ffc3ae" }}>New Service Project</button>
+          <p style={{ fontSize: 11, color: "#9caebb" }}>Each wall has its own workspace. Breakers and circuit names are managed under Service & Panel; physical feeder and circuit wiring is coming next.</p>
+        </section>
+
+
+                </div>}
+              </details>
+              <details open={showLibrary} onToggle={e=>setShowLibrary(e.currentTarget.open)}>
+                <summary>Component Library · Show/Hide</summary>
+                <div className="nova-control-body">
+                  {!showService && !!activeWall ? <ComponentLibrary workspaceRef={workspaceRef}/> : <div style={{padding:10,fontSize:12,color:"#aacbd7"}}>Open a room wall to place components.</div>}
+                </div>
+              </details>
+            </div>
             {!showService && !!activeWall && <div id="rws-wall-tools-panel-target" />}
 
             {project && !showService && !showBlueprint && activeWall && project.activeAreaId && (

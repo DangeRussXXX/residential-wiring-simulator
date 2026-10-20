@@ -181,10 +181,12 @@ function CompactWiredDevice({device,cables}:{device:ElectricalDevice;cables:Cabl
   const isGfci=device.symbol==="gfci";
   const isLight=device.symbol.startsWith("light");
   const colors:Record<string,string>={black:"#111c24",white:"#fffdf2",red:"#d23e46",ground:"#bd7942"};
+  // Rear terminal diagram: screw locations are shared by the conductor paths.
+  // Device faces are intentionally hidden in wiring mode, not wired through.
   const screws:Record<string,[number,number]>={
-    hot:[128,65],neutral:[105,65],ground:[117,104],
-    "line-hot":[128,53],"line-neutral":[105,53],"load-hot":[128,83],"load-neutral":[105,83],
-    line:[128,52],load:[128,85],"traveler-1":[105,52],"traveler-2":[105,85]
+    hot:[128,62],neutral:[105,62],ground:[116,102],
+    "line-hot":[128,51],"line-neutral":[105,51],"load-hot":[128,82],"load-neutral":[105,82],
+    line:[128,52],load:[128,84],"traveler-1":[105,52],"traveler-2":[105,84]
   };
   const applicable=isGfci?["line-hot","line-neutral","load-hot","load-neutral","ground"]:
     isSwitch?["line","load","traveler-1","traveler-2","ground"]:["hot","neutral","ground"];
@@ -202,12 +204,13 @@ function CompactWiredDevice({device,cables}:{device:ElectricalDevice;cables:Cabl
   return <svg viewBox="0 0 150 126" width="150" height="126" role="img" aria-label={`${device.name}: ${cables.length} cables, saved wiring connections`}>
     <rect x="4" y="17" width="142" height="105" rx="7" fill="#c5d1d5" stroke="#577789" strokeWidth="2.5"/>
     <rect x="9" y="22" width="132" height="94" rx="5" fill="#e8edeb" stroke="#9baeb7"/>
-    <rect x="96" y="31" width="41" height="82" rx="6" fill="#aebfc8" stroke="#658392" strokeWidth="2"/>
-    <rect x="101" y="36" width="31" height="72" rx="4" fill="#f7f6ee" stroke="#96a9af" strokeWidth="1.5"/>
-    {isLight?<circle cx="116" cy="74" r="12" fill="#fff0c4" stroke="#b9aa81"/>:
-     isSwitch?<g><rect x="111" y="62" width="10" height="24" rx="2" fill="#d9dcd9" stroke="#8196a0"/><path d="M 113 65 L 119 61 V 80 L 113 83 Z" fill="#fff"/></g>:
-     <g>{[58,83].map(y=><g key={y}><rect x="108" y={y} width="4" height="11" rx="1" fill="#34434b"/><rect x="121" y={y} width="4" height="11" rx="1" fill="#34434b"/></g>)}{isGfci&&<rect x="113" y="73" width="9" height="5" fill="#b33d32"/>}</g>}
-    {applicable.map(id=>{const [x,y]=screws[id];return <g key={id}><circle cx={x} cy={y} r="3.2" fill={id==="ground"?"#3bb887":id.includes("neutral")?"#dce4e9":"#d9a247"} stroke="#425966" strokeWidth="1"/><title>{id}</title></g>})}
+    {/* Rear/side wiring terminal board instead of a receptacle front face. */}
+    <rect x="95" y="30" width="44" height="84" rx="6" fill="#a8bac2" stroke="#5d7d8c" strokeWidth="2"/>
+    <rect x="100" y="35" width="34" height="74" rx="4" fill="#e6e1d4" stroke="#8a9da5" strokeWidth="1.5"/>
+    {isSwitch ? <g><rect x="112" y="59" width="10" height="23" rx="2" fill="#657984"/><path d="M115 61 L120 61 V77 L115 79 Z" fill="#d9e1e3"/></g>:
+      isLight ? <g><circle cx="117" cy="74" r="13" fill="#fff1c5" stroke="#ac9e76"/><circle cx="117" cy="74" r="5" fill="#d8c486"/></g>:
+      <g><rect x="111" y="59" width="12" height="24" rx="2" fill="#c5d0d3" stroke="#718b97"/>{isGfci&&<text x="117" y="75" fontSize="5" textAnchor="middle" fill="#384c58">GFCI</text>}</g>}
+    <text x="117" y="42" fontSize="5.5" fontWeight="bold" textAnchor="middle" fill="#2b4757">REAR</text>
     {shown.map((c,ci)=>{const x=23+ci*23;return <g key={c.id}>
       <path d={`M ${x} -2 V 37`} stroke="#4e626b" strokeWidth="11"/>
       <path d={`M ${x} -2 V 37`} stroke={c.type.includes("MC")?"#b4bec3":"#f1e9d9"} strokeWidth="7"/>
@@ -234,6 +237,7 @@ function CompactWiredDevice({device,cables}:{device:ElectricalDevice;cables:Cabl
       <path d={`M ${x-5} ${y+2} L ${x-4} ${y-5} Q ${x} ${y-11} ${x+4} ${y-5} L ${x+5} ${y+2} Z`} fill="#f2a33b" stroke="#ac6c29"/>
       {sp.pigtailTerminal&&(()=>{const id=resolve(sp.pigtailTerminal);const t=id?screws[id]:undefined;return t?<path d={`M ${x+4} ${y} Q ${x+20} ${y+14} ${t[0]} ${t[1]}`} stroke={colors[sp.members[0]?.conductor??"black"]} strokeWidth="3" fill="none"/>:null})()}
     </g>})}
+    {applicable.map(id=>{const [x,y]=screws[id];return <g key={id}><circle cx={x} cy={y} r="3.8" fill={id==="ground"?"#3bb887":id.includes("neutral")?"#dce4e9":"#d9a247"} stroke="#425966" strokeWidth="1"/><path d={`M ${x-2} ${y} H ${x+2}`} stroke="#435966" strokeWidth="1.3"/><title>{id} terminal</title></g>})}
     {cables.length>3&&<text x="11" y="115" fontSize="9" fill="#25495b">+{cables.length-3} cables · expand</text>}
   </svg>;
 }

@@ -62,7 +62,6 @@ export default function SimulatorLayout() {
   const [showLibrary,setShowLibrary]=useState(true);
   const [showPanelControls,setShowPanelControls]=useState(false);
   const [showProperties,setShowProperties]=useState(false);
-  const [showInspection,setShowInspection]=useState(false);
   const [showWallControls,setShowWallControls]=useState(true);
   const [showDeviceInstallation,setShowDeviceInstallation]=useState(true);
   const [allPanelsRevision,setAllPanelsRevision]=useState(0);
@@ -70,7 +69,7 @@ export default function SimulatorLayout() {
   const [wallLocationTarget,setWallLocationTarget]=useState<HTMLElement|null>(null);
   const toggleAllPanels = (open: boolean) => {
     setShowExplorer(open); setShowLibrary(open); setShowPanelControls(open);
-    setShowProperties(open); setShowInspection(open); setShowWallControls(open);
+    setShowProperties(open); setShowWallControls(open);
     setShowDeviceInstallation(open); setAllPanelsRevision(n => n + 1);
   };
   const [showBlueprint, setShowBlueprint] = useState(false);
@@ -677,9 +676,9 @@ export default function SimulatorLayout() {
             {!showService && !!activeWall && <div id="rws-wall-tools-panel-target" data-open={showWallControls ? "true" : "false"} data-device-open={showDeviceInstallation ? "true" : "false"} data-revision={allPanelsRevision}>
               {wallLocationTarget && createPortal(<div className="nova-wall-location-controls">
                 <button type="button" onClick={() => setActiveWall(null)}>← Four-Wall Room</button>
-                <strong>{project.areas.find(a => a.id === project.activeAreaId)?.name} / {activeWall} Wall</strong>
+                <strong>{project?.areas.find(a => a.id === project.activeAreaId)?.name} / {activeWall} Wall</strong>
                 <span>2×4 studs · 16&quot; O.C.</span>
-                {project.circuitAssignments?.flatMap(a => (a.destinations ?? []).filter(d => d.areaId === project.activeAreaId && d.wall === activeWall).map(d => ({...d, slot:a.slot, name:a.name}))).map(d => <span key={`${d.slot}-${d.areaId}-${d.wall}`}>Circuit #{d.slot}: {d.name || "Unnamed"} · {d.cable} (planned)</span>)}
+                {project?.circuitAssignments?.flatMap(a => (a.destinations ?? []).filter(d => d.areaId === project?.activeAreaId && d.wall === activeWall).map(d => ({...d, slot:a.slot, name:a.name}))).map(d => <span key={`${d.slot}-${d.areaId}-${d.wall}`}>Circuit #{d.slot}: {d.name || "Unnamed"} · {d.cable} (planned)</span>)}
               </div>,wallLocationTarget)}
             </div>}
 

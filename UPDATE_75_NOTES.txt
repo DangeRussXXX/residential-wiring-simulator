@@ -1,0 +1,1 @@
+Update 75: matching accordion styling; shared wall/master wiring rendering; enlarged wall wired device previews. TypeScript build passed. Vite browser build unavailable due missing native rolldown dependency. Wall physical cable endpoints and runtime visuals unverified. Legacy src/training duplicate excluded. Install npm install then npm run build.

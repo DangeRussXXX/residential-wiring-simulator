@@ -329,3 +329,26 @@
 .nova-unified-controls > details > summary,
 .nova-wall-controls > details.nova-panel-section > summary,
 .nova-unified-controls ~ details > summary {display:list-item !important;list-style-position:inside !important;background:#193e50 !important;color:#8eeaff !important;font-size:18px !important;font-weight:750 !important;padding:12px 14px !important;line-height:1.35 !important;}
+
+/* Update 75: one explicit style for every top-level right-side accordion. */
+.nova-unified-controls > details,
+.nova-wall-controls > details,
+.nova-unified-controls ~ details {
+  box-sizing:border-box !important; width:100% !important;
+  margin:0 0 9px !important; padding:0 !important;
+  background:#193e50 !important; border:1px solid #397e99 !important;
+  border-radius:7px !important; overflow:hidden !important;
+}
+.nova-unified-controls > details > summary,
+.nova-wall-controls > details > summary,
+.nova-unified-controls ~ details > summary {
+  display:list-item !important; list-style-position:inside !important;
+  padding:12px 14px !important; margin:0 !important;
+  color:#8eeaff !important; background:#193e50 !important;
+  font-size:18px !important; font-weight:750 !important;
+  line-height:1.35 !important; cursor:pointer !important;
+}
+.nova-unified-controls > details > summary:hover,
+.nova-wall-controls > details > summary:hover,
+.nova-unified-controls ~ details > summary:hover {background:#23536a !important;}
+.nova-wall-controls > details > :not(summary) {box-sizing:border-box;}

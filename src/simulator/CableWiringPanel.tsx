@@ -423,7 +423,6 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove,allCab
     {id:"neutral-bar",label:"Neutral bar",color:"#e7ecf0"},
     {id:"ground-bar",label:"Equipment-ground bar",color:"#33b477"}
   ]:deviceTerminals(dev);
-  const points=positions(kind,terms);
   const colorsList=conductors(cable.type);
   const attached=cable.ends[end]||{};
   const boxId=cable[end];

@@ -323,14 +323,14 @@ export function UnifiedBoxWiring({device,allCables,onTerminate,front=false,boxMo
     if(!point)return undefined;
     if(!mountedBox)return {x:290+point.x*.9,y:64+point.y*.9};
     const index=boxDevices.findIndex(d=>d.id===targetId);
-    return {x:345+index*125+point.x*.48,y:64+point.y*.48};
+    return {x:450+index*92+point.x*.39,y:92+point.y*.39};
   };
   const [picked,setPicked]=useState<{cableId:string;end:CableEnd;conductor:string}|null>(null);
   const svgRef=useRef<SVGSVGElement>(null);
-  const canvasHeight=front?410:Math.max(410,180+Math.ceil(entries.length/4)*155,180+uniqueSplices.length*100);
-  const cableX=(i:number)=>65+(i%4)*86;
-  const cableY=(i:number)=>58+Math.floor(i/4)*155;
-  const spliceXY=(i:number)=>({x:mountedBox?320:420,y:160+i*100});
+  const canvasHeight=front?410:Math.max(480,210+Math.ceil(entries.length/3)*175,270+uniqueSplices.length*115);
+  const cableX=(i:number)=>85+(i%3)*145;
+  const cableY=(i:number)=>72+Math.floor(i/3)*175;
+  const spliceXY=(i:number)=>({x:mountedBox?390:405,y:220+i*115});
   const memberSplice=(id:string,end:CableEnd,conductor:string)=>
     uniqueSplices.find(sp=>sp.members.some(m=>m.cableId===id&&m.end===end&&m.conductor===conductor));
   const getPoint=(e:React.PointerEvent<SVGSVGElement>)=>{
@@ -362,7 +362,7 @@ export function UnifiedBoxWiring({device,allCables,onTerminate,front=false,boxMo
       <text x="15" y="17" fontSize="14" fill="#f3fbff" fontWeight="bold">
         {front?"FRONT · DEVICE IDENTIFICATION":"REAR · ALL CABLES IN THIS BOX"}
       </text>
-      {mountedBox ? boxDevices.map((d,i)=><g key={d.id} transform={`translate(${345+i*125} 64) scale(.48)`}>
+      {mountedBox ? boxDevices.map((d,i)=><g key={d.id} transform={`translate(${450+i*92} 92) scale(.39)`}>
         <DeviceArtwork kind={kindFor(d,false)} front={front}/>
       </g>) : <g transform={front?"translate(-150 -26) scale(1.65)":"translate(290 64) scale(.9)"}>
         <DeviceArtwork kind={kind} front={front}/>
@@ -388,9 +388,9 @@ export function UnifiedBoxWiring({device,allCables,onTerminate,front=false,boxMo
             const spIdx=sp?uniqueSplices.findIndex(v=>v.id===sp.id):-1;
             const target=spIdx>=0?spliceXY(spIdx):saved?terminalXY(saved):undefined;
             const cap=saved==="cap";
-            const tx=target?.x??(x+(j-(n-1)/2)*20);
+            const tx=spIdx>=0 ? target!.x + (j-1)*12 + (i%2)*6 : target?.x??(x+(j-(n-1)/2)*25);
             const ty=target?.y??(y+132+j*5);
-            const bendY=Math.max(sy+30,Math.min(ty-24,sy+55+j*9));
+            const bendY=Math.max(sy+24,Math.min(ty-28,sy+40+j*21+i*12));
             const d=`M ${sx} ${sy} L ${sx} ${bendY} Q ${sx} ${bendY+12} ${sx+12} ${bendY+12} L ${tx-24} ${bendY+12} Q ${tx-10} ${bendY+12} ${tx-10} ${bendY+26} L ${tx-10} ${ty-10} Q ${tx-10} ${ty} ${tx} ${ty}`;
             const active=picked?.cableId===c.id&&picked.end===end&&picked.conductor===color;
             return <g key={color} onPointerDown={e=>{e.stopPropagation();setPicked({cableId:c.id,end,conductor:color});e.currentTarget.ownerSVGElement?.setPointerCapture(e.pointerId);}}
@@ -420,7 +420,7 @@ export function UnifiedBoxWiring({device,allCables,onTerminate,front=false,boxMo
             </g>;
           })}
           <WireConnector x={pt.x} y={pt.y} splice upright/>
-          <text x={pt.x} y={pt.y-38} textAnchor="middle" fontSize="10" fill="#ffe0a4">{sp.members.length} wires + {targets.length} pigtail(s)</text>
+          <text x={pt.x+20} y={pt.y-34} textAnchor="start" fontSize="10" fill="#ffe0a4">{sp.members.length} wires + {targets.length} pigtail(s)</text>
         </g>;
       })}
       {!front&&boxDevices.flatMap(d=>deviceTerminals(d).map(t=>{

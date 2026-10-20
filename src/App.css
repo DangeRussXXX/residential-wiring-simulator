@@ -443,7 +443,7 @@
   min-height: 55px !important;
 }
 .nova-double-text-sidebar .nova-panel-global-actions button {font-size:30px !important;}
-.nova-double-text-sidebar :is(svg,svg *) {font-size:inherit;}
+
 
 
 /* Stage K: match the large right-hand panel text in the left Service & Breaker Controls.
@@ -462,4 +462,8 @@
   font-size: 32px !important;
   line-height: 1.35 !important;
 }
-.nova-double-text-service :is(svg,svg *) { font-size: inherit; }
+
+
+/* Keep control text large, but preserve each wiring diagram's own SVG label sizes. */
+.nova-double-text-sidebar svg text,
+.nova-double-text-service svg text { font-size: revert !important; }

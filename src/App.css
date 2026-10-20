@@ -193,3 +193,61 @@
 }
 .nova-unified-controls summary:hover, #rws-wall-tools-panel-target ~ details > summary:hover {background:#193e50;}
 .nova-control-body {padding:8px 2px;}
+
+/* NOVA Update 71: consistent collapsible control panels */
+.nova-unified-controls details, .nova-panel-section,
+.nova-unified-controls ~ details {
+  border:1px solid #346b85; border-radius:7px; padding:8px;
+  margin:8px 0; background:#252526; color:#e4f5fc;
+}
+.nova-unified-controls summary, .nova-panel-section > summary,
+.nova-unified-controls ~ details > summary {
+  cursor:pointer; color:#a2eaff; font-weight:700; padding:7px 5px;
+  font-size:14px; list-style-position:inside;
+}
+.nova-panel-global-actions {display:flex;gap:8px;margin:4px 0 12px;}
+.nova-panel-global-actions button {flex:1;background:#153c50;color:#b4eeff;border:1px solid #34768d;border-radius:6px;padding:10px 5px;font-weight:700;}
+.nova-wall-controls {font-size:14px !important;}
+.nova-device-inspection {margin-top:12px;border-top:1px solid #346b85;padding-top:12px;}
+
+/* NOVA Update 71 Fix 2: consistent controls and readable drawer */
+.nova-unified-controls details,
+.nova-panel-section,
+.nova-unified-controls ~ details,
+#rws-wall-tools-panel-target details,
+.nova-wall-controls details {
+  border: 1px solid #36758e !important;
+  border-radius: 7px !important;
+  background: #252526 !important;
+  margin: 8px 0 !important;
+  padding: 7px !important;
+  color: #e4f5fc !important;
+}
+.nova-unified-controls details > summary,
+.nova-panel-section > summary,
+.nova-unified-controls ~ details > summary,
+#rws-wall-tools-panel-target details > summary,
+.nova-wall-controls details > summary {
+  cursor: pointer !important;
+  color: #8ee7ff !important;
+  font-size: 16px !important;
+  line-height: 1.35 !important;
+  font-weight: 700 !important;
+  padding: 3px 5px !important;
+  list-style-position: inside;
+}
+.nova-panel-drawer-toggle { min-width: 48px; }
+.nova-wall-location-controls {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px;
+  margin: 8px 0;
+  border: 1px solid #36758e;
+  border-radius: 7px;
+  background: #172d39;
+  color: #a2eaff;
+  font-size: 13px;
+}
+.nova-wall-location-controls button {padding: 8px 12px;}
+.nova-wall-location-controls span {color:#c4dce6;}

@@ -572,12 +572,6 @@ export default function SimulatorLayout() {
           {project && !showBlueprint && showService && !showElectricalService && <ServiceOverview project={project} onChange={changeProject} onOpenDestination={(areaId, wall) => { changeProject({...project, activeAreaId: areaId}); setWorkspaceScope(`${project.id}:${areaId}:${wall}`); setActiveWall(wall); setShowService(false); }} />}
           {project && !showBlueprint && !showService && project.activeAreaId && !activeWall && <RoomLayout area={project.areas.find(a => a.id === project.activeAreaId)!} onOpenWall={wall => { setWorkspaceScope(`${project.id}:${project.activeAreaId}:${wall}`); setActiveWall(wall); }} />}
           {project && !showBlueprint && !showService && project.activeAreaId && activeWall && <>
-            <div style={{ display: "flex", gap: 12, alignItems: "center", padding: "5px 8px 12px", color: "#90e7ff", fontSize: 13 }}>
-              <button onClick={() => setActiveWall(null)}>← Four-Wall Room</button>
-              <strong>{project.areas.find(a => a.id === project.activeAreaId)?.name} / {activeWall} Wall</strong>
-              <span style={{ color: "#a8bdc9" }}>2×4 studs · 16" O.C.</span>
-              {project.circuitAssignments?.flatMap(a => (a.destinations ?? []).filter(d => d.areaId === project.activeAreaId && d.wall === activeWall).map(d => ({...d, slot:a.slot, name:a.name}))).map(d => <span key={`${d.slot}-${d.areaId}-${d.wall}`} style={{border:"1px solid #37778d",padding:"5px 8px",borderRadius:6}}>Circuit #{d.slot}: {d.name || "Unnamed"} · {d.cable} (planned)</span>)}
-            </div>
             <Workspace key={workspaceScope} ref={workspaceRef} onSelectDevice={setSelectedDevice} onCircuitPathsChange={setCircuitPaths} liveProject={project} onProjectChange={changeProject} liveAreaId={project.activeAreaId} liveWall={activeWall} />
 
           </>}
@@ -592,7 +586,7 @@ export default function SimulatorLayout() {
         {project && <button type="button"
           title={showRightColumn?"Hide wiring and inspection panels":"Show wiring and inspection panels"}
           onClick={()=>setShowRightColumn(v=>!v)}
-          style={{background:"#12384c",color:"#8ee7ff",border:"1px solid #36758e",writingMode:"vertical-rl",padding:7}}>
+          className="nova-panel-drawer-toggle" style={{background:"#12384c",color:"#8ee7ff",border:"1px solid #36758e",writingMode:"vertical-rl",padding:"15px 12px",fontSize:18,fontWeight:800,letterSpacing:"0.5px",whiteSpace:"nowrap",cursor:"pointer"}}>
           {showRightColumn?"▶ Hide Panels":"◀ Show Panels"}
         </button>}
         <div
@@ -677,7 +671,14 @@ export default function SimulatorLayout() {
                 </div>
               </details>
             </div>
-            {!showService && !!activeWall && <div id="rws-wall-tools-panel-target" data-open={showWallControls ? "true" : "false"} data-device-open={showDeviceInstallation ? "true" : "false"} data-revision={allPanelsRevision} />}
+            {!showService && !!activeWall && <div id="rws-wall-tools-panel-target" data-open={showWallControls ? "true" : "false"} data-device-open={showDeviceInstallation ? "true" : "false"} data-revision={allPanelsRevision}>
+              <div className="nova-wall-location-controls" style={{display:showWallControls?"flex":"none"}}>
+                <button type="button" onClick={() => setActiveWall(null)}>← Four-Wall Room</button>
+                <strong>{project.areas.find(a => a.id === project.activeAreaId)?.name} / {activeWall} Wall</strong>
+                <span>2×4 studs · 16&quot; O.C.</span>
+                {project.circuitAssignments?.flatMap(a => (a.destinations ?? []).filter(d => d.areaId === project.activeAreaId && d.wall === activeWall).map(d => ({...d, slot:a.slot, name:a.name}))).map(d => <span key={`${d.slot}-${d.areaId}-${d.wall}`}>Circuit #{d.slot}: {d.name || "Unnamed"} · {d.cable} (planned)</span>)}
+              </div>
+            </div>}
 
             {deviceInspectorTarget && !showService && !!activeWall && createPortal(
               <div className="nova-device-inspection">

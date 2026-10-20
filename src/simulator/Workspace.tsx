@@ -1778,6 +1778,7 @@ function Workspace(
         <div className="nova-wall-controls" style={{color:"#d9edf5",fontSize:22}}>
           <details open={wallControlsOpen} onToggle={e=>setWallControlsOpen(e.currentTarget.open)} className="nova-panel-section">
             <summary>Wall View &amp; Tools</summary>
+            <div id="rws-wall-location-content" />
             <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:10}}>
               <button type="button" aria-pressed={!blueprintMode} onClick={()=>setBlueprintMode(false)}>Framed Wall</button>
               <button type="button" aria-pressed={blueprintMode} onClick={()=>setBlueprintMode(true)}>Blueprint Mode</button>

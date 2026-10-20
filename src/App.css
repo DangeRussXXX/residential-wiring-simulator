@@ -251,3 +251,45 @@
 }
 .nova-wall-location-controls button {padding: 8px 12px;}
 .nova-wall-location-controls span {color:#c4dce6;}
+
+/* NOVA unified panel appearance: scoped to actual panel wrappers */
+.nova-unified-controls details,
+.nova-wall-controls > details.nova-panel-section,
+.nova-right-controls > details,
+.nova-panel-section,
+#rws-wall-tools-panel-target ~ details {
+  display:block;
+  box-sizing:border-box;
+  width:100%;
+  margin:8px 0 !important;
+  padding:0 !important;
+  border:1px solid #36758e !important;
+  border-radius:7px !important;
+  background:#252526 !important;
+  overflow:visible;
+}
+.nova-unified-controls details > summary,
+.nova-wall-controls > details.nova-panel-section > summary,
+.nova-right-controls > details > summary,
+.nova-panel-section > summary,
+#rws-wall-tools-panel-target ~ details > summary {
+  display:list-item !important;
+  box-sizing:border-box;
+  width:100%;
+  padding:9px 12px !important;
+  margin:0 !important;
+  color:#8ee7ff !important;
+  font:700 16px/1.3 Arial,sans-serif !important;
+  cursor:pointer;
+  list-style-position:inside;
+  background:#252526 !important;
+  border-radius:6px;
+}
+.nova-unified-controls details > summary:hover,
+.nova-wall-controls > details.nova-panel-section > summary:hover,
+.nova-panel-section > summary:hover {background:#193e50 !important;}
+.nova-unified-controls details > .nova-control-body,
+.nova-wall-controls > details.nova-panel-section > :not(summary),
+.nova-panel-section > :not(summary) {margin:6px 10px 10px;}
+.nova-wall-controls {font-size:14px !important;}
+.nova-panel-global-actions button {font-size:13px !important;}

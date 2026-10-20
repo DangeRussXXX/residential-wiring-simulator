@@ -182,30 +182,3 @@
     border-right-color: var(--border);
   }
 }
-
-/* Update 60: unified right-side tool drawer */
-.nova-unified-controls details, #rws-wall-tools-panel-target ~ details {
-  border:1px solid #346b85; border-radius:7px; margin:8px 0; padding:7px;
-  background:#252526; color:#e4f5fc;
-}
-.nova-unified-controls summary, #rws-wall-tools-panel-target ~ details > summary {
-  cursor:pointer; color:#a2eaff; font-weight:700; padding:6px 4px;
-}
-.nova-unified-controls summary:hover, #rws-wall-tools-panel-target ~ details > summary:hover {background:#193e50;}
-.nova-control-body {padding:8px 2px;}
-
-/* NOVA Update 71: consistent collapsible control panels */
-.nova-unified-controls details, .nova-panel-section,
-.nova-unified-controls ~ details {
-  border:1px solid #346b85; border-radius:7px; padding:8px;
-  margin:8px 0; background:#252526; color:#e4f5fc;
-}
-.nova-unified-controls summary, .nova-panel-section > summary,
-.nova-unified-controls ~ details > summary {
-  cursor:pointer; color:#a2eaff; font-weight:700; padding:7px 5px;
-  font-size:14px; list-style-position:inside;
-}
-.nova-panel-global-actions {display:flex;gap:8px;margin:4px 0 12px;}
-.nova-panel-global-actions button {flex:1;background:#153c50;color:#b4eeff;border:1px solid #34768d;border-radius:6px;padding:10px 5px;font-weight:700;}
-.nova-wall-controls {font-size:14px !important;}
-.nova-device-inspection {margin-top:12px;border-top:1px solid #346b85;padding-top:12px;}

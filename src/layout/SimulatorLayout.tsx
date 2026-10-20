@@ -67,6 +67,7 @@ export default function SimulatorLayout() {
   const [showDeviceInstallation,setShowDeviceInstallation]=useState(true);
   const [allPanelsRevision,setAllPanelsRevision]=useState(0);
   const [deviceInspectorTarget,setDeviceInspectorTarget]=useState<HTMLElement|null>(null);
+  const [wallLocationTarget,setWallLocationTarget]=useState<HTMLElement|null>(null);
   const toggleAllPanels = (open: boolean) => {
     setShowExplorer(open); setShowLibrary(open); setShowPanelControls(open);
     setShowProperties(open); setShowInspection(open); setShowWallControls(open);
@@ -109,11 +110,13 @@ export default function SimulatorLayout() {
   } = useSimulator();
 
   useEffect(()=>{
-    if (!activeWall || showService || showBlueprint) {setDeviceInspectorTarget(null);return;}
+    if (!activeWall || showService || showBlueprint) {setDeviceInspectorTarget(null);setWallLocationTarget(null);return;}
     const timer=window.setInterval(()=>{
       const node=document.getElementById("rws-device-inspector-content");
+      const wallNode=document.getElementById("rws-wall-location-content");
+      setWallLocationTarget(previous=>previous===wallNode?previous:wallNode);
       setDeviceInspectorTarget(previous=>previous===node?previous:node);
-      if(node)window.clearInterval(timer);
+      if(node && wallNode)window.clearInterval(timer);
     },100);
     return ()=>window.clearInterval(timer);
   },[activeWall,showService,showBlueprint,workspaceScope]);
@@ -672,12 +675,12 @@ export default function SimulatorLayout() {
               </details>
             </div>
             {!showService && !!activeWall && <div id="rws-wall-tools-panel-target" data-open={showWallControls ? "true" : "false"} data-device-open={showDeviceInstallation ? "true" : "false"} data-revision={allPanelsRevision}>
-              <div className="nova-wall-location-controls" style={{display:showWallControls?"flex":"none"}}>
+              {wallLocationTarget && createPortal(<div className="nova-wall-location-controls">
                 <button type="button" onClick={() => setActiveWall(null)}>← Four-Wall Room</button>
                 <strong>{project.areas.find(a => a.id === project.activeAreaId)?.name} / {activeWall} Wall</strong>
                 <span>2×4 studs · 16&quot; O.C.</span>
                 {project.circuitAssignments?.flatMap(a => (a.destinations ?? []).filter(d => d.areaId === project.activeAreaId && d.wall === activeWall).map(d => ({...d, slot:a.slot, name:a.name}))).map(d => <span key={`${d.slot}-${d.areaId}-${d.wall}`}>Circuit #{d.slot}: {d.name || "Unnamed"} · {d.cable} (planned)</span>)}
-              </div>
+              </div>,wallLocationTarget)}
             </div>}
 
             {deviceInspectorTarget && !showService && !!activeWall && createPortal(

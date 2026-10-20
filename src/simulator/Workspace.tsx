@@ -411,7 +411,8 @@ function Workspace(
   function createDevice(
     name: string,
     dropX: number = 150,
-    dropY: number = 120
+    dropY: number = 120,
+    targetBoxId: string | null = selectedBoxId
   ) {
 
     const definition =
@@ -527,7 +528,7 @@ function Workspace(
     };
 
 
-    const targetBox=installedBoxes.find(b=>b.id===selectedBoxId);
+    const targetBox=installedBoxes.find(b=>b.id===targetBoxId);
     const boxDef=targetBox&&electricalBoxes.find(b=>b.id===targetBox.boxTypeId);
     if(targetBox && boxDef){
       if(boxDef.gangs===0){setPlacementMessage("This fixture/junction box has no device gang positions.");return;}
@@ -2250,7 +2251,19 @@ function Workspace(
             const def=electricalBoxes.find(b=>b.id===box.boxTypeId);
             if(!def)return null;
             const width=Math.max(100,def.gangs*110);
-            return <div key={box.id} onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();setSelectedBoxId(box.id);setPlacementMessage(`${def.name}: ${box.deviceIds.length}/${def.gangs} positions occupied. Choose a device to install.`);}}
+            return <div key={box.id} onMouseDown={e=>e.stopPropagation()}
+              onDragOver={e=>{if(e.dataTransfer.types.includes("componentType")){e.preventDefault();e.dataTransfer.dropEffect="copy";}}}
+              onDrop={e=>{
+                e.preventDefault();e.stopPropagation();
+                const componentName=e.dataTransfer.getData("componentType");
+                if(!componentName)return;
+                setSelectedBoxId(box.id);
+                const slot=box.deviceIds.length;
+                if(slot>=def.gangs){setPlacementMessage(`${def.name} is full. Choose another box.`);return;}
+                createDevice(componentName,box.x+slot*110,box.y,box.id);
+                setPlacementMessage(`${componentName} installed in ${def.name}, position ${slot+1}.`);
+              }}
+              onClick={e=>{e.stopPropagation();setSelectedBoxId(box.id);setPlacementMessage(`${def.name}: ${box.deviceIds.length}/${def.gangs} positions occupied. Choose a device to install.`);}}
               title={`${def.name} — ${box.deviceIds.length}/${def.gangs} device positions used`}
               style={{position:"absolute",left:box.x,top:box.y,width,height:145,zIndex:3,pointerEvents:"auto",cursor:"pointer",border:selectedBoxId===box.id?"3px solid #3df778":"3px solid #8495a4",borderRadius:9,background:"rgba(45,69,91,.38)",boxSizing:"border-box"}}>
               <div style={{position:"absolute",top:-28,left:0,whiteSpace:"nowrap",color:"#e8f7ff",background:"#172536",padding:"3px 7px",fontSize:12}}>{def.name} · {box.deviceIds.length}/{def.gangs}</div>

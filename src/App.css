@@ -409,3 +409,15 @@
 #rws-wall-tools-panel-target .nova-wall-controls > details.nova-panel-section > summary::-webkit-details-marker {display:none !important;}
 #rws-wall-tools-panel-target .nova-wall-controls > details.nova-panel-section > summary::marker {content:'' !important;}
 #rws-wall-tools-panel-target .nova-wall-controls > details.nova-panel-section > summary:hover {background:#23536a !important;}
+
+/* Update 80: uniform, larger headers across all five top-level panels. */
+.nova-unified-controls > details > summary,
+#rws-wall-tools-panel-target .nova-wall-controls > details.nova-panel-section > summary {
+ box-sizing:border-box !important; min-height:44px !important; padding:11px 12px 11px 30px !important;
+ font-family:Arial,sans-serif !important; font-size:16px !important; font-weight:700 !important;
+ line-height:20px !important; letter-spacing:0 !important;
+}
+.nova-unified-controls > details > summary::before,
+#rws-wall-tools-panel-target .nova-wall-controls > details.nova-panel-section > summary::before {
+ top:14px !important; left:10px !important; font-size:13px !important; line-height:16px !important;
+}

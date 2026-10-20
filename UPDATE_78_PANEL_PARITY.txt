@@ -1,0 +1,1 @@
+Update 78: All five accordion headers use identical styling. Only src/App.css changed; wiring untouched.

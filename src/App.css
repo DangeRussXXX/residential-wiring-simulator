@@ -353,30 +353,13 @@
 .nova-unified-controls ~ details > summary:hover {background:#23536a !important;}
 .nova-wall-controls > details > :not(summary) {box-sizing:border-box;}
 
-/* Update 77: match the three wall controls to Project Explorer and Component Library.
-   Scoped to top-level wall controls; wiring/terminal visuals are unchanged. */
-.nova-wall-controls {width:100% !important;box-sizing:border-box !important;font-size:14px !important;}
-.nova-wall-controls > details.nova-panel-section {
-  display:block !important;box-sizing:border-box !important;width:100% !important;
-  margin:0 0 9px !important;padding:0 !important;
-  background:#193e50 !important;border:1px solid #397e99 !important;
-  border-radius:7px !important;overflow:hidden !important;
-}
-.nova-wall-controls > details.nova-panel-section > summary {
-  display:list-item !important;box-sizing:border-box !important;width:100% !important;
-  margin:0 !important;padding:12px 14px !important;
-  background:#193e50 !important;border:0 !important;border-radius:0 !important;
-  color:#8eeaff !important;font:750 18px/1.35 Arial,sans-serif !important;
-  list-style-position:inside !important;cursor:pointer !important;
-}
-.nova-wall-controls > details.nova-panel-section > summary:hover {background:#23536a !important;}
-.nova-wall-controls > details.nova-panel-section > :not(summary) {box-sizing:border-box;}
 
-/* Panel styling fix: actual top-level accordion headers */
-.nova-wall-controls > details.nova-panel-section {width:100% !important;margin:0 0 8px !important;padding:0 !important;border:1px solid #397e99 !important;border-radius:7px !important;background:#193e50 !important;overflow:hidden !important;}
-.nova-wall-controls > details.nova-panel-section > summary {display:block !important;position:relative !important;width:100% !important;min-height:40px !important;margin:0 !important;padding:10px 12px 10px 28px !important;border:0 !important;border-radius:0 !important;background:#193e50 !important;color:#8eeaff !important;font-family:Arial,sans-serif !important;font-size:14px !important;font-weight:700 !important;line-height:20px !important;list-style:none !important;box-sizing:border-box !important;}
-.nova-wall-controls > details.nova-panel-section > summary::-webkit-details-marker {display:none !important;}
-.nova-wall-controls > details.nova-panel-section > summary::marker {content:"" !important;}
-.nova-wall-controls > details.nova-panel-section > summary::before {content:"▶";position:absolute;left:10px;top:10px;color:#83ddf5;font-size:12px;}
-.nova-wall-controls > details.nova-panel-section[open] > summary::before {content:"▼";}
-.nova-wall-controls > details.nova-panel-section > summary:hover {background:#23536a !important;}
+/* Update 78: equal-level right sidebar accordion chrome; wiring untouched. */
+.nova-unified-controls,.nova-wall-controls,#rws-wall-tools-panel-target {width:100%!important;box-sizing:border-box!important;padding:0!important;margin:0!important;background:transparent!important;border:0!important;}
+.nova-unified-controls > details,.nova-wall-controls > details.nova-panel-section {display:block!important;box-sizing:border-box!important;width:100%!important;margin:0 0 8px!important;padding:0!important;border:1px solid #397e99!important;border-radius:6px!important;background:#193e50!important;overflow:hidden!important;}
+.nova-unified-controls > details > summary,.nova-wall-controls > details.nova-panel-section > summary {display:block!important;box-sizing:border-box!important;position:relative!important;list-style:none!important;width:100%!important;min-height:40px!important;margin:0!important;padding:10px 12px 10px 28px!important;border:0!important;border-radius:0!important;background:#193e50!important;color:#8eeaff!important;font:700 14px/20px Arial,sans-serif!important;cursor:pointer!important;}
+.nova-unified-controls > details > summary::-webkit-details-marker,.nova-wall-controls > details.nova-panel-section > summary::-webkit-details-marker {display:none!important;}
+.nova-unified-controls > details > summary::marker,.nova-wall-controls > details.nova-panel-section > summary::marker {content:""!important;}
+.nova-unified-controls > details > summary::before,.nova-wall-controls > details.nova-panel-section > summary::before {content:"▶";position:absolute;left:10px;top:10px;color:#83ddf5;font-size:12px;}
+.nova-unified-controls > details[open] > summary::before,.nova-wall-controls > details.nova-panel-section[open] > summary::before {content:"▼";}
+.nova-unified-controls > details > summary:hover,.nova-wall-controls > details.nova-panel-section > summary:hover {background:#23536a!important;}

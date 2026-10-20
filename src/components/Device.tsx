@@ -168,12 +168,13 @@ export default function Device({ device, wireMode, selectedTerminal, selected, o
           <UnifiedBoxWiring device={device} allCables={allWiringCables.length?allWiringCables:wiringCables} front={face==="front"} onTerminate={onWiringTerminate??(()=>{})}/>
           {wiringCables.length>1&&<div style={{fontSize:12,color:"#245269"}}>All {wiringCables.length} cables shown together</div>}
         </div>})() :
-        showWiredBox ? <div title="Readable wall wiring preview — expand to edit all connections" style={{width:250,height:208,overflow:"hidden",position:"relative",background:"#587586",border:"2px solid #69889a",borderRadius:8,pointerEvents:"none",display:"flex",alignItems:"center",justifyContent:"center"}}>
+        showWiredBox ? <div title={face==="front"?"Front device identification":"Rear terminal wiring preview"} style={{width:250,height:208,overflow:"hidden",position:"relative",background:"#587586",border:"2px solid #69889a",borderRadius:8,pointerEvents:"none",display:"flex",alignItems:"center",justifyContent:"center"}}>
+          {face==="front" ? <div style={{transform:"scale(1.5)",transformOrigin:"center center",display:"flex",alignItems:"center",justifyContent:"center"}}><DeviceFace device={device}/></div> :
           <div style={{width:240,height:202,display:"flex",alignItems:"center",justifyContent:"center"}}>
             <div style={{transform:"scale(1.6)",transformOrigin:"center center",width:150,height:126,flexShrink:0}}>
               <CompactWiredDevice device={device} cables={wiringCables}/>
             </div>
-          </div>
+          </div>}
         </div> : <DeviceFace device={device}/>}
     </div>
     {showWiredBox&&<button type="button" title={`Flip to ${face==="rear"?"front":"rear"} view`} aria-label={`Flip ${device.name} to ${face==="rear"?"front":"rear"} view`} onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onWiringFaceChange?.(face==="rear"?"front":"rear");onSelect(device.id);}} style={{position:"absolute",top:2,right:isExpanded?94:36,zIndex:51,background:"#13516c",color:"#fff",border:"2px solid #7edcf0",borderRadius:5,padding:isExpanded?"4px 8px":"2px 5px",fontSize:isExpanded?12:10,cursor:"pointer"}}>↻ {isExpanded?(face==="rear"?"Front":"Rear"):""}</button>}

@@ -138,6 +138,7 @@ function Workspace(
   // Shared front/rear selection for the wall device and panel wiring editor.
   // Keep this state in Workspace so both views receive the same value.
   const [wiringFaces, setWiringFaces] = useState<Record<string, "front" | "rear">>({});
+  const [inspectedCableEnd, setInspectedCableEnd] = useState<"from" | "to">("to");
   const updateWiringFace = (deviceId: string, face: "front" | "rear") => {
     setWiringFaces(previous => ({ ...previous, [deviceId]: face }));
   };
@@ -1933,7 +1934,7 @@ function Workspace(
                 <div style={{color:"#a9d9ea"}}>Connections are saved per cable end and shared with Panel P1.</div>
               </div>}
               {selectedCable && <CableWiringPanel key={selectedCable.id} initialEnd="to" cable={selectedCable} devices={devices}
-                sharedView={wiringFaces[selectedCable.to]??"rear"} onSharedViewChange={face=>updateWiringFace(selectedCable.to,face)}
+                sharedView={wiringFaces[selectedCable[inspectedCableEnd]]??"rear"} onSharedViewChange={face=>updateWiringFace(selectedCable[inspectedCableEnd],face)} onActiveEndChange={setInspectedCableEnd}
                 allCables={cables} onChangeCables={saveCables}
                 onChange={next=>saveCables(cables.map(c=>c.id===next.id?next:c))}
                 onRemove={()=>{

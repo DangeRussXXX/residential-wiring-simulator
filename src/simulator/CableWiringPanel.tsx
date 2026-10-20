@@ -297,9 +297,9 @@ export function UnifiedBoxWiring({device,allCables,onTerminate,front=false}:{
   const terminalXY=(id:string)=>localPoints[id]?{x:290+localPoints[id].x*.9,y:64+localPoints[id].y*.9}:undefined;
   const [picked,setPicked]=useState<{cableId:string;end:CableEnd;conductor:string}|null>(null);
   const svgRef=useRef<SVGSVGElement>(null);
-  const canvasHeight=Math.max(410,180+Math.ceil(entries.length/4)*140,180+uniqueSplices.length*100);
-  const cableX=(i:number)=>62+(i%4)*104;
-  const cableY=(i:number)=>42+Math.floor(i/4)*130;
+  const canvasHeight=front?410:Math.max(410,180+Math.ceil(entries.length/4)*155,180+uniqueSplices.length*100);
+  const cableX=(i:number)=>65+(i%4)*86;
+  const cableY=(i:number)=>58+Math.floor(i/4)*155;
   const spliceXY=(i:number)=>({x:420,y:160+i*100});
   const memberSplice=(id:string,end:CableEnd,conductor:string)=>
     uniqueSplices.find(sp=>sp.members.some(m=>m.cableId===id&&m.end===end&&m.conductor===conductor));
@@ -332,7 +332,7 @@ export function UnifiedBoxWiring({device,allCables,onTerminate,front=false}:{
       <text x="15" y="17" fontSize="14" fill="#f3fbff" fontWeight="bold">
         {front?"FRONT · DEVICE IDENTIFICATION":"REAR · ALL CABLES IN THIS BOX"}
       </text>
-      <g transform="translate(290 64) scale(.9)">
+      <g transform={front?"translate(-150 -26) scale(1.65)":"translate(290 64) scale(.9)"}>
         <DeviceArtwork kind={kind} front={front}/>
       </g>
       {!front&&entries.map(({c,end},i)=>{
@@ -358,7 +358,8 @@ export function UnifiedBoxWiring({device,allCables,onTerminate,front=false}:{
             const cap=saved==="cap";
             const tx=target?.x??(x+(j-(n-1)/2)*20);
             const ty=target?.y??(y+132+j*5);
-            const d=`M ${sx} ${sy} C ${sx} ${sy+42} ${tx-40} ${ty+34} ${tx} ${ty}`;
+            const bendY=Math.max(sy+30,Math.min(ty-24,sy+55+j*9));
+            const d=`M ${sx} ${sy} L ${sx} ${bendY} Q ${sx} ${bendY+12} ${sx+12} ${bendY+12} L ${tx-24} ${bendY+12} Q ${tx-10} ${bendY+12} ${tx-10} ${bendY+26} L ${tx-10} ${ty-10} Q ${tx-10} ${ty} ${tx} ${ty}`;
             const active=picked?.cableId===c.id&&picked.end===end&&picked.conductor===color;
             return <g key={color} onPointerDown={e=>{e.stopPropagation();setPicked({cableId:c.id,end,conductor:color});e.currentTarget.ownerSVGElement?.setPointerCapture(e.pointerId);}}
               onClick={()=>setPicked({cableId:c.id,end,conductor:color})} style={{cursor:"pointer"}}>
@@ -399,10 +400,10 @@ export function UnifiedBoxWiring({device,allCables,onTerminate,front=false}:{
   </div>;
 }
 
-export default function CableWiringPanel({cable,devices,onChange,onRemove,allCables,onChangeCables,initialEnd="from",sharedView, onSharedViewChange}:{
+export default function CableWiringPanel({cable,devices,onChange,onRemove,allCables,onChangeCables,initialEnd="from",sharedView, onSharedViewChange,onActiveEndChange}:{
   cable:CableRecord;devices:ElectricalDevice[];onChange:(c:CableRecord)=>void;onRemove:()=>void;
   allCables?:CableRecord[];onChangeCables?:(cables:CableRecord[])=>void;initialEnd?:CableEnd;
-  sharedView?:"rear"|"front";onSharedViewChange?:(view:"rear"|"front")=>void;
+  sharedView?:"rear"|"front";onSharedViewChange?:(view:"rear"|"front")=>void;onActiveEndChange?:(end:CableEnd)=>void;
 }) {
   const [end,setEnd]=useState<CableEnd>(initialEnd);
   const [selected,setSelected]=useState<string|null>(null);
@@ -522,7 +523,7 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove,allCab
     <div style={{fontWeight:700,color:"#83e5ff",marginBottom:8}}>🔌 Device Wiring · Actual Terminal Layout</div>
     <div style={{fontSize:16,marginBottom:8}}>{cable.type} · {cable.from===PANEL_SOURCE_ID?"Panel P1":devices.find(d=>d.id===cable.from)?.name||cable.fromName||"Device"} → {devices.find(d=>d.id===cable.to)?.name||cable.toName||"Device"}</div>
     <div style={{display:"flex",gap:6,marginBottom:8}}>
-      {(["from","to"] as CableEnd[]).map(e=><button key={e} type="button" onClick={()=>{setEnd(e);setSelected(null)}} style={{flex:1,padding:7,border:"1px solid #368bab",background:end===e?"#167193":"#183d51",color:"white",borderRadius:5}}>{e==="from"?"Panel / starting device":"Destination device"}</button>)}
+      {(["from","to"] as CableEnd[]).map(e=><button key={e} type="button" onClick={()=>{setEnd(e);setSelected(null);onActiveEndChange?.(e)}} style={{flex:1,padding:7,border:"1px solid #368bab",background:end===e?"#167193":"#183d51",color:"white",borderRadius:5}}>{e==="from"?"Panel / starting device":"Destination device"}</button>)}
     </div>
     <div style={{marginBottom:7,fontWeight:700}}>{dev.name} · {kind==="panel"?`Breaker #${cable.breakerSlot??1}`:kind.replaceAll("-"," ")}</div>
     <div style={{display:"flex",gap:8,marginBottom:8}}>

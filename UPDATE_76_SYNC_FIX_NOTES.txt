@@ -1,0 +1,6 @@
+Update 76 synchronization fix
+- Wall device compact front preview now renders the actual front device graphic when Front - Identify is selected.
+- Rear view retains existing compact wiring preview and saved terminal data.
+- Expanded wall diagram already respects shared face state and is unchanged.
+- Right inspector view now targets the active starting/destination cable end.
+- No changes to persisted cable records or electrical calculations.

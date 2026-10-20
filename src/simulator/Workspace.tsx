@@ -144,6 +144,8 @@ function Workspace(
     catch { return []; }
   });
   const [selectedBoxId, setSelectedBoxId] = useState<string | null>(null);
+  const [pendingBoxKind, setPendingBoxKind] = useState<string | null>(null);
+  const [pendingBoxHeight, setPendingBoxHeight] = useState<string>("18");
   const [movingBoxId, setMovingBoxId] = useState<string | null>(null);
   useEffect(() => {
     try { localStorage.setItem(`rws-empty-boxes:${workspaceScope}`, JSON.stringify(wallBoxes)); } catch { /* storage disabled */ }
@@ -153,7 +155,15 @@ function Workspace(
     catch { setWallBoxes([]); }
     setSelectedBoxId(null);
   }, [workspaceScope]);
-  const installEmptyBox = (kind: string, x = 240, y = 300) => {
+  const installEmptyBox = (kind: string, x?: number, y?: number) => {
+    // Choosing a box starts the same stud + mounting-height workflow used for devices.
+    // No box is created until the installer explicitly confirms its location.
+    if (x === undefined || y === undefined) {
+      setPendingBoxKind(kind);
+      setSelectedBoxId(null);
+      setPlacementMessage("Choose a stud, set mounting height, then click Install Box.");
+      return;
+    }
     const gangs = Math.max(1, Math.min(6, Number(kind.match(/(\d+)-gang/i)?.[1] || 1)));
     setWallBoxes(prev => [...prev, { id: `box-${Date.now()}-${Math.random().toString(36).slice(2,7)}`, kind, gangs, x, y }]);
   };
@@ -1753,8 +1763,7 @@ function Workspace(
 
     const boxType = e.dataTransfer.getData("novaEmptyBox");
     if (boxType) {
-      const bounds = e.currentTarget.getBoundingClientRect();
-      installEmptyBox(boxType, e.clientX - bounds.left + e.currentTarget.scrollLeft, e.clientY - bounds.top + e.currentTarget.scrollTop);
+      installEmptyBox(boxType);
       return;
     }
 
@@ -1845,7 +1854,29 @@ function Workspace(
             <summary>Device Installation</summary>
             <div className="nova-wall-tools-combined">
             <div style={{display:"flex",flexDirection:"column",gap:8,paddingTop:8}}>
-              <div>Selected: {selectedDevice ? selectedDevice.name || selectedDevice.type : "Drag a component onto a stud"}</div>
+              {pendingBoxKind && <div style={{padding:10,border:"1px solid #6da1b8",borderRadius:6,background:"#17364b",display:"flex",flexDirection:"column",gap:8}}>
+                <strong>Install Electrical Box: {pendingBoxKind}</strong>
+                <span>1. Click the mounting stud on the wall. 2. Enter box height. 3. Install.</span>
+                <span>Stud: {selectedStud === null ? "Not selected" : `#${selectedStud+1}`}</span>
+                <label>Mounting height (inches)
+                  <input aria-label="Box mounting height in inches" type="number" min="0" max="120" step="1"
+                    value={pendingBoxHeight} onChange={e=>setPendingBoxHeight(e.target.value)}
+                    style={{width:80,marginLeft:8}} />
+                </label>
+                <div style={{display:"flex",gap:8}}>
+                  <button type="button" disabled={selectedStud===null || pendingBoxHeight.trim()==="" || !Number.isFinite(Number(pendingBoxHeight)) || Number(pendingBoxHeight)<0 || Number(pendingBoxHeight)>120}
+                    onClick={()=>{
+                      if(selectedStud===null || !pendingBoxKind) return;
+                      const x=selectedStud*studSpacing*8+13-6;
+                      const y=heightToY(Number(pendingBoxHeight));
+                      installEmptyBox(pendingBoxKind,x,y);
+                      setPendingBoxKind(null);
+                      setPlacementMessage("Electrical box installed. Select another box to continue.");
+                    }}>🔨 Install Box</button>
+                  <button type="button" onClick={()=>{setPendingBoxKind(null);setPlacementMessage("");}}>Cancel</button>
+                </div>
+              </div>}
+              <div>Selected: {pendingBoxKind ? `Box: ${pendingBoxKind}` : selectedDevice ? selectedDevice.name || selectedDevice.type : "Select a box in Component Library"}</div>
               {placementMessage && <div role="status" style={{color:"#ffd3a3"}}>{placementMessage}</div>}
               {selectedDevice && <div style={{color:"#8fe9ff"}}>Drop stud: {deviceStuds[selectedDevice.id]===undefined?"not assigned":`#${deviceStuds[selectedDevice.id]+1}`} · {nailedDevices[selectedDevice.id]?"Installed":heightConfirmed[selectedDevice.id]?"Ready to hammer":"Enter height to enable hammer"}</div>}
                       <span title="Click a stud on the wall to highlight it before installing a device"

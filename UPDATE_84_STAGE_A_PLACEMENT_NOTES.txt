@@ -1,0 +1,5 @@
+Update 84 Stage A — Stud and height placement for boxes
+
+Choose a box from Component Library. In Device Installation, select a stud on the wall, enter mounting height in inches, and click Install Box. Boxes are no longer immediately placed when clicked or dropped. Existing devices and electrical wiring remain unchanged. Box state is saved in browser localStorage per workspace; project export integration is not yet implemented.
+
+Note: Existing wall boxes remain movable. Device-in-box installation is Stage B, not implemented in this update.

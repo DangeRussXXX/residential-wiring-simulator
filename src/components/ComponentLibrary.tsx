@@ -477,10 +477,10 @@ borderRadius:"4px"
     {openCategories.includes("Electrical Boxes")?"▼":"▶"} Electrical Boxes
   </div>
   {openCategories.includes("Electrical Boxes") && emptyBoxTypes.filter(b=>b.toLowerCase().includes(search.toLowerCase())).map(kind=>(
-    <div key={kind} draggable onDragStart={e=>{e.dataTransfer.setData("novaEmptyBox",kind);e.dataTransfer.effectAllowed="copy";}}
+    <div key={kind}
       onClick={()=>workspaceRef.current?.addBox(kind)}
-      style={{marginTop:8,padding:12,background:"#1e1e1e",border:"1px solid #555",borderRadius:8,cursor:"grab",display:"flex",alignItems:"center",gap:12}}>
-      <span style={{fontSize:24}}>▣</span><span>{kind}<div style={{fontSize:11,color:"#aabac5"}}>Drag to wall • empty box only</div></span>
+      style={{marginTop:8,padding:12,background:"#1e1e1e",border:"1px solid #555",borderRadius:8,cursor:"pointer",display:"flex",alignItems:"center",gap:12}}>
+      <span style={{fontSize:24}}>▣</span><span>{kind}<div style={{fontSize:11,color:"#aabac5"}}>Select box → choose stud → set height → install</div></span>
     </div>
   ))}
 </div>}

@@ -444,3 +444,22 @@
 }
 .nova-double-text-sidebar .nova-panel-global-actions button {font-size:30px !important;}
 .nova-double-text-sidebar :is(svg,svg *) {font-size:inherit;}
+
+
+/* Stage K: match the large right-hand panel text in the left Service & Breaker Controls.
+   Scoped to ServiceOverview; no changes to wiring, placement or panel layout. */
+.nova-double-text-service { font-size: 28px !important; line-height: 1.5 !important; }
+.nova-double-text-service :is(div,span,p,small,strong,b,em,label,li,section,article,option,td,th) {
+  font-size: 28px !important;
+  line-height: 1.5 !important;
+}
+.nova-double-text-service :is(button,input,select,textarea) {
+  font-size: 28px !important;
+  line-height: 1.4 !important;
+  min-height: 52px;
+}
+.nova-double-text-service :is(summary,h1,h2,h3,h4) {
+  font-size: 32px !important;
+  line-height: 1.35 !important;
+}
+.nova-double-text-service :is(svg,svg *) { font-size: inherit; }

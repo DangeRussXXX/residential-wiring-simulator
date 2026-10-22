@@ -1,4 +1,3 @@
-import { electricalBoxes } from "../electrical/boxCatalog";
 export const BREAKER_DRAG_EVENT = "rws-breaker-drag";
 export const BREAKER_DRAG_END_EVENT = "rws-breaker-drag-end";
 // Residential Wiring Simulator v2.6
@@ -97,6 +96,15 @@ componentCatalog.filter(c => String(c.category) !== "Breakers" && !["Service Ent
 
 
 
+const emptyBoxTypes = [
+  "1-Gang New-Work Box", "2-Gang New-Work Box", "3-Gang New-Work Box", "4-Gang New-Work Box",
+  "1-Gang Old-Work Box", "2-Gang Old-Work Box", "3-Gang Old-Work Box", "4-Gang Old-Work Box",
+  "1-Gang Metal Device Box", "2-Gang Metal Device Box", "3-Gang Metal Device Box", "4-Gang Metal Device Box",
+  "1-Gang Weatherproof Box", "2-Gang Weatherproof Box",
+  "1-Gang Surface-Mount Box", "2-Gang Surface-Mount Box",
+  "1-Gang Low-Voltage Ring", "2-Gang Low-Voltage Ring"
+];
+
 const categories = [
 
   ...new Set(
@@ -122,8 +130,6 @@ workspaceRef
 
 
 
-const [boxOpen,setBoxOpen] = useState(true);
-
 const [search,setSearch] =
 
 useState("");
@@ -133,7 +139,7 @@ useState("");
 
 const [openCategories,setOpenCategories] =
 
-useState<string[]>(categories);
+useState<string[]>(["Electrical Boxes",...categories]);
 
 
 
@@ -466,22 +472,21 @@ borderRadius:"4px"
 
 
 
-
-
-
-<div style={{marginBottom:14}}>
-  <div onClick={()=>setBoxOpen(v=>!v)} style={{cursor:"pointer",fontWeight:"bold",padding:10,background:"#333",borderRadius:5}}>{boxOpen?"▼":"▶"} Electrical Boxes</div>
-  {boxOpen && electricalBoxes.filter(b=>`${b.name} ${b.category}`.toLowerCase().includes(search.toLowerCase())).map(box=>(
-    <div key={box.id} draggable onDragStart={e=>e.dataTransfer.setData("electricalBoxType",box.id)}
-      onClick={()=>workspaceRef.current?.addBox(box.id)}
-      style={{marginTop:8,padding:12,background:"#1e1e1e",border:"1px solid #555",borderRadius:8,cursor:"grab"}}>
-      <strong>▣ {box.name}</strong><div style={{fontSize:12,color:"#aaa"}}>{box.category} · {box.gangs ? `${box.gangs}-gang` : "Fixture / junction"}{box.volume ? ` · nominal ${box.volume} cu in` : ""}</div>
-      <div style={{fontSize:12,color:"#bbb"}}>{box.note}</div>
+{(!search || "electrical boxes".includes(search.toLowerCase()) || emptyBoxTypes.some(b=>b.toLowerCase().includes(search.toLowerCase()))) && <div style={{marginBottom:12}}>
+  <div onClick={()=>toggleCategory("Electrical Boxes")} style={{cursor:"pointer",fontWeight:"bold",padding:10,background:"#333",borderRadius:5}}>
+    {openCategories.includes("Electrical Boxes")?"▼":"▶"} Electrical Boxes
+  </div>
+  {openCategories.includes("Electrical Boxes") && emptyBoxTypes.filter(b=>b.toLowerCase().includes(search.toLowerCase())).map(kind=>(
+    <div key={kind} draggable onDragStart={e=>{e.dataTransfer.setData("novaEmptyBox",kind);e.dataTransfer.effectAllowed="copy";}}
+      onClick={()=>workspaceRef.current?.addBox(kind)}
+      style={{marginTop:8,padding:12,background:"#1e1e1e",border:"1px solid #555",borderRadius:8,cursor:"grab",display:"flex",alignItems:"center",gap:12}}>
+      <span style={{fontSize:24}}>▣</span><span>{kind}<div style={{fontSize:11,color:"#aabac5"}}>Drag to wall • empty box only</div></span>
     </div>
   ))}
-</div>
+</div>}
 
 {
+
 categories.map(category=>{
 
 

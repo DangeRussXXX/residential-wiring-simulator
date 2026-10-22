@@ -35,6 +35,33 @@ const PARTS: Record<string, PartInfo> = {
 /** Visual training model. Physical bus placement and manufacturer listing are not represented. */
 export default function RealisticPanel({ slots, selected, assignments, onSelect, onDropBreaker, canDrop, mainBreaker, onMainDrop, panelWires, onBreakerState }: Props) {
   const [infoEnabled, setInfoEnabled] = useState(true);
+  const [zoom, setZoom] = useState(1);
+  const [panMode, setPanMode] = useState(false);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const panStart = useRef<{x:number;y:number;left:number;top:number}|null>(null);
+  const clampZoom = (value:number) => Math.max(0.35, Math.min(3, value));
+  const setPanelZoom = (value:number) => {
+    const viewport = viewportRef.current;
+    const next = clampZoom(value);
+    if (viewport) {
+      const old = zoom;
+      const centerX = viewport.scrollLeft + viewport.clientWidth / 2;
+      const centerY = viewport.scrollTop + viewport.clientHeight / 2;
+      // Scroll after React paints the new SVG dimensions.
+      requestAnimationFrame(() => {
+        viewport.scrollLeft = centerX * next / old - viewport.clientWidth / 2;
+        viewport.scrollTop = centerY * next / old - viewport.clientHeight / 2;
+      });
+    }
+    setZoom(next);
+  };
+  const fitPanel = () => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    const next = clampZoom(Math.min(viewport.clientWidth / 600, viewport.clientHeight / (365 + Math.ceil(slots.length / 2) * 49)));
+    setZoom(next);
+    requestAnimationFrame(() => { viewport.scrollLeft = 0; viewport.scrollTop = 0; });
+  };
   const [activeInfo, setActiveInfo] = useState<PartInfo | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clearTimer = () => { if (timer.current !== null) { clearTimeout(timer.current); timer.current = null; } };
@@ -51,15 +78,30 @@ export default function RealisticPanel({ slots, selected, assignments, onSelect,
   });
   const rows = Math.ceil(slots.length / 2);
   const height = 365 + rows * 49;
-  return <div style={{position:"relative",background:"#102d3e",border:"2px solid #247a9c",borderRadius:12,padding:10,overflowX:"auto"}}>
-    <svg viewBox={`0 0 600 ${height}`} role="img" aria-label="Interactive simulated distribution panel with feeder terminals, breakers, neutral and ground bars" style={{width:"100%",height:"auto",minWidth:300}}>
+  return <div className="nova-panel-viewport-shell" style={{position:"relative",background:"#122b3a",border:"2px solid #3b8ba6",borderRadius:12,padding:10,minWidth:0}}>
+    <div className="nova-panel-zoom-toolbar" aria-label="Electrical panel view controls">
+      <button type="button" onClick={()=>setPanelZoom(zoom/1.25)} aria-label="Zoom out">−</button>
+      <span aria-live="polite">{Math.round(zoom*100)}%</span>
+      <button type="button" onClick={()=>setPanelZoom(zoom*1.25)} aria-label="Zoom in">+</button>
+      <button type="button" onClick={fitPanel}>Fit</button>
+      <button type="button" onClick={()=>setPanelZoom(1)}>100%</button>
+      <button type="button" aria-pressed={panMode} onClick={()=>setPanMode(v=>!v)} className={panMode?"nova-panel-pan-active":""}>Pan {panMode?"ON":"OFF"}</button>
+    </div>
+    <div ref={viewportRef} className="nova-panel-viewport" style={{height:"min(72vh, 740px)",overflow:"auto",cursor:panMode?"grab":"auto",touchAction:panMode?"none":"auto"}}
+      onWheel={e=>{if(e.ctrlKey){e.preventDefault();setPanelZoom(zoom*(e.deltaY>0?0.9:1.1));}}}
+      onPointerDown={e=>{if(!panMode||e.button!==0)return;panStart.current={x:e.clientX,y:e.clientY,left:e.currentTarget.scrollLeft,top:e.currentTarget.scrollTop};e.currentTarget.setPointerCapture(e.pointerId);e.preventDefault();}}
+      onPointerMove={e=>{if(!panMode||!panStart.current)return;e.currentTarget.scrollLeft=panStart.current.left-(e.clientX-panStart.current.x);e.currentTarget.scrollTop=panStart.current.top-(e.clientY-panStart.current.y);}}
+      onPointerUp={e=>{panStart.current=null;if(e.currentTarget.hasPointerCapture(e.pointerId))e.currentTarget.releasePointerCapture(e.pointerId);}}
+      onPointerCancel={()=>{panStart.current=null;}}>
+    <svg viewBox={`0 0 600 ${height}`} role="img" aria-label="Interactive simulated distribution panel with feeder terminals, breakers, neutral and ground bars" style={{display:"block",width:600*zoom,height:height*zoom,maxWidth:"none",pointerEvents:panMode?"none":"auto"}}>
       <defs>
-        <linearGradient id="novaPanelSteel" x1="0" x2="1"><stop stopColor="#698da1"/><stop offset=".15" stopColor="#3b647a"/><stop offset=".85" stopColor="#31566b"/><stop offset="1" stopColor="#7899a8"/></linearGradient>
+        <linearGradient id="novaPanelSteel" x1="0" x2="1"><stop stopColor="#5a6269"/><stop offset=".15" stopColor="#303a42"/><stop offset=".85" stopColor="#252f37"/><stop offset="1" stopColor="#747d84"/></linearGradient>
         <linearGradient id="novaBreakerFace" x1="0" x2="1"><stop stopColor="#10151b"/><stop offset=".5" stopColor="#303941"/><stop offset="1" stopColor="#0a1016"/></linearGradient>
       </defs>
-      <rect x="7" y="7" width="586" height={height-14} rx="14" fill="url(#novaPanelSteel)" stroke="#9caab5" strokeWidth="6"/>
-      <rect x="24" y="25" width="552" height={height-50} rx="7" fill="#24485c" stroke="#5b9bb7" strokeWidth="3"/>
-      {Array.from({length:5},(_,i)=><g key={i}><circle cx={62+i*115} cy="41" r="13" fill="#102e40" stroke="#91b9ca" strokeWidth="3"/><circle cx={62+i*115} cy={height-40} r="13" fill="#102e40" stroke="#91b9ca" strokeWidth="3"/></g>)}
+      <rect x="7" y="7" width="586" height={height-14} rx="14" fill="url(#novaPanelSteel)" stroke="#8ab5c7" strokeWidth="6"/>
+      <rect x="24" y="25" width="552" height={height-50} rx="7" fill="#203c4c" stroke="#5b9cb7" strokeWidth="3"/>
+      {Array.from({length:5},(_,i)=><g key={i}><circle cx={62+i*115} cy="41" r="13" fill="#101921" stroke="#8a969d" strokeWidth="3"/><circle cx={62+i*115} cy={height-40} r="13" fill="#101921" stroke="#8a969d" strokeWidth="3"/></g>)}
+
       <g aria-label="Incoming feeder conductors">
         <path d="M 205 36 V 142" fill="none" stroke="#20272b" strokeWidth="16"/><path d="M 395 36 V 142" fill="none" stroke="#cf3035" strokeWidth="15"/>
         <path d="M 114 36 V 187 H 75 V 275" fill="none" stroke="#e3e4e2" strokeWidth="12"/>
@@ -95,8 +137,8 @@ export default function RealisticPanel({ slots, selected, assignments, onSelect,
       <g {...infoEvents("l2bus")} role="button" tabIndex={0} aria-label="L2 bus — component information" style={{cursor:"help"}}><path d="M 352 300 V 450" stroke="transparent" strokeWidth="30"/></g>
       <rect x="241" y="293" width="14" height={height-342} fill="#a55b46" opacity=".88"/>
       <rect x="345" y="293" width="14" height={height-342} fill="#718ac0" opacity=".88"/>
-      <text x="75" y="262" textAnchor="middle" fontSize="12" fill="#e6f6ff">NEUTRAL</text>
-      <text x="525" y="262" textAnchor="middle" fontSize="12" fill="#e6f6ff">GROUND</text>
+      <text x="105" y="267" textAnchor="start" fontSize="13" fontWeight="bold" fill="#8ceaff">NEUTRAL</text>
+      <text x="494" y="267" textAnchor="end" fontSize="13" fontWeight="bold" fill="#8ceaff">GROUND</text>
       <rect x="50" y="274" width="50" height={height-319} rx="5" fill="#8d979a" stroke="#d5dbda" strokeWidth="2"/>
       <rect x="500" y="274" width="50" height={height-319} rx="5" fill="#8d979a" stroke="#d5dbda" strokeWidth="2"/>
       <g {...infoEvents("neutral")} role="button" tabIndex={0} aria-label="Isolated neutral bar — component information" style={{cursor:"help"}}><rect x="48" y="270" width="54" height={height-311} fill="transparent"/></g>
@@ -167,7 +209,9 @@ export default function RealisticPanel({ slots, selected, assignments, onSelect,
           <title>{`Breaker #${wire.slot}: ${wire.conductor} → ${wire.terminal}${valid?"":" (check termination)"}`}</title>
         </g>;
       })}
+
     </svg>
+    </div>
     {infoEnabled && activeInfo && <div role="status" aria-live="polite" style={{position:"fixed",right:24,bottom:24,margin:0,width:"min(360px,95%)",background:"#0c2638",border:"2px solid #38bde8",borderRadius:10,boxShadow:"0 8px 28px #000a",padding:14,zIndex:20,color:"#edf8ff",fontSize:13}}>
       <div style={{display:"flex",alignItems:"start",justifyContent:"space-between",gap:8}}><strong style={{color:"#6ee6ff",fontSize:15}}>{activeInfo.title}</strong><button type="button" aria-label="Close component information" onClick={hideInfo} style={{background:"transparent",color:"#fff",border:"1px solid #5a8ba3",borderRadius:4,cursor:"pointer"}}>✕</button></div>
       <p style={{margin:"9px 0 5px"}}><b>What is it?</b> {activeInfo.what}</p>

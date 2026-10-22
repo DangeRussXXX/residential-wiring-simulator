@@ -5,7 +5,7 @@ export type CableKind = "14/2 NM-B"|"14/3 NM-B"|"12/2 NM-B"|"12/3 NM-B"|"14/2 MC
 export type CableEnd = "from"|"to";
 export const PANEL_SOURCE_ID="__panel_p1__";
 export type SpliceMember = {cableId:string;end:CableEnd;conductor:string};
-export type SpliceRecord = {id:string;deviceId:string;members:SpliceMember[];connector:string;pigtailTerminal?:string};
+export type SpliceRecord = {id:string;deviceId:string;members:SpliceMember[];connector:string;pigtailTerminal?:string;pigtailTerminals?:string[]};
 export type CableRecord = {
   id:string; from:string; to:string; type:CableKind;
   areaId?:string; wall?:"NORTH"|"SOUTH"|"EAST"|"WEST"; breakerSlot?:number;
@@ -297,27 +297,40 @@ export function LiveWiringDiagram({cable,end,device,allCables,onTerminate,front=
 
 /** One box, one drawing: every cable end (including panel home runs) and every
  * saved splice is drawn together. Reused unchanged by the right panel and wall. */
-export function UnifiedBoxWiring({device,allCables,onTerminate,front=false}:{
-  device:ElectricalDevice;allCables:CableRecord[];
+export function UnifiedBoxWiring({device,allCables,onTerminate,front=false,boxMounts,devices}:{
+  device:ElectricalDevice;allCables:CableRecord[];boxMounts?:Record<string,{boxId:string;gang:number}>;devices?:ElectricalDevice[];
   onTerminate:(cableId:string,end:CableEnd,conductor:string,terminal:string)=>void;
   front?:boolean;
 }) {
+  const mountedBox=boxMounts?.[device.id]?.boxId;
+  const inBox=(id:string)=>mountedBox ? boxMounts?.[id]?.boxId===mountedBox : id===device.id;
+  const boxDevices=mountedBox ? (devices??[device]).filter(d=>inBox(d.id)).sort((a,b)=>(boxMounts?.[a.id]?.gang??0)-(boxMounts?.[b.id]?.gang??0)) : [device];
   const entries=allCables.flatMap(c=>(["from","to"] as CableEnd[])
-    .filter(end=>c[end]===device.id).map(end=>({c,end})))
+    .filter(end=>inBox(c[end])).map(end=>({c,end})))
     .sort((a,b)=>Number(b.c.from===PANEL_SOURCE_ID)-Number(a.c.from===PANEL_SOURCE_ID));
   const uniqueSplices=allCables.flatMap(c=>c.splices??[])
-    .filter(sp=>sp.deviceId===device.id)
+    .filter(sp=>sp.deviceId===mountedBox||inBox(sp.deviceId))
     .filter((sp,i,arr)=>arr.findIndex(v=>v.id===sp.id)===i);
   const terms=deviceTerminals(device);
   const kind=kindFor(device,false);
   const localPoints=positions(kind,terms);
-  const terminalXY=(id:string)=>localPoints[id]?{x:290+localPoints[id].x*.9,y:64+localPoints[id].y*.9}:undefined;
+  const terminalXY=(id:string)=>{
+    const [targetId,terminalId]=id.includes("::")?id.split("::",2):[device.id,id];
+    const target=boxDevices.find(d=>d.id===targetId);
+    if(!target)return undefined;
+    const targetTerms=deviceTerminals(target);
+    const point=positions(kindFor(target,false),targetTerms)[terminalId];
+    if(!point)return undefined;
+    if(!mountedBox)return {x:290+point.x*.9,y:64+point.y*.9};
+    const index=boxDevices.findIndex(d=>d.id===targetId);
+    return {x:500+index*70+point.x*.29,y:128+point.y*.29};
+  };
   const [picked,setPicked]=useState<{cableId:string;end:CableEnd;conductor:string}|null>(null);
   const svgRef=useRef<SVGSVGElement>(null);
-  const canvasHeight=front?410:Math.max(410,180+Math.ceil(entries.length/4)*155,180+uniqueSplices.length*100);
-  const cableX=(i:number)=>65+(i%4)*86;
-  const cableY=(i:number)=>58+Math.floor(i/4)*155;
-  const spliceXY=(i:number)=>({x:420,y:160+i*100});
+  const canvasHeight=front?410:Math.max(600,250+Math.ceil(entries.length/2)*190,290+uniqueSplices.length*135);
+  const cableX=(i:number)=>100+(i%2)*195;
+  const cableY=(i:number)=>115+Math.floor(i/2)*190;
+  const spliceXY=(i:number)=>({x:mountedBox?405:425,y:250+i*135});
   const memberSplice=(id:string,end:CableEnd,conductor:string)=>
     uniqueSplices.find(sp=>sp.members.some(m=>m.cableId===id&&m.end===end&&m.conductor===conductor));
   const getPoint=(e:React.PointerEvent<SVGSVGElement>)=>{
@@ -336,7 +349,7 @@ export function UnifiedBoxWiring({device,allCables,onTerminate,front=false}:{
     setPicked(null);
   };
   return <div style={{width:"100%"}}>
-    <svg ref={svgRef} viewBox={`0 0 720 ${canvasHeight}`} width="100%"
+    <svg ref={svgRef} viewBox={`0 0 720 ${canvasHeight}`} width="100%" height="auto"
       aria-label={`Complete wiring box for ${device.name}, including home runs and outgoing cables`}
       style={{background:"#587586",border:"2px solid #9fc4d6",borderRadius:6,touchAction:"none"}}
       onPointerUp={e=>{
@@ -346,12 +359,39 @@ export function UnifiedBoxWiring({device,allCables,onTerminate,front=false}:{
           .sort((a,b)=>Math.hypot(a.p!.x-pt.x,a.p!.y-pt.y)-Math.hypot(b.p!.x-pt.x,b.p!.y-pt.y))[0];
         if(near?.p&&Math.hypot(near.p.x-pt.x,near.p.y-pt.y)<24)commit(near.id);
       }}>
-      <text x="15" y="17" fontSize="14" fill="#f3fbff" fontWeight="bold">
+      <text x="18" y="28" fontSize="14" fill="#f3fbff" fontWeight="bold">
         {front?"FRONT · DEVICE IDENTIFICATION":"REAR · ALL CABLES IN THIS BOX"}
       </text>
-      <g transform={front?"translate(-150 -26) scale(1.65)":"translate(290 64) scale(.9)"}>
-        <DeviceArtwork kind={kind} front={front}/>
-      </g>
+      {front ? (
+        <g>
+          {boxDevices.map((d,i)=>{
+            const count=boxDevices.length;
+            // Each device is drawn at a readable size in its own gang column.
+            // Rear terminal coordinates and cable geometry are unchanged.
+            const cell=720/count;
+            const scale=Math.min(1.1, Math.max(.48,(cell-22)/115));
+            const centerX=cell*(i+.5);
+            const topY=76;
+            const tx=centerX-310*scale;
+            const ty=topY-24*scale;
+            return <g key={d.id}>
+              <rect x={i*cell+8} y="59" width={cell-16} height="324" rx="9"
+                fill="#4c6c7e" stroke="#a0c2d3" strokeWidth="1.5"/>
+              <g transform={`translate(${tx} ${ty}) scale(${scale})`}>
+                <DeviceArtwork kind={kindFor(d,false)} front={true}/>
+              </g>
+              <text x={centerX} y="357" textAnchor="middle" fill="#f4faff"
+                fontSize="15" fontWeight="bold">{d.name.length>23?d.name.slice(0,21)+"…":d.name}</text>
+              <text x={centerX} y="376" textAnchor="middle" fill="#c5e3f1"
+                fontSize="12">{mountedBox?`GANG ${i+1}`:"DEVICE"}</text>
+            </g>;
+          })}
+        </g>
+      ) : mountedBox ? boxDevices.map((d,i)=><g key={d.id} transform={`translate(${500+i*70} 128) scale(.29)`}>
+        <DeviceArtwork kind={kindFor(d,false)} front={false}/>
+      </g>) : <g transform="translate(290 64) scale(.9)">
+        <DeviceArtwork kind={kind} front={false}/>
+      </g>}
       {!front&&entries.map(({c,end},i)=>{
         const x=cableX(i),y=cableY(i);
         const home=c.from===PANEL_SOURCE_ID;
@@ -359,9 +399,9 @@ export function UnifiedBoxWiring({device,allCables,onTerminate,front=false}:{
         const otherName=home?`PANEL P1 · #${c.breakerSlot??"?"}`:
           (end==="from"?"TO ":"FROM ")+(c[end==="from"?"toName":"fromName"]??other.slice(0,12));
         return <g key={`${c.id}-${end}`}>
-          <text x={x} y={y+3} fontSize="10" fill={home?"#ffe2a3":"#e1f5ff"} textAnchor="middle" fontWeight="bold">{home?"⚡ HOME RUN":`CABLE ${i+1}`}</text>
-          <text x={x} y={y+16} fontSize="9" fill="#f1f5fa" textAnchor="middle">{otherName.slice(0,23)}</text>
-          <text x={x} y={y+29} fontSize="9" fill="#d9ebf3" textAnchor="middle">{c.type}</text>
+          <text x={x} y={y-45} fontSize="10" fill={home?"#ffe2a3":"#e1f5ff"} textAnchor="middle" fontWeight="bold">{home?"⚡ HOME RUN":`CABLE ${i+1}`}</text>
+          <text x={x} y={y-32} fontSize="9" fill="#f1f5fa" textAnchor="middle">{otherName.slice(0,23)}</text>
+          <text x={x} y={y-19} fontSize="9" fill="#d9ebf3" textAnchor="middle">{c.type}</text>
           <path d={`M ${x} ${y+36} V ${y+73}`} stroke="#374d58" strokeWidth="24" strokeLinecap="round"/>
           <path d={`M ${x} ${y+36} V ${y+73}`} stroke={c.type.includes("MC")?"#b8c2c8":home?"#1e2229":"#ece8db"} strokeWidth="17" strokeLinecap="round"/>
           <rect x={x-12} y={y+68} width="24" height="9" rx="3" fill="#a6b9c2" stroke="#355568" strokeWidth="1.5"/>
@@ -373,9 +413,9 @@ export function UnifiedBoxWiring({device,allCables,onTerminate,front=false}:{
             const spIdx=sp?uniqueSplices.findIndex(v=>v.id===sp.id):-1;
             const target=spIdx>=0?spliceXY(spIdx):saved?terminalXY(saved):undefined;
             const cap=saved==="cap";
-            const tx=target?.x??(x+(j-(n-1)/2)*20);
+            const tx=spIdx>=0 ? target!.x + (j-1)*12 + (i%2)*6 : target?.x??(x+(j-(n-1)/2)*25);
             const ty=target?.y??(y+132+j*5);
-            const bendY=Math.max(sy+30,Math.min(ty-24,sy+55+j*9));
+            const bendY=Math.max(sy+22,Math.min(ty-28,sy+38+j*22+i*15));
             const d=`M ${sx} ${sy} L ${sx} ${bendY} Q ${sx} ${bendY+12} ${sx+12} ${bendY+12} L ${tx-24} ${bendY+12} Q ${tx-10} ${bendY+12} ${tx-10} ${bendY+26} L ${tx-10} ${ty-10} Q ${tx-10} ${ty} ${tx} ${ty}`;
             const active=picked?.cableId===c.id&&picked.end===end&&picked.conductor===color;
             return <g key={color} onPointerDown={e=>{e.stopPropagation();setPicked({cableId:c.id,end,conductor:color});e.currentTarget.ownerSVGElement?.setPointerCapture(e.pointerId);}}
@@ -390,36 +430,41 @@ export function UnifiedBoxWiring({device,allCables,onTerminate,front=false}:{
         </g>;
       })}
       {!front&&uniqueSplices.map((sp,i)=>{
-        const pt=spliceXY(i),t=sp.pigtailTerminal?terminalXY(sp.pigtailTerminal):undefined;
+        const pt=spliceXY(i);
+        const targets=sp.pigtailTerminals?.length?sp.pigtailTerminals:(sp.pigtailTerminal?[sp.pigtailTerminal]:[]);
         const family=sp.members[0]?.conductor==="white"?"white":sp.members[0]?.conductor==="ground"?"ground":"black";
         return <g key={sp.id}>
-          {t&&<>
-            <path d={`M ${pt.x} ${pt.y} C ${pt.x+28} ${pt.y+45} ${t.x-55} ${t.y+45} ${t.x} ${t.y}`} fill="none" stroke="#2b4655" strokeWidth="10" strokeLinecap="round"/>
-            <path d={`M ${pt.x} ${pt.y} C ${pt.x+28} ${pt.y+45} ${t.x-55} ${t.y+45} ${t.x} ${t.y}`} fill="none" stroke={colors[family]} strokeWidth="5" strokeLinecap="round"/>
-            <text x={pt.x+20} y={pt.y+53} fontSize="10" fill="#ffe0a4">PIGTAIL → {sp.pigtailTerminal}</text>
-          </>}
+          {targets.map((terminal,j)=>{
+            const t=terminalXY(terminal);
+            if(!t)return null;
+            const path=`M ${pt.x+j*5} ${pt.y} C ${pt.x+28+j*9} ${pt.y+45+j*10} ${t.x-55} ${t.y+45} ${t.x} ${t.y}`;
+            return <g key={`${terminal}-${j}`}>
+              <path d={path} fill="none" stroke="#2b4655" strokeWidth="10" strokeLinecap="round"/>
+              <path d={path} fill="none" stroke={colors[family]} strokeWidth="5" strokeLinecap="round"/>
+              <title>Pigtail to {terminal}</title>
+            </g>;
+          })}
           <WireConnector x={pt.x} y={pt.y} splice upright/>
-          <text x={pt.x} y={pt.y-38} textAnchor="middle" fontSize="10" fill="#ffe0a4">{sp.members.length} wires + {t?"pigtail":"no pigtail"}</text>
+          <text x={pt.x+20} y={pt.y-35} textAnchor="start" fontSize="10" fill="#ffe0a4">{sp.members.length} wires + {targets.length} pigtail(s)</text>
         </g>;
       })}
-      {!front&&terms.map(t=>{
-        const p=terminalXY(t.id);if(!p)return null;
-        return <g key={t.id} onClick={()=>commit(t.id)} style={{cursor:"pointer"}}>
-          <circle cx={p.x} cy={p.y} r="12" fill={t.color} stroke={picked?"#12e8ff":"#304d5a"} strokeWidth={picked?4:2}/>
-          <path d={`M ${p.x-5} ${p.y} h10`} stroke="#344c5b" strokeWidth="2"/>
-          <title>{t.label} · click to connect selected conductor</title>
+      {!front&&boxDevices.flatMap(d=>deviceTerminals(d).map(t=>{
+        const key=mountedBox?`${d.id}::${t.id}`:t.id;
+        const p=terminalXY(key);if(!p)return null;
+        return <g key={key} onClick={()=>commit(t.id)} style={{cursor:"pointer"}}>
+          <circle cx={p.x} cy={p.y} r="9" fill={t.color} stroke={picked?"#12e8ff":"#304d5a"} strokeWidth={picked?3:2}/>
+          <path d={`M ${p.x-4} ${p.y} h8`} stroke="#344c5b" strokeWidth="2"/>
+          <title>{d.name}: {t.label}</title>
         </g>;
-      })}
+      }))}
     </svg>
-    {!front&&<div style={{fontSize:12,color:"#bcdce9",marginTop:4}}>
-      {entries.length} cable{entries.length===1?"":"s"} in this box · Select a conductor, then click or drag to a compatible terminal. Splices and pigtails use saved records.
-    </div>}
+
   </div>;
 }
 
-export default function CableWiringPanel({cable,devices,onChange,onRemove,allCables,onChangeCables,initialEnd="from",sharedView, onSharedViewChange,onActiveEndChange}:{
+export default function CableWiringPanel({cable,devices,onChange,onRemove,allCables,onChangeCables,boxMounts,initialEnd="from",sharedView, onSharedViewChange,onActiveEndChange}:{
   cable:CableRecord;devices:ElectricalDevice[];onChange:(c:CableRecord)=>void;onRemove:()=>void;
-  allCables?:CableRecord[];onChangeCables?:(cables:CableRecord[])=>void;initialEnd?:CableEnd;
+  allCables?:CableRecord[];onChangeCables?:(cables:CableRecord[])=>void;boxMounts?:Record<string,{boxId:string;gang:number}>;initialEnd?:CableEnd;
   sharedView?:"rear"|"front";onSharedViewChange?:(view:"rear"|"front")=>void;onActiveEndChange?:(end:CableEnd)=>void;
 }) {
   const [end,setEnd]=useState<CableEnd>(initialEnd);
@@ -443,16 +488,23 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove,allCab
   ]:deviceTerminals(dev);
   const colorsList=conductors(cable.type);
   const attached=cable.ends[end]||{};
-  const boxId=cable[end];
+  const boxId=boxMounts?.[cable[end]]?.boxId ?? cable[end];
+  const sameBox=(deviceId:string)=> (boxMounts?.[deviceId]?.boxId ?? deviceId)===boxId;
+  const boxDevices=devices.filter(d=>sameBox(d.id));
+  const terminalOptions=boxDevices.flatMap(d=>deviceTerminals(d).map(t=>({
+    ...t,id:`${d.id}::${t.id}`,label:`${d.name} · ${t.label}`
+  })));
+  const terminalKey=(key:string)=>key.includes("::")?key.split("::").slice(1).join("::"):key;
+  const targetDevice=(key:string)=>key.includes("::")?key.split("::")[0]:dev.id;
   // Other cables entering the same physical box, including a panel home run.
   // Each retains its own saved termination records and can be wired in place.
   const boxCables=(allCables??[cable]).flatMap(c=>
-    (["from","to"] as CableEnd[]).filter(side=>c[side]===boxId)
+    (["from","to"] as CableEnd[]).filter(side=>sameBox(c[side]))
       .map(side=>({cable:c,side,isHomeRun:c.from===PANEL_SOURCE_ID})));
   const otherBoxCables=boxCables.filter(item=>item.cable.id!==cable.id);
-  const available=(allCables??[cable]).flatMap(c=>(["from","to"] as CableEnd[]).flatMap(e=>c[e]===boxId?
+  const available=(allCables??[cable]).flatMap(c=>(["from","to"] as CableEnd[]).flatMap(e=>sameBox(c[e])?
     conductors(c.type).map(conductor=>({key:`${c.id}|${e}|${conductor}`,cableId:c.id,end:e,conductor,cable:c})):[]));
-  const splices=(allCables??[cable]).flatMap(c=>c.splices??[]).filter(sp=>sp.deviceId===boxId);
+  const splices=(allCables??[cable]).flatMap(c=>c.splices??[]).filter(sp=>sameBox(sp.deviceId)||sp.deviceId===boxId);
   const selectedMembers=available.filter(a=>spliceSelection.includes(a.key));
   const selectedFamily=selectedMembers.length>0?selectedMembers[0].conductor==="ground"?"ground":selectedMembers[0].conductor==="white"?"neutral":"hot":null;
   // Terminal options come from the actual device, not from the selected cable.
@@ -461,23 +513,34 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove,allCab
   const terminalFamily=(id:string):"ground"|"neutral"|"hot"=>
     ["ground","ground-bar"].includes(id)?"ground":
     ["silver","neutral-bar","load-neutral","fixture-neutral","neutral-splice"].includes(id)?"neutral":"hot";
-  const compatibleTerminals=terms.filter(t=>!selectedFamily||terminalFamily(t.id)===selectedFamily);
-  const hasPigtailTo=(terminal:string,excludeId?:string)=>splices.some(sp=>sp.id!==excludeId&&sp.pigtailTerminal===terminal);
-  const terminalUsedByCable=(terminal:string)=>available.some(a=>a.cable.ends[a.end]?.[a.conductor]===terminal);
+  const compatibleTerminals=(terminalOptions.length?terminalOptions:terms).filter(t=>!selectedFamily||terminalFamily(terminalKey(t.id))===selectedFamily);
+  const spliceTargets=(sp:SpliceRecord)=>sp.pigtailTerminals?.length?sp.pigtailTerminals:(sp.pigtailTerminal?[sp.pigtailTerminal]:[]);
+  const hasPigtailTo=(terminal:string,excludeId?:string)=>splices.some(sp=>sp.id!==excludeId&&spliceTargets(sp).includes(terminal));
+  const terminalUsedByCable=(terminal:string)=>available.some(a=>
+    a.cable.ends[a.end]?.[a.conductor]===terminal ||
+    (targetDevice(terminal)===a.cable[a.end] && a.cable.ends[a.end]?.[a.conductor]===terminalKey(terminal))
+  );
+  const addSplicePigtail=(id:string,terminal:string)=>{
+    setSpliceError("");
+    const splice=splices.find(sp=>sp.id===id);
+    if(!splice||!terminal)return;
+    const family=splice.members[0]?.conductor==="ground"?"ground":splice.members[0]?.conductor==="white"?"neutral":"hot";
+    if(spliceTargets(splice).includes(terminal)){
+      setSpliceError("Choose a free, compatible terminal in this box.");return;
+    }
+    const targets=[...spliceTargets(splice),terminal];
+    saveAll((allCables??[cable]).map(c=>({...c,splices:c.splices?.map(sp=>sp.id===id?{
+      ...sp,pigtailTerminal:targets[0],pigtailTerminals:targets
+    }:sp)})));
+  };
   const updateSplicePigtail=(id:string,terminal:string)=>{
     setSpliceError("");
     const splice=splices.find(sp=>sp.id===id);
     if(!splice)return;
     const first=splice.members[0];
     const family=first?.conductor==="ground"?"ground":first?.conductor==="white"?"neutral":"hot";
-    if(terminal&&(!terms.some(t=>t.id===terminal)||terminalFamily(terminal)!==family)){
-      setSpliceError("Choose a compatible terminal for the existing splice.");return;
-    }
-    if(terminal&&(hasPigtailTo(terminal,id)||terminalUsedByCable(terminal))){
-      setSpliceError("That terminal is already occupied. Disconnect the existing wire first.");return;
-    }
     saveAll((allCables??[cable]).map(c=>({...c,splices:c.splices?.map(sp=>
-      sp.id===id?{...sp,pigtailTerminal:terminal||undefined}:sp)})));
+      sp.id===id?{...sp,pigtailTerminal:terminal||undefined,pigtailTerminals:terminal?[terminal]:[]}:sp)})));
   };
   const deviceLabel=(id:string, fallback?:string)=>{
     if(id===PANEL_SOURCE_ID)return `Panel P1 · Breaker #${cable.breakerSlot??1}`;
@@ -488,7 +551,7 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove,allCab
     if(!terminal)return "Not connected";
     if(terminal==="cap")return "Individually capped";
     if(terminal.startsWith("splice:"))return "Wire-nut splice";
-    return terms.find(t=>t.id===terminal)?.label||terminal.replaceAll("-"," ");
+    return [...terminalOptions,...terms].find(t=>t.id===terminal)?.label||terminal.replaceAll("-"," ");
   };
   const otherEnd:CableEnd=end==="from"?"to":"from";
   const wireLabels=colorsList.map(color=>{
@@ -513,13 +576,11 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove,allCab
     if(members.length<2){setSpliceError("Choose at least two loose conductors entering this same box.");return;}
     if(members.some(m=>m.cable.ends[m.end]?.[m.conductor])){setSpliceError("Disconnect or uncap selected wires before splicing.");return;}
     const families=new Set(members.map(m=>m.conductor==="ground"?"ground":m.conductor==="white"?"neutral":"hot"));
-    if(families.size!==1){setSpliceError("Only splice conductors from the same hot, neutral, or ground group.");return;}
+
     const family=[...families][0];
     const allowed=family==="ground"?["ground","ground-bar"]:family==="neutral"?["silver","neutral-bar","load-neutral","fixture-neutral"]:["line","load","common","traveler-1","traveler-2","brass","breaker-hot","load-hot","fixture-hot"];
-    if(pigtailTerminal&&!allowed.includes(pigtailTerminal)){setSpliceError("Choose a compatible terminal for the pigtail.");return;}
-    if(pigtailTerminal&&(hasPigtailTo(pigtailTerminal)||terminalUsedByCable(pigtailTerminal))){setSpliceError("That terminal is already occupied. Disconnect the existing wire first.");return;}
     const id=`splice-${Date.now()}-${Math.random().toString(36).slice(2,7)}`;
-    const splice:SpliceRecord={id,deviceId:boxId,connector,members:members.map(({cableId,end,conductor})=>({cableId,end,conductor})),...(pigtailTerminal?{pigtailTerminal}: {})};
+    const splice:SpliceRecord={id,deviceId:boxId,connector,members:members.map(({cableId,end,conductor})=>({cableId,end,conductor})),...(pigtailTerminal?{pigtailTerminal,pigtailTerminals:[pigtailTerminal]}: {})};
     saveAll((allCables??[cable]).map(c=>{
       const entries=members.filter(m=>m.cableId===c.id);
       let next={...c,ends:{from:{...c.ends.from},to:{...c.ends.to}}};
@@ -551,7 +612,7 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove,allCab
     </div>
     {fromPanel
       ? <LiveWiringDiagram cable={cable} end={end} device={dev} allCables={allCables??[cable]} front={view==="front"} onTerminate={changeConnection} onSelectConductor={setSelected} externalSelected={selected}/>
-      : <UnifiedBoxWiring device={dev} allCables={allCables??[cable]} front={view==="front"} onTerminate={changeConnection}/>}
+      : <UnifiedBoxWiring device={dev} allCables={allCables??[cable]} devices={devices} boxMounts={boxMounts} front={view==="front"} onTerminate={changeConnection}/>}
     {kind==="gfci"&&view==="rear"&&<div style={{fontSize:14,color:"#e0f3fa",marginTop:7}}>GFCI rear: top pair = LINE, lower pair = LOAD; left silver = neutral, right brass = hot. Ground is green. Follow the actual device markings when installing.</div>}
     {!fromPanel && otherBoxCables.length>0 && <div style={{marginTop:12,padding:10,border:"1px solid #368bab",borderRadius:7,background:"#102f40"}}>
       <div style={{fontWeight:800,color:"#8feaff",marginBottom:8}}>Other cables entering this box · {boxCables.length} total</div>
@@ -621,11 +682,8 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove,allCab
     </div>)}
     {!fromPanel&&<div style={{marginTop:14,padding:10,border:"1px solid #38667b",borderRadius:6}}>
       <strong style={{color:"#83e5ff"}}>Splices & Pigtails</strong>
-      <p style={{fontSize:15,margin:"6px 0"}}>For a feed-through hot: select the incoming BLACK and outgoing BLACK from different cables, choose the device hot terminal for a pigtail, then create the splice. Use the same box for both cables.</p>
-      {(kind==="switch-single"||kind==="switch-three-way")&&<div style={{fontSize:14,color:"#ffd69b",padding:"7px 0"}}>
-        Switch-box note: only splice incoming and outgoing BLACK conductors for an always-hot feed-through.
-        The switched-hot going to a controlled light must connect to the switch LOAD terminal, not to the always-hot splice.
-      </div>}
+
+
       <div style={{maxHeight:190,overflowY:"auto"}}>{available.map(a=>{
         const val=a.cable.ends[a.end]?.[a.conductor];
         return <label key={a.key} style={{display:"flex",gap:8,alignItems:"center",fontSize:15,margin:"5px 0",opacity:val?0.55:1}}>
@@ -641,13 +699,13 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove,allCab
       </label>
       <label style={{display:"block",fontSize:16,marginTop:8}}>Pigtail to device (optional)
         <select value={pigtailTerminal} onChange={e=>{setPigtailTerminal(e.target.value);setSpliceError("");}} style={{display:"block",width:"100%",padding:10,background:"#173d50",color:"white",fontSize:16}}>
-          <option value="">Join wires only — no pigtail</option>{compatibleTerminals.filter(t=>!hasPigtailTo(t.id)&&!terminalUsedByCable(t.id)).map(t=><option key={t.id} value={t.id}>{t.label}</option>)}
+          <option value="">Join wires only — no pigtail</option>{(terminalOptions.length?terminalOptions:terms).map(t=><option key={t.id} value={t.id}>{t.label}</option>)}
         </select>
       </label>
       <button type="button" disabled={spliceSelection.length<2} onClick={createSplice} style={{marginTop:8,padding:11,background:"#155c7c",color:"white",border:"1px solid #4b9fbc",borderRadius:5,fontSize:16}}>{pigtailTerminal?"Create splice + pigtail":"Join selected wires"}</button>
       {spliceError&&<div role="alert" style={{color:"#ffb2a5",fontSize:15,marginTop:7}}>{spliceError}</div>}
       {splices.map(sp=><div key={sp.id} style={{padding:"8px 0",borderBottom:"1px solid #35566a",fontSize:14}}>
-        🟠 {sp.connector} · {sp.members.length} cable conductors{sp.pigtailTerminal?` + pigtail → ${terms.find(t=>t.id===sp.pigtailTerminal)?.label??sp.pigtailTerminal}`:""}
+        🟠 {sp.connector} · {sp.members.length} conductors {spliceTargets(sp).map(t=>` + ${terminalLabel(t)}`).join("")}
         <label style={{display:"block",marginTop:7,color:"#bcefff"}}>
           Pigtail from this existing splice
           <select aria-label={`Pigtail terminal for splice ${sp.id}`}
@@ -655,14 +713,25 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove,allCab
             onChange={e=>updateSplicePigtail(sp.id,e.target.value)}
             style={{display:"block",width:"100%",padding:8,background:"#173d50",color:"white",border:"1px solid #52869d",borderRadius:4}}>
             <option value="">No pigtail</option>
-            {terms.filter(t=>terminalFamily(t.id)===(sp.members[0]?.conductor==="ground"?"ground":sp.members[0]?.conductor==="white"?"neutral":"hot"))
-              .filter(t=>t.id===sp.pigtailTerminal||(!hasPigtailTo(t.id,sp.id)&&!terminalUsedByCable(t.id)))
+            {(terminalOptions.length?terminalOptions:terms)
               .map(t=><option key={t.id} value={t.id}>{t.label}</option>)}
           </select>
         </label>
+        <label style={{display:"block",marginTop:7}}>Add another device pigtail
+          <select value="" onChange={e=>addSplicePigtail(sp.id,e.target.value)} style={{display:"block",width:"100%",padding:8,background:"#173d50",color:"white"}}>
+            <option value="">Choose a free terminal…</option>
+            {(terminalOptions.length?terminalOptions:terms)
+              .filter(t=>!spliceTargets(sp).includes(t.id))
+              .map(t=><option key={t.id} value={t.id}>{t.label}</option>)}
+          </select>
+        </label>
+        {spliceTargets(sp).length>1&&<div>{spliceTargets(sp).slice(1).map(t=><div key={t} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>{terminalLabel(t)} <button type="button" onClick={()=>{
+          const targets=spliceTargets(sp).filter(x=>x!==t);
+          saveAll((allCables??[cable]).map(c=>({...c,splices:c.splices?.map(item=>item.id===sp.id?{...item,pigtailTerminal:targets[0],pigtailTerminals:targets}:item)})));
+        }}>Remove</button></div>)}</div>}
         <button type="button" onClick={()=>removeSplice(sp.id)} style={{marginTop:7,padding:5}}>Remove splice</button>
       </div>)}
-      <p style={{fontSize:13,color:"#b7cbd5"}}>Training model: connector suitability, box fill, conductor preparation, and bonding must be checked against the actual connector/device listing. Pigtails are drawn in the device-box editor and saved as splice-to-terminal connections; they are not separate wall cable runs.</p>
+
     </div>}
     <button type="button" onClick={onRemove} style={{marginTop:8,padding:8,background:"#5d2b37",color:"#fff",border:"1px solid #a85c69",borderRadius:5}}>Remove this cable</button>
   </section>;

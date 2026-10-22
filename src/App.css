@@ -486,3 +486,48 @@
 .nova-panel-zoom-toolbar button:hover,.nova-panel-zoom-toolbar .nova-panel-pan-active {background:#1a7596;border-color:#7ce7ff;}
 .nova-panel-zoom-toolbar span {font-variant-numeric:tabular-nums;min-width:54px;text-align:center;}
 .nova-panel-viewport {border:1px solid #397b99;border-radius:6px;background:#173847;}
+
+
+/* Stage Y: make Service & Breaker Controls match the other unified sidebar panels. */
+.nova-double-text-sidebar > .nova-unified-service-panel,
+.nova-double-text-sidebar .nova-unified-service-panel {
+  display:block !important;
+  box-sizing:border-box !important;
+  width:100% !important;
+  margin:0 0 8px !important;
+  padding:0 !important;
+  border:1px solid #397e99 !important;
+  border-radius:6px !important;
+  background:#193e50 !important;
+  overflow:hidden !important;
+}
+.nova-double-text-sidebar .nova-unified-service-panel > summary {
+  display:block !important;
+  box-sizing:border-box !important;
+  position:relative !important;
+  list-style:none !important;
+  width:100% !important;
+  min-height:55px !important;
+  margin:0 !important;
+  padding:10px 12px 10px 38px !important;
+  border:0 !important;
+  border-radius:0 !important;
+  background:#193e50 !important;
+  color:#8eeaff !important;
+  font-size:32px !important;
+  font-weight:700 !important;
+  line-height:1.35 !important;
+  cursor:pointer !important;
+}
+.nova-double-text-sidebar .nova-unified-service-panel > summary::-webkit-details-marker {display:none !important;}
+.nova-double-text-sidebar .nova-unified-service-panel > summary::marker {content:"" !important;}
+.nova-double-text-sidebar .nova-unified-service-panel > summary::before {
+  content:"▶";
+  position:absolute;
+  left:12px;
+  top:13px;
+  color:#83ddf5;
+  font-size:20px;
+}
+.nova-double-text-sidebar .nova-unified-service-panel[open] > summary::before {content:"▼";}
+.nova-double-text-sidebar .nova-unified-service-panel > summary:hover {background:#23536a !important;}

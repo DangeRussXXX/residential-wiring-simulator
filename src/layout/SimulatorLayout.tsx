@@ -676,7 +676,7 @@ export default function SimulatorLayout() {
                 </div>
               </details>
             </div>
-            {showService && !showElectricalService && <details open={showPanelControls} onToggle={e => setShowPanelControls(e.currentTarget.open)}>
+            {showService && !showElectricalService && <details className="nova-unified-service-panel" open={showPanelControls} onToggle={e => setShowPanelControls(e.currentTarget.open)}>
               <summary>Service & Breaker Controls</summary>
               <div className="nova-control-body" ref={setServiceControlsTarget} />
             </details>}

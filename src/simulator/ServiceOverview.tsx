@@ -87,13 +87,8 @@ export default function ServiceOverview({ project, onChange, onOpenDestination, 
     onChange({...project, distributionPanel:{...panel, breakers:slots.map(s=>s.slot===position&&s.breaker?{...s,breaker:{...s.breaker,status,energized:status==="ON",tripped:status==="TRIPPED"}}:s)}});
   };
   return <div className="nova-double-text-service" style={{ color: "#e9f7ff", width: "100%", minWidth: 0, boxSizing: "border-box" }}>
-    <div style={{display:"flex",gap:8,alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",marginBottom:14}}>
-      <h2 style={{margin:0,color:"#79e2ff"}}>⚡ Service & Panel Workspace</h2>
-
-    </div>
     <div style={{display:"grid",gridTemplateColumns:"minmax(0, 1fr)",gap:16,alignItems:"start",width:"100%"}} className="nova-service-grid">
       <div style={{minWidth:0,alignSelf:"start"}}>
-        <h3 style={{color:"#79e2ff",margin:"0 0 10px"}}>Main Distribution Panel</h3>
         {panelView === "realistic" ? <RealisticPanel
           slots={slots}
           selected={selected}

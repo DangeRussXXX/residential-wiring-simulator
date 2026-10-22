@@ -40,7 +40,28 @@ export default function RealisticPanel({ slots, selected, assignments, onSelect,
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const panStart = useRef<{x:number;y:number;left:number;top:number}|null>(null);
   const clampZoom = (value:number) => Math.max(0.35, Math.min(3, value));
+  // Default to fitting the panel's WIDTH to its workspace, not the
+  // fixed 600px SVG width. Leave zoom and pan under user control afterward.
+  const [autoWidth, setAutoWidth] = useState(true);
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport || !autoWidth) return;
+    const resize = () => {
+      const usable = viewport.clientWidth - 2;
+      if (usable > 0) {
+        setZoom(clampZoom(usable / 600));
+        viewport.scrollLeft = 0;
+        viewport.scrollTop = 0;
+      }
+    };
+    resize();
+    const observer = new ResizeObserver(resize);
+    observer.observe(viewport);
+    return () => observer.disconnect();
+  }, [autoWidth]);
+
   const setPanelZoom = (value:number) => {
+    setAutoWidth(false);
     const viewport = viewportRef.current;
     const next = clampZoom(value);
     if (viewport) {
@@ -56,6 +77,7 @@ export default function RealisticPanel({ slots, selected, assignments, onSelect,
     setZoom(next);
   };
   const fitPanel = () => {
+    setAutoWidth(false);
     const viewport = viewportRef.current;
     if (!viewport) return;
     const next = clampZoom(Math.min(viewport.clientWidth / 600, viewport.clientHeight / (365 + Math.ceil(slots.length / 2) * 49)));
@@ -83,11 +105,12 @@ export default function RealisticPanel({ slots, selected, assignments, onSelect,
       <button type="button" onClick={()=>setPanelZoom(zoom/1.25)} aria-label="Zoom out">−</button>
       <span aria-live="polite">{Math.round(zoom*100)}%</span>
       <button type="button" onClick={()=>setPanelZoom(zoom*1.25)} aria-label="Zoom in">+</button>
+      <button type="button" onClick={()=>{setAutoWidth(true);const viewport=viewportRef.current;if(viewport){viewport.scrollLeft=0;viewport.scrollTop=0;}}}>Fill Width</button>
       <button type="button" onClick={fitPanel}>Fit</button>
       <button type="button" onClick={()=>setPanelZoom(1)}>100%</button>
       <button type="button" aria-pressed={panMode} onClick={()=>setPanMode(v=>!v)} className={panMode?"nova-panel-pan-active":""}>Pan {panMode?"ON":"OFF"}</button>
     </div>
-    <div ref={viewportRef} className="nova-panel-viewport" style={{height:"min(72vh, 740px)",overflow:"auto",cursor:panMode?"grab":"auto",touchAction:panMode?"none":"auto"}}
+    <div ref={viewportRef} className="nova-panel-viewport" style={{height:"calc(100dvh - 194px)",minHeight:420,overflow:"auto",cursor:panMode?"grab":"auto",touchAction:panMode?"none":"auto"}}
       onWheel={e=>{if(e.ctrlKey){e.preventDefault();setPanelZoom(zoom*(e.deltaY>0?0.9:1.1));}}}
       onPointerDown={e=>{if(!panMode||e.button!==0)return;panStart.current={x:e.clientX,y:e.clientY,left:e.currentTarget.scrollLeft,top:e.currentTarget.scrollTop};e.currentTarget.setPointerCapture(e.pointerId);e.preventDefault();}}
       onPointerMove={e=>{if(!panMode||!panStart.current)return;e.currentTarget.scrollLeft=panStart.current.left-(e.clientX-panStart.current.x);e.currentTarget.scrollTop=panStart.current.top-(e.clientY-panStart.current.y);}}

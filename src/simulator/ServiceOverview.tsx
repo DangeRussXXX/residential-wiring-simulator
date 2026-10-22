@@ -127,7 +127,8 @@ export default function ServiceOverview({ project, onChange, onOpenDestination, 
         </div>
         {accordion("connections", "Service Connections · Lugs & Feeder", <ServiceConnectionView project={project} />)}
 
-    {breakerLibraryTarget ? createPortal(<div className="nova-breaker-library-subpanel">{accordion("install", "Breaker Library · Drag into Empty Slots", <>
+    {breakerLibraryTarget
+      ? createPortal(<div className="nova-breaker-library-subpanel">{accordion("install", "Breaker Library · Drag into Empty Slots", <>
       <div style={{border:"1px solid #376a84",padding:12,borderRadius:8,marginBottom:12}}>
         <strong style={{color:"#8be4ff"}}>Main Breaker Library — Dedicated Main Position</strong>
         <p style={{fontSize:12,color:"#b6cfdd"}}>Optional distribution-panel main breaker. This is separate from your existing upstream 200A service disconnect. Select a rating or drag the main-breaker card to the dedicated MAIN position on the realistic panel.</p>
@@ -151,7 +152,8 @@ export default function ServiceOverview({ project, onChange, onOpenDestination, 
           <span><strong>{item.amps}A</strong><br/><span style={{fontSize:11}}>{item.kind.replace("_"," ")}</span></span>
         </button>)}
       </div>
-    </>)}}</div>, breakerLibraryTarget) : {accordion("install", "Breaker Library · Drag into Empty Slots", <>
+    </>)}</div>, breakerLibraryTarget)
+      : accordion("install", "Breaker Library · Drag into Empty Slots", <>
       <div style={{border:"1px solid #376a84",padding:12,borderRadius:8,marginBottom:12}}>
         <strong style={{color:"#8be4ff"}}>Main Breaker Library — Dedicated Main Position</strong>
         <p style={{fontSize:12,color:"#b6cfdd"}}>Optional distribution-panel main breaker. This is separate from your existing upstream 200A service disconnect. Select a rating or drag the main-breaker card to the dedicated MAIN position on the realistic panel.</p>
@@ -175,8 +177,9 @@ export default function ServiceOverview({ project, onChange, onOpenDestination, 
           <span><strong>{item.amps}A</strong><br/><span style={{fontSize:11}}>{item.kind.replace("_"," ")}</span></span>
         </button>)}
       </div>
-    </>)}
-}
+    </>)
+    }
+
     {accordion("selected", `Selected Breaker · Position ${selected}`, <>          <h3 style={{ color: "#86e1ff" }}>Selected position {selected}</h3>
           {active?.breaker ? <>
             <div style={{ marginBottom: 12 }}>{active.breaker.amperage}A · {active.breaker.poles}-pole · {active.breaker.breakerType}</div>

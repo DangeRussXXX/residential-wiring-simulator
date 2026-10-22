@@ -3,8 +3,7 @@ import EndToEndCircuitLab from "./EndToEndCircuitLab";
 import RealisticPanel from "./RealisticPanel";
 import ServiceConnectionView from "./ServiceConnectionView";
 import BreakerWiringPopup from "./BreakerWiringPopup";
-import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
+import { useState } from "react";
 import type { ServiceProject } from "./projectWorkflow";
 import { createBreakerPanel, installBreaker, removeBreaker } from "../electrical/breakerPanel";
 import { createBreaker, type BreakerType } from "../electrical/breaker";
@@ -13,13 +12,13 @@ const frame: React.CSSProperties = { background: "#101b27", border: "1px solid #
 const button: React.CSSProperties = { background: "#163c52", border: "1px solid #397b99", color: "#e7f7ff", borderRadius: 6, padding: "8px 12px", cursor: "pointer" };
 const field: React.CSSProperties = { background: "#0b1824", color: "white", border: "1px solid #397b99", borderRadius: 5, padding: 8, maxWidth: "100%" };
 
-export default function ServiceOverview({ project, onChange, onOpenDestination, controlsTarget, expandRevision, expandAll }: { project: ServiceProject; onChange: (next: ServiceProject) => void; onOpenDestination?: (areaId: string, wall: "NORTH" | "SOUTH" | "EAST" | "WEST") => void; controlsTarget?: HTMLElement | null; expandRevision?: number; expandAll?: boolean }) {
+export default function ServiceOverview({ project, onChange, onOpenDestination }: { project: ServiceProject; onChange: (next: ServiceProject) => void; onOpenDestination?: (areaId: string, wall: "NORTH" | "SOUTH" | "EAST" | "WEST") => void }) {
   const panelSections = ["connections", "install", "selected", "routing", "labs", "circuits"] as const;
   type SectionId = typeof panelSections[number];
-  const [expanded, setExpanded] = useState<Record<SectionId, boolean>>({ connections: false, install: false, selected: false, routing: false, labs: false, circuits: false });
-  useEffect(() => { if (expandRevision) setExpanded(Object.fromEntries(panelSections.map(id => [id, !!expandAll])) as Record<SectionId, boolean>); }, [expandRevision, expandAll]);
+  const [expanded, setExpanded] = useState<Record<SectionId, boolean>>({ connections: false, install: false, selected: true, routing: true, labs: false, circuits: false });
   const toggle = (id: SectionId) => setExpanded(p => ({...p, [id]: !p[id]}));
-  const accordion = (id: SectionId, label: string, content: React.ReactNode) => <details open={expanded[id]} onToggle={e => { if (e.currentTarget.open !== expanded[id]) toggle(id); }} className="nova-service-section"><summary>{label}</summary>{expanded[id] && <div className="nova-control-body">{content}</div>}</details>;
+  const sectionHeader = (id: SectionId, label: string) => <button type="button" aria-expanded={expanded[id]} onClick={() => toggle(id)} style={{...button, width:"100%", textAlign:"left", display:"flex", justifyContent:"space-between", alignItems:"center", background:"#12283a", padding:"12px 14px", fontWeight:700, fontSize:17, color:"#7fe3ff"}}><span>{label}</span><span aria-hidden="true">{expanded[id] ? "▾" : "▸"}</span></button>;
+  const accordion = (id: SectionId, label: string, content: React.ReactNode) => <section style={{...frame,padding:10}}>{sectionHeader(id,label)}{expanded[id] && <div style={{padding:"14px 6px 4px"}}>{content}</div>}</section>;
   const [panelView, setPanelView] = useState<"realistic" | "schematic">("realistic");
   const [slot, setSlot] = useState(1);
   const [draggedBreaker, setDraggedBreaker] = useState<{ amps: number; poles: 1 | 2; kind: BreakerType } | null>(null);
@@ -86,13 +85,16 @@ export default function ServiceOverview({ project, onChange, onOpenDestination, 
     if (target.status === "TRIPPED" && status === "ON") return;
     onChange({...project, distributionPanel:{...panel, breakers:slots.map(s=>s.slot===position&&s.breaker?{...s,breaker:{...s.breaker,status,energized:status==="ON",tripped:status==="TRIPPED"}}:s)}});
   };
-  return <div className="nova-double-text-service" style={{ color: "#e9f7ff", width: "100%", minWidth: 0, boxSizing: "border-box" }}>
+  return <div style={{ color: "#e9f7ff", width: "100%", minWidth: 0, boxSizing: "border-box" }}>
     <div style={{display:"flex",gap:8,alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",marginBottom:14}}>
       <h2 style={{margin:0,color:"#79e2ff"}}>⚡ Service & Panel Workspace</h2>
-
+      <div role="group" aria-label="Panel view" style={{display:"flex",gap:8}}>
+        <button type="button" aria-pressed={panelView==="schematic"} style={{...button,background:panelView==="schematic"?"#17658b":"#142c3b"}} onClick={()=>setPanelView("schematic")}>Schematic View</button>
+        <button type="button" aria-pressed={panelView==="realistic"} style={{...button,background:panelView==="realistic"?"#17658b":"#142c3b"}} onClick={()=>setPanelView("realistic")}>Realistic Panel View</button>
+      </div>
     </div>
-    <div style={{display:"grid",gridTemplateColumns:"minmax(0, 1fr)",gap:16,alignItems:"start",width:"100%"}} className="nova-service-grid">
-      <div style={{minWidth:0,alignSelf:"start",width:"100%",maxWidth:820,marginInline:"auto"}}>
+    <div style={{display:"grid",gridTemplateColumns:"minmax(400px, 1.6fr) minmax(360px, .85fr)",gap:16,alignItems:"start",width:"100%"}} className="nova-service-grid">
+      <div style={{minWidth:0,alignSelf:"start"}}>
         <h3 style={{color:"#79e2ff",margin:"0 0 10px"}}>Main Distribution Panel</h3>
         {panelView === "realistic" ? <RealisticPanel
           slots={slots}
@@ -125,10 +127,13 @@ export default function ServiceOverview({ project, onChange, onOpenDestination, 
         </div>}
 
       </div>
-      {controlsTarget && createPortal(<div className="nova-service-sidebar-controls" style={{minWidth:0,display:"flex",flexDirection:"column",gap:8}}>
-        <div role="group" aria-label="Panel view" style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-          <button type="button" aria-pressed={panelView==="schematic"} style={{...button,background:panelView==="schematic"?"#17658b":"#142c3b"}} onClick={()=>setPanelView("schematic")}>Schematic View</button>
-          <button type="button" aria-pressed={panelView==="realistic"} style={{...button,background:panelView==="realistic"?"#17658b":"#142c3b"}} onClick={()=>setPanelView("realistic")}>Realistic Panel View</button>
+      <div style={{minWidth:0,display:"flex",flexDirection:"column",gap:8}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:6}}>
+          <strong style={{color:"#79e2ff",fontSize:18}}>Service & Breaker Controls</strong>
+          <div style={{display:"flex",gap:8}}>
+            <button style={button} onClick={()=>setExpanded(()=>Object.fromEntries(panelSections.map(id=>[id,true])) as Record<SectionId,boolean>)}>Show All</button>
+            <button style={button} onClick={()=>setExpanded(()=>Object.fromEntries(panelSections.map(id=>[id,false])) as Record<SectionId,boolean>)}>Hide All</button>
+          </div>
         </div>
         {accordion("connections", "Service Connections · Lugs & Feeder", <ServiceConnectionView project={project} />)}
 
@@ -244,7 +249,7 @@ export default function ServiceOverview({ project, onChange, onOpenDestination, 
     {accordion("circuits", "Project Circuit Directory", <><h3 style={{ marginTop: 0, color: "#86e1ff" }}>Project Circuit Directory</h3>
       {slots.filter(s => s.breaker).length === 0 ? <p>No breakers installed yet.</p> : slots.filter(s => s.breaker).map(s => <div key={s.slot} style={{ padding: "9px 0", borderBottom: "1px solid #2e4b5c" }}><strong>#{s.slot} · {s.breaker?.amperage}A</strong> — {assignments.find(a => a.slot === s.slot)?.name || "Unassigned"}<div style={{ fontSize: 12, color: "#99b9c8" }}>{(assignments.find(a => a.slot === s.slot)?.areaIds ?? []).map(id => project.areas.find(a => a.id === id)?.name).filter(Boolean).join(", ") || "No rooms assigned"}</div></div>)}
     </>)}
-      </div>, controlsTarget)}
+      </div>
     </div>
     {wiringPopup&&<BreakerWiringPopup key={`${selected}-${wiringPopup}`} project={project} slot={selected} mode={wiringPopup} onChange={onChange} onClose={()=>setWiringPopup(null)} />}
     <style>{`@media (max-width: 1050px) { .nova-service-grid { grid-template-columns: minmax(0,1fr) !important; } }`}</style>

@@ -51,16 +51,15 @@ export default function RealisticPanel({ slots, selected, assignments, onSelect,
   });
   const rows = Math.ceil(slots.length / 2);
   const height = 365 + rows * 49;
-  return <div style={{position:"relative",background:"#0b141e",border:"2px solid #526879",borderRadius:12,padding:10,overflowX:"auto"}}>
+  return <div style={{position:"relative",background:"#102d3e",border:"2px solid #247a9c",borderRadius:12,padding:10,overflowX:"auto"}}>
     <svg viewBox={`0 0 600 ${height}`} role="img" aria-label="Interactive simulated distribution panel with feeder terminals, breakers, neutral and ground bars" style={{width:"100%",height:"auto",minWidth:300}}>
       <defs>
-        <linearGradient id="novaPanelSteel" x1="0" x2="1"><stop stopColor="#5a6269"/><stop offset=".15" stopColor="#303a42"/><stop offset=".85" stopColor="#252f37"/><stop offset="1" stopColor="#747d84"/></linearGradient>
+        <linearGradient id="novaPanelSteel" x1="0" x2="1"><stop stopColor="#698da1"/><stop offset=".15" stopColor="#3b647a"/><stop offset=".85" stopColor="#31566b"/><stop offset="1" stopColor="#7899a8"/></linearGradient>
         <linearGradient id="novaBreakerFace" x1="0" x2="1"><stop stopColor="#10151b"/><stop offset=".5" stopColor="#303941"/><stop offset="1" stopColor="#0a1016"/></linearGradient>
       </defs>
       <rect x="7" y="7" width="586" height={height-14} rx="14" fill="url(#novaPanelSteel)" stroke="#9caab5" strokeWidth="6"/>
-      <rect x="24" y="25" width="552" height={height-50} rx="7" fill="#1a252e" stroke="#6e7e88" strokeWidth="3"/>
-      {Array.from({length:5},(_,i)=><g key={i}><circle cx={62+i*115} cy="41" r="13" fill="#101921" stroke="#8a969d" strokeWidth="3"/><circle cx={62+i*115} cy={height-40} r="13" fill="#101921" stroke="#8a969d" strokeWidth="3"/></g>)}
-      <text x="300" y="100" textAnchor="middle" fill="#a9c3d3" fontSize="11">FEEDER FROM SEPARATE SERVICE DISCONNECT</text>
+      <rect x="24" y="25" width="552" height={height-50} rx="7" fill="#24485c" stroke="#5b9bb7" strokeWidth="3"/>
+      {Array.from({length:5},(_,i)=><g key={i}><circle cx={62+i*115} cy="41" r="13" fill="#102e40" stroke="#91b9ca" strokeWidth="3"/><circle cx={62+i*115} cy={height-40} r="13" fill="#102e40" stroke="#91b9ca" strokeWidth="3"/></g>)}
       <g aria-label="Incoming feeder conductors">
         <path d="M 205 36 V 142" fill="none" stroke="#20272b" strokeWidth="16"/><path d="M 395 36 V 142" fill="none" stroke="#cf3035" strokeWidth="15"/>
         <path d="M 114 36 V 187 H 75 V 275" fill="none" stroke="#e3e4e2" strokeWidth="12"/>
@@ -168,7 +167,6 @@ export default function RealisticPanel({ slots, selected, assignments, onSelect,
           <title>{`Breaker #${wire.slot}: ${wire.conductor} → ${wire.terminal}${valid?"":" (check termination)"}`}</title>
         </g>;
       })}
-      <text x="300" y={height-18} textAnchor="middle" fill="#a9c8d9" fontSize="11">Select a position • Drag a training breaker into an empty slot</text>
     </svg>
     {infoEnabled && activeInfo && <div role="status" aria-live="polite" style={{position:"fixed",right:24,bottom:24,margin:0,width:"min(360px,95%)",background:"#0c2638",border:"2px solid #38bde8",borderRadius:10,boxShadow:"0 8px 28px #000a",padding:14,zIndex:20,color:"#edf8ff",fontSize:13}}>
       <div style={{display:"flex",alignItems:"start",justifyContent:"space-between",gap:8}}><strong style={{color:"#6ee6ff",fontSize:15}}>{activeInfo.title}</strong><button type="button" aria-label="Close component information" onClick={hideInfo} style={{background:"transparent",color:"#fff",border:"1px solid #5a8ba3",borderRadius:4,cursor:"pointer"}}>✕</button></div>
@@ -176,6 +174,5 @@ export default function RealisticPanel({ slots, selected, assignments, onSelect,
       <p style={{margin:"5px 0"}}><b>What does it do?</b> {activeInfo.purpose}</p>
       <p style={{margin:"5px 0 0",color:"#b6e3f5"}}><b>Classroom tip:</b> {activeInfo.tip}</p>
     </div>}
-    <p style={{fontSize:12,color:"#b6cbd6",margin:"8px 0 0"}}>Incoming L1, L2, neutral, and equipment-ground conductors are illustrated. Optional main breaker is a training-only component. Illustrated practice view, not a manufacturer-accurate panel. The actual feeder and bus connections are not electrically simulated here. Select a breaker, then use Circuit Routing & Wiring to open its wiring and troubleshooting tools.</p>
   </div>;
 }

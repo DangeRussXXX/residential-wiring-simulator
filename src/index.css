@@ -264,18 +264,3 @@ hr {
 /* Update 35: readable workspace controls */
 .nova-wall-controls { font-size: 14px; line-height: 1.35; }
 .nova-wall-controls button, .nova-wall-controls select, .nova-wall-controls input { min-height: 42px; }
-
-/* Update 84 Stage F: legible control columns without changing wall device graphics. */
-.nova-unified-controls {font-size:17px;line-height:1.5;}
-.nova-unified-controls summary {font-size:19px;line-height:1.45;}
-.nova-unified-controls .nova-control-body,
-.nova-unified-controls .nova-control-body * {font-size:inherit;}
-.nova-unified-controls button,
-.nova-unified-controls input,
-.nova-unified-controls select,
-.nova-unified-controls label {font-size:16px;line-height:1.45;}
-.nova-wall-controls {font-size:17px;line-height:1.5;}
-.nova-wall-controls summary {font-size:19px;}
-.nova-wall-controls button,
-.nova-wall-controls select,
-.nova-wall-controls input {font-size:16px;}

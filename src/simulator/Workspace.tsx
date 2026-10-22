@@ -1,3 +1,4 @@
+import { electricalBoxes, type InstalledBox } from "../electrical/boxCatalog";
 // Residential Wiring Simulator v2.6
 // Main simulator workspace
 //
@@ -58,7 +59,7 @@ import type {
 
 export type WorkspaceHandle = {
 
-  addBox: (boxType: string, x?: number, y?: number) => void;
+  addBox: (boxTypeId:string, x?:number, y?:number)=>void;
 
   addDevice:
   (
@@ -133,48 +134,27 @@ function Workspace(
   } = useSimulator();
 
 
+  // Boxes are persisted separately so Update 82 device/wire records remain intact.
+  const [installedBoxes,setInstalledBoxes] = useState<InstalledBox[]>(()=>{
+    try {return JSON.parse(localStorage.getItem(`rws-installed-boxes:${workspaceScope}`)||"[]");} catch {return [];}
+  });
+  const [selectedBoxId,setSelectedBoxId] = useState<string|null>(null);
+  useEffect(()=>{
+    try {setInstalledBoxes(JSON.parse(localStorage.getItem(`rws-installed-boxes:${workspaceScope}`)||"[]"));}catch{setInstalledBoxes([]);}
+    setSelectedBoxId(null);
+  },[workspaceScope]);
+  useEffect(()=>{try{localStorage.setItem(`rws-installed-boxes:${workspaceScope}`,JSON.stringify(installedBoxes));}catch{}},[installedBoxes,workspaceScope]);
+  function addBox(boxTypeId:string,x=150,y=200){
+    const definition=electricalBoxes.find(b=>b.id===boxTypeId);
+    if(!definition)return;
+    const next={id:crypto.randomUUID(),boxTypeId,x,y,deviceIds:[]};
+    setInstalledBoxes(prev=>[...prev,next]);setSelectedBoxId(next.id);
+    setPlacementMessage(`Installed ${definition.name}. Select a device in the Component Library to install it.`);
+  }
+
   // ==========================================================
   // LOCAL WORKSPACE STATE
   // ==========================================================
-
-  // Update 84A: boxes are independent wall fixtures; no device or wire state is modified.
-  type WallBox = { id: string; kind: string; gangs: number; x: number; y: number };
-  const [wallBoxes, setWallBoxes] = useState<WallBox[]>(() => {
-    try { return JSON.parse(localStorage.getItem(`rws-empty-boxes:${workspaceScope}`) || "[]") as WallBox[]; }
-    catch { return []; }
-  });
-  // Box membership is separate from electrical device records. Terminals and IDs stay intact.
-  type BoxMount = { boxId: string; gang: number };
-  const [boxMounts, setBoxMounts] = useState<Record<string, BoxMount>>(() => {
-    try { return JSON.parse(localStorage.getItem(`rws-box-mounts:${workspaceScope}`) || "{}"); }
-    catch { return {}; }
-  });
-  useEffect(() => {
-    try { localStorage.setItem(`rws-box-mounts:${workspaceScope}`, JSON.stringify(boxMounts)); } catch { /* storage disabled */ }
-  }, [boxMounts, workspaceScope]);
-  const [selectedBoxId, setSelectedBoxId] = useState<string | null>(null);
-  // Wiring pop-outs are workspace views, not additional wall installations.
-  const [openBoxWiringViews, setOpenBoxWiringViews] = useState<Record<string, boolean>>({});
-  const [movingBoxId, setMovingBoxId] = useState<string | null>(null);
-  useEffect(() => {
-    try { localStorage.setItem(`rws-empty-boxes:${workspaceScope}`, JSON.stringify(wallBoxes)); } catch { /* storage disabled */ }
-  }, [wallBoxes, workspaceScope]);
-  useEffect(() => {
-    try { setWallBoxes(JSON.parse(localStorage.getItem(`rws-empty-boxes:${workspaceScope}`) || "[]")); }
-    catch { setWallBoxes([]); }
-    setSelectedBoxId(null);
-    setOpenBoxWiringViews({});
-    try { setBoxMounts(JSON.parse(localStorage.getItem(`rws-box-mounts:${workspaceScope}`) || "{}")); }
-    catch { setBoxMounts({}); }
-  }, [workspaceScope]);
-  const installEmptyBox = (kind: string, x = 240, y = 300) => {
-    const gangs = Math.max(1, Math.min(6, Number(kind.match(/(\d+)-gang/i)?.[1] || 1)));
-    setWallBoxes(prev => [...prev, { id: `box-${Date.now()}-${Math.random().toString(36).slice(2,7)}`, kind, gangs, x, y }]);
-  };
-  const boxWidth = (gangs: number) => 58 + (gangs - 1) * 52;
-  const selectedWallBox = wallBoxes.find(box => box.id === selectedBoxId);
-  const boxHeightInches = (y: number) => Math.round(Math.max(0, Math.min(120, (1105 - y) / 8)) * 10) / 10;
-
 
   // Shared front/rear selection for the wall device and panel wiring editor.
   // Keep this state in Workspace so both views receive the same value.
@@ -326,8 +306,8 @@ function Workspace(
   },[workspaceScope,deviceStuds,heightConfirmed]);
   const [placementMessage,setPlacementMessage] = useState("");
   const [rightPanelTarget,setRightPanelTarget] = useState<HTMLElement|null>(null);
-  const [wallControlsOpen,setWallControlsOpen] = useState(false);
-  const [deviceInstallationOpen,setDeviceInstallationOpen] = useState(false);
+  const [wallControlsOpen,setWallControlsOpen] = useState(true);
+  const [deviceInstallationOpen,setDeviceInstallationOpen] = useState(true);
   useEffect(() => {
     const target = document.getElementById("rws-wall-tools-panel-target");
     setRightPanelTarget(target);
@@ -431,8 +411,7 @@ function Workspace(
   function createDevice(
     name: string,
     dropX: number = 150,
-    dropY: number = 120,
-    mount?: BoxMount
+    dropY: number = 120
   ) {
 
     const definition =
@@ -548,8 +527,17 @@ function Workspace(
     };
 
 
+    const targetBox=installedBoxes.find(b=>b.id===selectedBoxId);
+    const boxDef=targetBox&&electricalBoxes.find(b=>b.id===targetBox.boxTypeId);
+    if(targetBox && boxDef){
+      if(boxDef.gangs===0){setPlacementMessage("This fixture/junction box has no device gang positions.");return;}
+      if(targetBox.deviceIds.length>=boxDef.gangs){setPlacementMessage("This electrical box has no free gang positions.");return;}
+      const slot=targetBox.deviceIds.length;
+      device.x=targetBox.x+slot*110;
+      device.y=targetBox.y;
+      setInstalledBoxes(prev=>prev.map(b=>b.id===targetBox.id?{...b,deviceIds:[...b.deviceIds,device.id]}:b));
+    }
     setDevices(prev => [...prev, device]);
-    if (mount) setBoxMounts(prev => ({...prev, [device.id]: mount}));
     const pitch = studSpacing * 8;
     const stud = Math.round((dropX + 6 - 13) / pitch);
     setDeviceStuds(prev => ({...prev,[device.id]:stud}));
@@ -606,7 +594,7 @@ function Workspace(
     ref,
     () => ({
 
-      addBox: installEmptyBox,
+      addBox,
 
       addDevice:
         createDevice,
@@ -1770,28 +1758,8 @@ function Workspace(
     e.preventDefault();
 
 
-    const boxType = e.dataTransfer.getData("novaEmptyBox");
-    if (boxType) {
-      const bounds = e.currentTarget.getBoundingClientRect();
-      const x = e.clientX - bounds.left + e.currentTarget.scrollLeft;
-      const y = e.clientY - bounds.top + e.currentTarget.scrollTop;
-      const pitch = studSpacing * 8;
-      const nearest = Math.max(0, Math.round((x - 13) / pitch));
-      const studX = nearest * pitch + 13;
-      if (Math.abs(x - studX) > 26) {
-        setPlacementMessage("Drop the electrical box directly on a stud, just like a device.");
-        return;
-      }
-      const gangs = Math.max(1, Math.min(6, Number(boxType.match(/(\d+)-gang/i)?.[1] || 1)));
-      const id = `box-${Date.now()}-${Math.random().toString(36).slice(2,7)}`;
-      setWallBoxes(prev => [...prev, { id, kind: boxType, gangs, x: studX - 6, y: Math.max(30, Math.min(1100, y)) }]);
-      setSelectedBoxId(id);
-      setSelectedDevice(null);
-      setSelectedStud(nearest);
-      setPlacementMessage("");
-      return;
-    }
-
+    const boxType=e.dataTransfer.getData("electricalBoxType");
+    if(boxType){const rect=e.currentTarget.getBoundingClientRect();addBox(boxType,e.clientX-rect.left,e.clientY-rect.top);return;}
     const componentName =
       e.dataTransfer.getData(
         "componentType"
@@ -1824,12 +1792,12 @@ function Workspace(
     const pitch=studSpacing*8;
     const nearest=Math.round((x-13)/pitch);
     const studX=nearest*pitch+13;
-    if(Math.abs(x-studX)>26) {
+    if(!selectedBoxId && Math.abs(x-studX)>26) {
       setPlacementMessage("Drop the component directly on a stud to place it.");
       return;
     }
     setPlacementMessage("");
-    createDevice(componentName,studX-6,y);
+    createDevice(componentName,selectedBoxId?x:studX-6,y);
 
   }
 
@@ -1879,18 +1847,7 @@ function Workspace(
             <summary>Device Installation</summary>
             <div className="nova-wall-tools-combined">
             <div style={{display:"flex",flexDirection:"column",gap:8,paddingTop:8}}>
-              <div>Selected: {selectedWallBox ? selectedWallBox.kind : selectedDevice ? selectedDevice.name || selectedDevice.type : "Drag a component or box onto a stud"}</div>
-              {selectedWallBox && <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",padding:"6px 8px",border:"1px solid #7a9aab",borderRadius:6,background:"#f5f8fa",color:"#172b36",fontSize:12}}>
-                <strong>{selectedWallBox.kind}</strong>
-                <span>Stud #{Math.max(1,Math.round((selectedWallBox.x+6-13)/(studSpacing*8))+1)}</span>
-                <label>Height (in)
-                  <input aria-label="Electrical box mounting height in inches" type="number" min="0" max="120" step="0.5"
-                    value={boxHeightInches(selectedWallBox.y)}
-                    onChange={e=>{const height=Number(e.target.value);if(e.target.value!=="" && Number.isFinite(height) && height>=0 && height<=120) setWallBoxes(prev=>prev.map(b=>b.id===selectedWallBox.id?{...b,y:Math.max(30,Math.min(1100,1105-height*8))}:b));}}
-                    style={{width:65,marginLeft:4}} />
-                </label>
-                <button type="button" onClick={()=>{if(Object.values(boxMounts).some(m=>m.boxId===selectedWallBox.id)){setPlacementMessage("Remove installed devices before deleting this box.");return;}setWallBoxes(prev=>prev.filter(b=>b.id!==selectedWallBox.id));setSelectedBoxId(null);}}>Remove Box</button>
-              </div>}
+              <div>Selected: {selectedDevice ? selectedDevice.name || selectedDevice.type : "Drag a component onto a stud"}</div>
               {placementMessage && <div role="status" style={{color:"#ffd3a3"}}>{placementMessage}</div>}
               {selectedDevice && <div style={{color:"#8fe9ff"}}>Drop stud: {deviceStuds[selectedDevice.id]===undefined?"not assigned":`#${deviceStuds[selectedDevice.id]+1}`} · {nailedDevices[selectedDevice.id]?"Installed":heightConfirmed[selectedDevice.id]?"Ready to hammer":"Enter height to enable hammer"}</div>}
                       <span title="Click a stud on the wall to highlight it before installing a device"
@@ -1943,7 +1900,6 @@ function Workspace(
                   if(!window.confirm(`Remove ${selectedDevice.name||selectedDevice.type} from this wall${attached?" and delete its connected wires":""}?`))return;
                   checkpoint();
                   setDevices(prev=>prev.filter(d=>d.id!==selectedDevice.id));
-                  setBoxMounts(prev=>{const next={...prev};delete next[selectedDevice.id];return next;});
                   saveCables(cables.filter(c=>c.from!==selectedDevice.id&&c.to!==selectedDevice.id));
                   setConnections(prev=>prev.filter(c=>c.from.deviceId!==selectedDevice.id&&c.to.deviceId!==selectedDevice.id));
                   setWires(prev=>prev.filter(w=>w.from.deviceId!==selectedDevice.id&&w.to.deviceId!==selectedDevice.id));
@@ -1959,7 +1915,7 @@ function Workspace(
             </div>
             </div>
           </details>
-          <details className="nova-panel-section">
+          <details open className="nova-panel-section">
             <summary style={{cursor:"pointer",fontWeight:700,color:"#8ee7ff"}}>New Wire Tool · Cable Wiring</summary>
             <div style={{paddingTop:8,display:"flex",flexDirection:"column",gap:8}}>
               <div>Click a device's connection dot, or start a home run from Panel P1.</div>
@@ -2014,7 +1970,7 @@ function Workspace(
               </div>}
               {selectedCable && <CableWiringPanel key={selectedCable.id} initialEnd="to" cable={selectedCable} devices={devices}
                 sharedView={wiringFaces[selectedCable[inspectedCableEnd]]??"front"} onSharedViewChange={face=>updateWiringFace(selectedCable[inspectedCableEnd],face)} onActiveEndChange={end=>{setInspectedCableEnd(end);const id=selectedCable[end];const target=devices.find(d=>d.id===id);if(target){setSelectedDevice(target);onSelectDevice?.(target);}}}
-                allCables={cables} boxMounts={boxMounts} onChangeCables={saveCables}
+                allCables={cables} onChangeCables={saveCables}
                 onChange={next=>saveCables(cables.map(c=>c.id===next.id?next:c))}
                 onRemove={()=>{
                   if(!window.confirm("Remove this cable and its conductor terminations?"))return;
@@ -2045,7 +2001,6 @@ function Workspace(
         }
 
         onMouseDown={e => {
-          setSelectedBoxId(null);
 
           const target =
             e.target as HTMLElement;
@@ -2078,24 +2033,11 @@ function Workspace(
 
         }}
 
-        onMouseMove={e => {
-          if (movingBoxId && (e.buttons & 1)) {
-            const r=e.currentTarget.getBoundingClientRect();
-            const x=Math.max(0,Math.min(2000-70,e.clientX-r.left+e.currentTarget.scrollLeft-25));
-            const y=Math.max(30,Math.min(1100,e.clientY-r.top+e.currentTarget.scrollTop-35));
-            setWallBoxes(prev=>prev.map(b=>b.id===movingBoxId?{...b,x,y}:b));
-            return;
-          }
-          moveBoard(e);
-        }}
+        onMouseMove={
+          moveBoard
+        }
 
-        onMouseLeave={() => setMovingBoxId(null)}
         onMouseUp={() => {
-          if (movingBoxId) {
-            const pitch = studSpacing * 8;
-            setWallBoxes(prev=>prev.map(b=>b.id===movingBoxId?{...b,x:Math.max(0,Math.round((b.x+6-13)/pitch)*pitch+13-6)}:b));
-          }
-          setMovingBoxId(null);
           if (dragging) {
             const moved = devices.find(d => d.id === dragging);
             if (moved) {
@@ -2272,30 +2214,6 @@ function Workspace(
               // centered in the 250x208 wall preview, inside the 260x228 device.
               // Sorting must agree with the preview so home runs enter the same port.
               const entry=(device:ElectricalDevice)=>{
-                // Installed devices are wired through their physical box, never
-                // through the movable device wiring pop-out coordinates.
-                const mount=boxMounts[device.id];
-                const wallBox=mount && wallBoxes.find(box=>box.id===mount.boxId);
-                if (wallBox) {
-                  // Each mounted device has its own cable drop aligned with
-                  // its physical gang slot. Do not use pop-out coordinates.
-                  // Box padding is 7px and the gap between slots is 4px.
-                  const innerWidth = boxWidth(wallBox.gangs) - 14;
-                  const slotWidth = (innerWidth - (wallBox.gangs - 1) * 4) / wallBox.gangs;
-                  const slotCenter = wallBox.x + 7 + mount.gang * (slotWidth + 4) + slotWidth / 2;
-                  // Spread separate cable entries within this gang instead of
-                  // piling every sheath onto the same pixel. Use cable IDs so
-                  // the layout is stable when pop-outs are opened or moved.
-                  const attachedToGang = cables
-                    .filter(w => w.from === device.id || w.to === device.id)
-                    .sort((a, b) => a.id.localeCompare(b.id));
-                  const position = Math.max(0, attachedToGang.findIndex(w => w.id === c.id));
-                  const count = Math.max(1, attachedToGang.length);
-                  const available = Math.max(0, slotWidth - 14);
-                  const spread = count === 1 ? 0 : Math.min(12, available / (count - 1));
-                  const offset = (position - (count - 1) / 2) * spread;
-                  return {x:slotCenter + offset, y:wallBox.y+3};
-                }
                 const attached=cables.filter(w=>w.from===device.id||w.to===device.id)
                   .sort((a,b)=>Number(b.from===PANEL_SOURCE_ID)-Number(a.from===PANEL_SOURCE_ID));
                 const index=Math.max(0,attached.findIndex(w=>w.id===c.id));
@@ -2305,26 +2223,12 @@ function Workspace(
               const start=a?entry(a):{x:26,y:0};
               const end=entry(b);
               const x1=start.x,y1=start.y,x2=end.x,y2=end.y;
-              // Assign each cable a distinct overhead lane. Without this,
-              // multiple runs to one multi-gang box draw directly on top of
-              // each other, obscuring the individual left/center/right drops.
-              const destinationMount=boxMounts[b.id];
-              const destinationBox=destinationMount && wallBoxes.find(box=>box.id===destinationMount.boxId);
-              const siblings=destinationBox
-                ? cables.filter(other=>boxMounts[other.to]?.boxId===destinationBox.id)
-                : cables.filter(other=>other.to===c.to);
-              const lane=Math.max(0,siblings.findIndex(other=>other.id===c.id));
-              // Keep the cable routes above the box, with different horizontal
-              // tracks for each gang. The final vertical drop stays centered
-              // on that device's own gang position.
-              const middle=c.from===PANEL_SOURCE_ID
-                ? Math.max(24,y2-115-lane*26)
-                : Math.max(22,Math.min(y1,y2)-90-lane*26);
+              const middle=c.from===PANEL_SOURCE_ID?Math.max(24,y2-115):Math.max(22,Math.min(y1,y2)-90);
               const d=`M ${x1} ${y1} L ${x1} ${middle} L ${x2} ${middle} L ${x2} ${y2}`;
               const homeRun=c.from===PANEL_SOURCE_ID;
               return <g key={c.id}>
-                <path d={d} fill="none" stroke={homeRun?"#000000":"#6c7b84"} strokeWidth="9" strokeLinejoin="round"/>
-                <path d={d} fill="none" stroke={homeRun?"#191b20":c.type.includes("MC")?"#a5afb7":"#f4f0e6"} strokeWidth="6" strokeLinejoin="round"
+                <path d={d} fill="none" stroke={homeRun?"#000000":"#6c7b84"} strokeWidth="17" strokeLinejoin="round"/>
+                <path d={d} fill="none" stroke={homeRun?"#191b20":c.type.includes("MC")?"#a5afb7":"#f4f0e6"} strokeWidth="12" strokeLinejoin="round"
                   strokeDasharray={c.type.includes("MC")?"8 3":undefined}/>
               </g>;
             })}
@@ -2342,60 +2246,17 @@ function Workspace(
                 background:selectedStud===index?"rgba(17,212,255,.19)":"transparent",
                 cursor:"pointer",zIndex:2,padding:0}}/>;
           })}
-          {/* Update 84A: independent empty boxes, deliberately not tied to device geometry. */}
-          {!blueprintMode && wallBoxes.map(box => (
-            <div key={box.id}
-              onDragOver={e => { if (e.dataTransfer.types.includes("componentType")) { e.preventDefault(); e.dataTransfer.dropEffect="copy"; } }}
-              onDrop={e => {
-                e.preventDefault(); e.stopPropagation();
-                const name=e.dataTransfer.getData("componentType");
-                if (!name) return;
-                const definition=componentCatalog.find(c=>c.name===name);
-                if (!definition || !["Receptacle", "GFCI Receptacle", "Single Pole Switch", "Three Way Switch", "Dimmer Switch"].includes(definition.name)) {
-                  setPlacementMessage("Choose a wall switch or receptacle for this device box."); return;
-                }
-                const rect=e.currentTarget.getBoundingClientRect();
-                const gang=Math.min(box.gangs-1,Math.max(0,Math.floor((e.clientX-rect.left)/rect.width*box.gangs)));
-                if (Object.values(boxMounts).some(m=>m.boxId===box.id && m.gang===gang)) {
-                  setPlacementMessage(`Gang ${gang+1} is occupied. Drop into an empty position.`); return;
-                }
-                createDevice(name,box.x+boxWidth(box.gangs)+35+gang*30,Math.max(12,box.y-190),{boxId:box.id,gang});
-                setSelectedBoxId(box.id); setMovingBoxId(null); setPlacementMessage("");
-              }}
-              onMouseDown={e => { e.stopPropagation(); setSelectedDevice(null); setSelectedBoxId(box.id); setMovingBoxId(box.id); }}
-              onClick={e => { e.stopPropagation(); setSelectedBoxId(box.id); }}
-              title={`${box.kind} • drag a switch or receptacle into an empty gang`}
-              style={{ position:"absolute", left:box.x, top:box.y,
-                width:boxWidth(box.gangs), height:96, boxSizing:"border-box", zIndex:5,
-                border:selectedBoxId===box.id?"3px solid #24ff57":"3px solid #356b87",
-                borderRadius:7, background:"#8199a6e8", cursor:"move",
-                boxShadow:"inset 0 0 0 5px #b9c8ce, 0 3px 10px #0004", display:"flex", alignItems:"center", padding:7, gap:4 }}>
-              {Array.from({length:box.gangs},(_,i)=>{
-                const mounted=devices.find(d=>boxMounts[d.id]?.boxId===box.id && boxMounts[d.id]?.gang===i);
-                const symbol=mounted?.symbol || "";
-                const receptacle=mounted?.name==="Receptacle"||mounted?.name==="GFCI Receptacle";
-                return <div key={i} onMouseDown={e=>{
-                    if(!mounted)return;
-                    e.stopPropagation();setMovingBoxId(null);setSelectedBoxId(box.id);setSelectedDevice(mounted);onSelectDevice?.(mounted);
-                    if(wireMode && cableSource) finishCable(mounted.id);
-                  }} title={mounted?`${mounted.name} — gang ${i+1}`:`Empty gang ${i+1} — drop a device here`}
-                  style={{flex:1,minWidth:0,height:70,border:mounted&&selectedDevice?.id===mounted.id?"2px solid #39ff14":"1px dashed #405b6a",borderRadius:3,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",fontSize:10,color:"#183444",background:mounted?"#f0eee6":"#b4c4cb",cursor:mounted?"pointer":"default",pointerEvents:"auto"}}>
-                  {mounted && <button type="button" title={`Open ${mounted.name} wiring pop-out`} onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();setSelectedBoxId(box.id);setSelectedDevice(mounted);onSelectDevice?.(mounted);setOpenBoxWiringViews(prev=>({...prev,[mounted.id]:!prev[mounted.id]}));
-                    // Older Stage B mounts stored their pop-out at the box itself.
-                    // Move that VIEW only; physical cable routing still uses boxMounts.
-                    if(Math.abs(mounted.x-box.x)<boxWidth(box.gangs)+10 && Math.abs(mounted.y-box.y)<100){
-                      setDevices(prev=>prev.map(d=>d.id===mounted.id?{...d,x:box.x+boxWidth(box.gangs)+35+i*30,y:Math.max(12,box.y-190)}:d));
-                    }}} style={{position:"absolute",top:4,left:`calc(${(i+0.5)*100/box.gangs}% - 10px)`,fontSize:12,fontWeight:700,padding:"1px 3px",background:openBoxWiringViews[mounted.id]?"#26774b":"#075e80",border:"1px solid #8de0f5",borderRadius:3,color:"white",cursor:"pointer",zIndex:12}}>{openBoxWiringViews[mounted.id]?"×":"↗"}</button>}
-                  {mounted?<><svg viewBox="0 0 36 52" width="35" height="50" aria-label={mounted.name}>
-                    <rect x="3" y="1" width="30" height="50" rx="4" fill="#f7f5ed" stroke="#667780" strokeWidth="2"/>
-                    {receptacle?<>{[15,36].map(y=><g key={y}><rect x="11" y={y-5} width="3" height="9" fill="#303638"/><rect x="22" y={y-5} width="3" height="9" fill="#303638"/><circle cx="18" cy={y+6} r="2" fill="#303638"/></g>)}{mounted?.name==="GFCI Receptacle"&&<rect x="14" y="24" width="8" height="4" fill="#d24c43"/>}</>:<><rect x="13" y="13" width="10" height="26" rx="2" fill="#b8b8b0" stroke="#707f85"/><path d="M15 16 L21 13 L21 29 L15 32 Z" fill="white"/></>}
-                  </svg></>:<span>+ {i+1}</span>}
-                </div>;
-              })}
-
-              {selectedBoxId===box.id && <button type="button" title="Remove empty box" onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();if(Object.values(boxMounts).some(m=>m.boxId===box.id)){setPlacementMessage("Remove installed devices before deleting this box.");return;}setWallBoxes(prev=>prev.filter(b=>b.id!==box.id));setSelectedBoxId(null);setMovingBoxId(null);}} style={{position:"absolute",right:-13,top:-15,borderRadius:12,background:"#a31f2c",color:"white",border:"1px solid white",cursor:"pointer"}}>×</button>}
-            </div>
-          ))}
+          {!blueprintMode && installedBoxes.map(box=>{
+            const def=electricalBoxes.find(b=>b.id===box.boxTypeId);
+            if(!def)return null;
+            const width=Math.max(100,def.gangs*110);
+            return <div key={box.id} onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();setSelectedBoxId(box.id);setPlacementMessage(`${def.name}: ${box.deviceIds.length}/${def.gangs} positions occupied. Choose a device to install.`);}}
+              title={`${def.name} — ${box.deviceIds.length}/${def.gangs} device positions used`}
+              style={{position:"absolute",left:box.x,top:box.y,width,height:145,zIndex:3,pointerEvents:"auto",cursor:"pointer",border:selectedBoxId===box.id?"3px solid #3df778":"3px solid #8495a4",borderRadius:9,background:"rgba(45,69,91,.38)",boxSizing:"border-box"}}>
+              <div style={{position:"absolute",top:-28,left:0,whiteSpace:"nowrap",color:"#e8f7ff",background:"#172536",padding:"3px 7px",fontSize:12}}>{def.name} · {box.deviceIds.length}/{def.gangs}</div>
+              {Array.from({length:def.gangs||1},(_,i)=><div key={i} style={{position:"absolute",left:i*110+8,top:12,width:82,height:115,border:"1px dashed #8fa8b6",borderRadius:6,opacity:box.deviceIds[i]?.length?0.25:0.9,display:"grid",placeItems:"center",fontSize:11,color:"#b8d5e5"}}>{box.deviceIds[i]?"":"EMPTY"}</div>)}
+            </div>;
+          })}
           {/* =================================================
               DEVICES
               ================================================= */}
@@ -2413,7 +2274,7 @@ function Workspace(
             })}
           </svg>}
           {
-            !blueprintMode && devices.filter(d=>!boxMounts[d.id] || openBoxWiringViews[d.id]).map(
+            !blueprintMode && devices.map(
               device => (
 
                 <Device
@@ -2431,8 +2292,6 @@ function Workspace(
                   }
                   wiringCables={cables.filter(c=>c.from===device.id||c.to===device.id)}
                   allWiringCables={cables}
-                  boxMounts={boxMounts}
-                  boxDevices={devices}
                   wiringFace={wiringFaces[device.id]??"front"}
                   onWiringFaceChange={face=>updateWiringFace(device.id,face)}
                   onWiringTerminate={(cableId,end,conductor,terminal)=>saveCables(cables.map(c=>c.id===cableId?{...c,ends:{...c.ends,[end]:{...c.ends[end],[conductor]:terminal}}}:c))}

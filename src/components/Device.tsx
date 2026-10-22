@@ -16,8 +16,6 @@ type Props = {
   wiringCables?: CableRecord[];
   onWiringTerminate?: (cableId:string,end:CableEnd,conductor:string,terminal:string)=>void;
   allWiringCables?: CableRecord[];
-  boxMounts?: Record<string,{boxId:string;gang:number}>;
-  boxDevices?: ElectricalDevice[];
   wiringFace?: "rear"|"front";
   onWiringFaceChange?: (face:"rear"|"front")=>void;
 };
@@ -150,7 +148,7 @@ function CompactWiredDevice({device,cables}:{device:ElectricalDevice;cables:Cabl
 
 void CompactWiredDevice;
 
-export default function Device({ device, wireMode, selectedTerminal, selected, onSelect, onTerminalClick, onStartDrag, onCableStart, onCableDestination, cableSource, wiringCables=[], onWiringTerminate, allWiringCables=[], boxMounts, boxDevices, wiringFace="rear", onWiringFaceChange }: Props) {
+export default function Device({ device, wireMode, selectedTerminal, selected, onSelect, onTerminalClick, onStartDrag, onCableStart, onCableDestination, cableSource, wiringCables=[], onWiringTerminate, allWiringCables=[], wiringFace="rear", onWiringFaceChange }: Props) {
   void selectedTerminal; void onTerminalClick;
   const [expanded,setExpanded]=useState(false);
   const face=wiringFace;
@@ -158,7 +156,7 @@ export default function Device({ device, wireMode, selectedTerminal, selected, o
   // Keep the wall footprint fixed. The detailed wiring is available on demand,
   // without moving the device or obscuring neighboring boxes.
   const wallWidth = expanded && showWiredBox ? 760 : showWiredBox ? 160 : 190;
-  const wallHeight = expanded && showWiredBox ? 665 : showWiredBox ? 174 : 180;
+  const wallHeight = expanded && showWiredBox ? 535 : showWiredBox ? 174 : 180;
   const isExpanded=expanded&&showWiredBox;
 
   const wallMounted = ["outlet", "gfci", "switch-single", "switch-three-way", "dimmer"].includes(device.symbol);
@@ -166,19 +164,19 @@ export default function Device({ device, wireMode, selectedTerminal, selected, o
     style={{position:"absolute",left:device.x,top:device.y,width:wallWidth,height:wallHeight,boxSizing:"border-box",border:selected?"3px solid #39ff14":"2px solid transparent",borderRadius:8,boxShadow:selected?"0 0 0 3px #123a17, 0 0 14px 5px #39ff14":isExpanded?"0 14px 36px #0009":"none",background:isExpanded?"#c9d0d1":"transparent",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:wireMode?"crosshair":"grab",userSelect:"none",zIndex:isExpanded?45:selected?25:10}}>
     {!showWiredBox&&wallMounted && <div title="Electrical device box" style={{position:"absolute",top:10,left:18,width:114,height:120,background:"#174e87",border:"4px solid #12375c",borderRadius:9,boxShadow:"inset 0 0 0 3px #4680ad, 2px 4px 7px #0005"}}/>}
     <div style={{position:"relative",zIndex:1,transform:"none",filter:"drop-shadow(1px 3px 2px #0005)",pointerEvents:isExpanded?"auto":"none"}}>
-      {isExpanded ? (()=>{return <div style={{width:720,height:605,pointerEvents:"auto",overflow:"hidden"}} onPointerDown={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()}>
-          <UnifiedBoxWiring device={device} allCables={allWiringCables.length?allWiringCables:wiringCables} boxMounts={boxMounts} devices={boxDevices} front={face==="front"} onTerminate={onWiringTerminate??(()=>{})}/>
-
+      {isExpanded ? (()=>{return <div style={{width:720,height:440,pointerEvents:"auto",overflow:"auto"}} onPointerDown={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()}>
+          <UnifiedBoxWiring device={device} allCables={allWiringCables.length?allWiringCables:wiringCables} front={face==="front"} onTerminate={onWiringTerminate??(()=>{})}/>
+          {wiringCables.length>1&&<div style={{fontSize:12,color:"#245269"}}>All {wiringCables.length} cables shown together</div>}
         </div>})() :
         showWiredBox ? (face==="front" ?
           <div title="Front device face" style={{width:142,height:130,background:"#50778a",border:"2px solid #7197a9",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{width:96,height:118,display:"flex",alignItems:"center",justifyContent:"center"}}><FrontDeviceArtwork symbol={device.symbol}/></div></div>
           : <div title="Rear wiring — same diagram as the right panel" style={{width:148,height:132,overflow:"hidden",position:"relative",background:"#587586",border:"2px solid #69889a",borderRadius:7,pointerEvents:"none"}}>
-              <div style={{width:370,transform:"scale(0.39)",transformOrigin:"top left"}}><UnifiedBoxWiring device={device} allCables={allWiringCables.length?allWiringCables:wiringCables} boxMounts={boxMounts} devices={boxDevices} front={false} onTerminate={()=>{}}/></div>
+              <div style={{width:370,transform:"scale(0.39)",transformOrigin:"top left"}}><UnifiedBoxWiring device={device} allCables={allWiringCables.length?allWiringCables:wiringCables} front={false} onTerminate={()=>{}}/></div>
             </div>) : <DeviceFace device={device}/>}
     </div>
     {showWiredBox&&<button type="button" title={`Flip to ${face==="rear"?"front":"rear"} view`} aria-label={`Flip ${device.name} to ${face==="rear"?"front":"rear"} view`} onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onWiringFaceChange?.(face==="rear"?"front":"rear");onSelect(device.id);}} style={{position:"absolute",top:2,right:isExpanded?94:36,zIndex:51,background:"#13516c",color:"#fff",border:"2px solid #7edcf0",borderRadius:5,padding:isExpanded?"4px 8px":"2px 5px",fontSize:11,cursor:"pointer"}}>{face==="rear"?"Face":"Wires"}</button>}
     {showWiredBox&&<button type="button" title={isExpanded?"Collapse wiring view":"Expand wiring on wall"} onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();setExpanded(v=>!v);onSelect(device.id);}} style={{position:"absolute",top:2,right:2,zIndex:50,background:"#13516c",color:"#fff",border:"2px solid #7edcf0",borderRadius:5,padding:"4px 8px",fontSize:isExpanded?16:12,cursor:"pointer"}}>{isExpanded?"− Close":"⤢"}</button>}
-
+    {isExpanded&&<div style={{position:"absolute",bottom:5,left:12,right:12,textAlign:"center",fontSize:13,color:"#183c4c",fontWeight:700,pointerEvents:"none"}}>Same shared box diagram as the right panel · Click − Close to return to wall</div>}
     <div style={{position:"absolute",top:isExpanded?wallHeight-27:showWiredBox?152:164,left:isExpanded?8:-8,width:isExpanded?wallWidth-16:showWiredBox?160:190,textAlign:"center",fontSize:12,fontWeight:700,color:"#17212c",textShadow:"0 1px #ffffff",pointerEvents:"none"}}>{device.name}</div>
     <button type="button" aria-label={`Start cable from ${device.name}`} title="Wire Tool: select cable source"
       onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();if(wireMode && !cableSource) onCableStart(device.id); else if(wireMode) onCableDestination(device.id); else onCableStart(device.id)}}

@@ -92,7 +92,7 @@ export default function ServiceOverview({ project, onChange, onOpenDestination, 
 
     </div>
     <div style={{display:"grid",gridTemplateColumns:"minmax(0, 1fr)",gap:16,alignItems:"start",width:"100%"}} className="nova-service-grid">
-      <div style={{minWidth:0,alignSelf:"start"}}>
+      <div style={{minWidth:0,alignSelf:"start",width:"100%",maxWidth:820,marginInline:"auto"}}>
         <h3 style={{color:"#79e2ff",margin:"0 0 10px"}}>Main Distribution Panel</h3>
         {panelView === "realistic" ? <RealisticPanel
           slots={slots}

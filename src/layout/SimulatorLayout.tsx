@@ -67,10 +67,12 @@ export default function SimulatorLayout() {
   const [allPanelsRevision,setAllPanelsRevision]=useState(0);
   const [deviceInspectorTarget,setDeviceInspectorTarget]=useState<HTMLElement|null>(null);
   const [wallLocationTarget,setWallLocationTarget]=useState<HTMLElement|null>(null);
+  const [serviceControlsTarget,setServiceControlsTarget]=useState<HTMLElement|null>(null);
+  const [expandAllService,setExpandAllService]=useState(false);
   const toggleAllPanels = (open: boolean) => {
     setShowExplorer(open); setShowLibrary(open); setShowPanelControls(open);
     setShowProperties(open); setShowWallControls(open);
-    setShowDeviceInstallation(open); setAllPanelsRevision(n => n + 1);
+    setShowDeviceInstallation(open); setExpandAllService(open); setAllPanelsRevision(n => n + 1);
   };
   const [showBlueprint, setShowBlueprint] = useState(false);
   const [showElectricalService, setShowElectricalService] = useState(false);
@@ -571,7 +573,7 @@ export default function SimulatorLayout() {
 
           {project && showBlueprint && <WholeHouseBlueprint project={project} onChange={changeProject} onOpenRoom={areaId=>{changeProject({...project,activeAreaId:areaId});setShowBlueprint(false);setShowService(false);setWorkspaceScope(`${project.id}:${areaId}:OVERVIEW`);setActiveWall(null);}} onOpenPanel={()=>{setShowBlueprint(false);setShowService(true);setShowElectricalService(false);setWorkspaceScope("SERVICE");setActiveWall(null);}} />}
           {project && !showBlueprint && showService && showElectricalService && <ElectricalServiceWorkspace project={project} onChange={changeProject} />}
-          {project && !showBlueprint && showService && !showElectricalService && <ServiceOverview project={project} onChange={changeProject} onOpenDestination={(areaId, wall) => { changeProject({...project, activeAreaId: areaId}); setWorkspaceScope(`${project.id}:${areaId}:${wall}`); setActiveWall(wall); setShowService(false); }} />}
+          {project && !showBlueprint && showService && !showElectricalService && <ServiceOverview project={project} onChange={changeProject} controlsTarget={serviceControlsTarget} expandRevision={allPanelsRevision} expandAll={expandAllService} onOpenDestination={(areaId, wall) => { changeProject({...project, activeAreaId: areaId}); setWorkspaceScope(`${project.id}:${areaId}:${wall}`); setActiveWall(wall); setShowService(false); }} />}
           {project && !showBlueprint && !showService && project.activeAreaId && !activeWall && <RoomLayout area={project.areas.find(a => a.id === project.activeAreaId)!} onOpenWall={wall => { setWorkspaceScope(`${project.id}:${project.activeAreaId}:${wall}`); setActiveWall(wall); }} />}
           {project && !showBlueprint && !showService && project.activeAreaId && activeWall && <>
             <Workspace key={workspaceScope} ref={workspaceRef} onSelectDevice={setSelectedDevice} onCircuitPathsChange={setCircuitPaths} liveProject={project} onProjectChange={changeProject} liveAreaId={project.activeAreaId} liveWall={activeWall} />
@@ -674,6 +676,10 @@ export default function SimulatorLayout() {
                 </div>
               </details>
             </div>
+            {showService && !showElectricalService && <details open={showPanelControls} onToggle={e => setShowPanelControls(e.currentTarget.open)}>
+              <summary>Service & Breaker Controls</summary>
+              <div className="nova-control-body" ref={setServiceControlsTarget} />
+            </details>}
             {!showService && !!activeWall && <div id="rws-wall-tools-panel-target" data-open={showWallControls ? "true" : "false"} data-device-open={showDeviceInstallation ? "true" : "false"} data-revision={allPanelsRevision}>
               {wallLocationTarget && createPortal(<div className="nova-wall-location-controls">
                 <button type="button" onClick={() => setActiveWall(null)}>← Four-Wall Room</button>

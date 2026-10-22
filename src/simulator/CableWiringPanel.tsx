@@ -44,7 +44,7 @@ export function deviceTerminals(device?:ElectricalDevice):Terminal[] {
     {id:"silver",label:"Neutral · silver screw",color:"#e7ecf0"},
     {id:"ground",label:"Ground · green screw",color:"#33b477"}
   ];
-  if(sym==="💡"||sym.startsWith("light")||/light/i.test(device.type))return [
+  if(sym.startsWith("light")||/light/i.test(device.type))return [
     {id:"fixture-hot",label:"Fixture hot lead",color:"#d7a34b"},
     {id:"fixture-neutral",label:"Fixture neutral lead",color:"#e7ecf0"},
     {id:"ground",label:"Fixture ground",color:"#33b477"}
@@ -70,7 +70,7 @@ function positions(kind:string,terminals:Terminal[]):Record<string,{x:number;y:n
 }
 /** Shared face artwork for the wall and the wiring inspector. */
 export function FrontDeviceArtwork({symbol}:{symbol:string}) {
-  const kind = symbol === "💡" ? "light" : symbol === "gfci" ? "gfci" : symbol.startsWith("switch") || symbol === "dimmer" ? symbol : symbol.startsWith("light") ? "light" : symbol === "breaker-panel" || symbol === "sub-panel" ? "panel" : symbol;
+  const kind = symbol === "gfci" ? "gfci" : symbol.startsWith("switch") || symbol === "dimmer" ? symbol : symbol.startsWith("light") ? "light" : symbol === "breaker-panel" || symbol === "sub-panel" ? "panel" : symbol;
   return <svg viewBox={kind === "light" ? "205 35 210 215" : kind === "panel" ? "238 15 150 254" : "255 17 111 248"} width="100%" height="100%" preserveAspectRatio="xMidYMid meet" aria-label={`${symbol} front appearance`}>
     <DeviceArtwork kind={kind} front={true}/>
   </svg>;
@@ -154,7 +154,6 @@ function WireConnector({x,y,splice=false,selected=false,upright=true}:{x:number;
 function kindFor(device:ElectricalDevice|undefined,fromPanel:boolean){
   if(fromPanel)return "panel";
   const sym=device?.symbol??"";
-  if(sym==="💡"||sym.startsWith("light")||/light/i.test(device?.name??"")||/light/i.test(device?.type??""))return "light";
   if(sym==="switch-three-way"||sym==="switch-single"||sym==="dimmer"||sym==="gfci"||sym==="outlet")return sym;
   if(sym.startsWith("light")||/light/i.test(device?.name??"")||/light/i.test(device?.type??""))return "light";
   return "outlet";
@@ -329,20 +328,6 @@ export function UnifiedBoxWiring({device,allCables,onTerminate,front=false,boxMo
   const [picked,setPicked]=useState<{cableId:string;end:CableEnd;conductor:string}|null>(null);
   const svgRef=useRef<SVGSVGElement>(null);
   const canvasHeight=front?410:Math.max(600,250+Math.ceil(entries.length/2)*190,290+uniqueSplices.length*135);
-  // Include every gang and terminal in the natural drawing bounds; never crop the right edge.
-  const canvasWidth=front?720:Math.max(720,mountedBox?580+boxDevices.length*70:720);
-  const fitBounds={x:0,y:0,w:canvasWidth,h:canvasHeight};
-  const [viewport,setViewport]=useState<{x:number;y:number;w:number;h:number}|null>(null);
-  const [expanded,setExpanded]=useState(false);
-  const [panning,setPanning]=useState<{clientX:number;clientY:number;x:number;y:number;w:number;h:number}|null>(null);
-  const view=viewport??fitBounds;
-  const zoom=(factor:number)=>setViewport(v=>{
-    const old=v??fitBounds;
-    const w=Math.max(canvasWidth*.22,Math.min(canvasWidth*3,old.w*factor));
-    const h=w*old.h/old.w;
-    return {x:old.x+(old.w-w)/2,y:old.y+(old.h-h)/2,w,h};
-  });
-  const toolbarButton:React.CSSProperties={background:"#176786",border:"1px solid #6fb6cf",color:"#fff",borderRadius:5,padding:"5px 9px",cursor:"pointer",fontWeight:600};
   const cableX=(i:number)=>100+(i%2)*195;
   const cableY=(i:number)=>115+Math.floor(i/2)*190;
   const spliceXY=(i:number)=>({x:mountedBox?405:425,y:250+i*135});
@@ -350,9 +335,9 @@ export function UnifiedBoxWiring({device,allCables,onTerminate,front=false,boxMo
     uniqueSplices.find(sp=>sp.members.some(m=>m.cableId===id&&m.end===end&&m.conductor===conductor));
   const getPoint=(e:React.PointerEvent<SVGSVGElement>)=>{
     const rect=svgRef.current?.getBoundingClientRect();if(!rect)return null;
-    const scale=Math.min(rect.width/view.w,rect.height/view.h);
-    return {x:view.x+(e.clientX-rect.left-(rect.width-view.w*scale)/2)/scale,
-      y:view.y+(e.clientY-rect.top-(rect.height-view.h*scale)/2)/scale};
+    const scale=Math.min(rect.width/720,rect.height/canvasHeight);
+    return {x:(e.clientX-rect.left-(rect.width-720*scale)/2)/scale,
+      y:(e.clientY-rect.top-(rect.height-canvasHeight*scale)/2)/scale};
   };
   const commit=(id:string)=>{
     if(!picked)return;
@@ -363,25 +348,11 @@ export function UnifiedBoxWiring({device,allCables,onTerminate,front=false,boxMo
     onTerminate(picked.cableId,picked.end,picked.conductor,id);
     setPicked(null);
   };
-  return <div style={expanded?{position:"fixed",inset:12,zIndex:99999,background:"#102c3c",padding:12,display:"flex",flexDirection:"column",border:"2px solid #69b8d4",borderRadius:8,boxShadow:"0 0 0 100vmax #000b"}:{width:"100%"}}>
-    <div style={{display:"flex",alignItems:"center",flexWrap:"wrap",gap:6,marginBottom:7}}>
-      <button type="button" style={toolbarButton} onClick={()=>zoom(1.25)} title="Zoom out">−</button>
-      <span style={{color:"#d5effb",minWidth:49,textAlign:"center",fontSize:12}}>{Math.round(100*canvasWidth/view.w)}%</span>
-      <button type="button" style={toolbarButton} onClick={()=>zoom(.8)} title="Zoom in">+</button>
-      <button type="button" style={toolbarButton} onClick={()=>setViewport({...fitBounds})}>Fit All</button>
-      <button type="button" style={toolbarButton} onClick={()=>setViewport(null)}>Reset</button>
-      <button type="button" style={toolbarButton} onClick={()=>{setExpanded(e=>!e);setViewport(null)}}>{expanded?"Close expanded":"Expand"}</button>
-      <span style={{fontSize:11,color:"#c5dce8"}}>Drag empty space to pan · Wheel to zoom</span>
-    </div>
-    <svg ref={svgRef} viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`} width="100%" height={expanded?"100%":"auto"}
+  return <div style={{width:"100%"}}>
+    <svg ref={svgRef} viewBox={`0 0 720 ${canvasHeight}`} width="100%" height="auto"
       aria-label={`Complete wiring box for ${device.name}, including home runs and outgoing cables`}
-      style={{background:"#587586",border:"2px solid #9fc4d6",borderRadius:6,touchAction:"none",minHeight:expanded?0:260,flex:expanded?1:undefined,cursor:panning?"grabbing":"grab"}}
-      onWheel={e=>{e.preventDefault();zoom(e.deltaY>0?1.12:.89);}}
-      onPointerDown={e=>{if(e.target!==e.currentTarget)return;setPanning({clientX:e.clientX,clientY:e.clientY,...view});e.currentTarget.setPointerCapture(e.pointerId);}}
-      onPointerMove={e=>{if(!panning)return;const r=e.currentTarget.getBoundingClientRect();setViewport({x:panning.x-(e.clientX-panning.clientX)*panning.w/r.width,y:panning.y-(e.clientY-panning.clientY)*panning.h/r.height,w:panning.w,h:panning.h});}}
-      onPointerCancel={()=>setPanning(null)}
+      style={{background:"#587586",border:"2px solid #9fc4d6",borderRadius:6,touchAction:"none"}}
       onPointerUp={e=>{
-        if(panning){setPanning(null);return;}
         if(!picked)return;
         const pt=getPoint(e);if(!pt)return;
         const near=terms.map(t=>({id:t.id,p:terminalXY(t.id)})).filter(v=>v.p)
@@ -505,7 +476,6 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove,allCab
   const [connector,setConnector]=useState("Listed twist-on connector");
   const [pigtailTerminal,setPigtailTerminal]=useState("");
   const [spliceError,setSpliceError]=useState("");
-  const [spliceAddSelections,setSpliceAddSelections]=useState<Record<string,string>>({});
   const fromPanel=cable[end]===PANEL_SOURCE_ID;
   const dev=devices.find(d=>d.id===cable[end])??(fromPanel?
     ({id:PANEL_SOURCE_ID,name:"Panel P1",type:"Distribution Panel",symbol:"breaker-panel"} as ElectricalDevice):
@@ -562,26 +532,6 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove,allCab
     saveAll((allCables??[cable]).map(c=>({...c,splices:c.splices?.map(sp=>sp.id===id?{
       ...sp,pigtailTerminal:targets[0],pigtailTerminals:targets
     }:sp)})));
-  };
-  const addConductorToSplice=(id:string,key:string)=>{
-    setSpliceError("");
-    const splice=splices.find(sp=>sp.id===id);
-    const member=available.find(a=>a.key===key);
-    if(!splice||!member){setSpliceError("Choose an available conductor.");return;}
-    if(member.cable.ends[member.end]?.[member.conductor]){
-      setSpliceError("That conductor is already connected. Disconnect it first.");return;
-    }
-    const family=(conductor:string)=>conductor==="ground"?"ground":conductor==="white"?"neutral":"hot";
-    if(splice.members.length&&family(splice.members[0].conductor)!==family(member.conductor)){
-      setSpliceError("Cannot mix hot, neutral, and ground conductors in one splice.");return;
-    }
-    const updated={...splice,members:[...splice.members,{cableId:member.cableId,end:member.end,conductor:member.conductor}]};
-    saveAll((allCables??[cable]).map(c=>({
-      ...c,
-      splices:c.splices?.map(sp=>sp.id===id?updated:sp),
-      ends:c.id===member.cableId?{...c.ends,[member.end]:{...c.ends[member.end],[member.conductor]:`splice:${id}`}}:c.ends
-    })));
-    setSpliceAddSelections(prev=>({...prev,[id]:""}));
   };
   const updateSplicePigtail=(id:string,terminal:string)=>{
     setSpliceError("");
@@ -756,27 +706,6 @@ export default function CableWiringPanel({cable,devices,onChange,onRemove,allCab
       {spliceError&&<div role="alert" style={{color:"#ffb2a5",fontSize:15,marginTop:7}}>{spliceError}</div>}
       {splices.map(sp=><div key={sp.id} style={{padding:"8px 0",borderBottom:"1px solid #35566a",fontSize:14}}>
         🟠 {sp.connector} · {sp.members.length} conductors {spliceTargets(sp).map(t=>` + ${terminalLabel(t)}`).join("")}
-        <div style={{marginTop:9,padding:8,border:"1px solid #477b91",borderRadius:5,background:"#102d3c"}}>
-          <strong style={{color:"#9feaff"}}>Add a conductor to this existing wire nut</strong>
-          <div style={{fontSize:12,color:"#c1dbe6",margin:"5px 0"}}>Choose a loose conductor from any cable entering this box. Existing splice members stay connected.</div>
-          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-            <select aria-label={`Loose conductor for splice ${sp.id}`} value={spliceAddSelections[sp.id]??""}
-              onChange={e=>setSpliceAddSelections(prev=>({...prev,[sp.id]:e.target.value}))}
-              style={{flex:"1 1 190px",minWidth:0,padding:8,background:"#173d50",color:"white",border:"1px solid #52869d"}}>
-              <option value="">Choose loose wire…</option>
-              {available.filter(a=>!a.cable.ends[a.end]?.[a.conductor] &&
-                (sp.members[0]?.conductor==="ground" ? a.conductor==="ground" :
-                 sp.members[0]?.conductor==="white" ? a.conductor==="white" :
-                 a.conductor!=="white"&&a.conductor!=="ground"))
-                .map(a=><option key={a.key} value={a.key}>{a.conductor.toUpperCase()} · {a.cable.type} · {a.cable.fromName||a.cable.from} → {a.cable.toName||a.cable.to} ({a.end})</option>)}
-            </select>
-            <button type="button" disabled={!spliceAddSelections[sp.id]}
-              onClick={()=>addConductorToSplice(sp.id,spliceAddSelections[sp.id])}
-              style={{padding:"8px 12px",background:"#176b82",border:"1px solid #6bbbd0",borderRadius:5,color:"white"}}>
-              Add wire
-            </button>
-          </div>
-        </div>
         <label style={{display:"block",marginTop:7,color:"#bcefff"}}>
           Pigtail from this existing splice
           <select aria-label={`Pigtail terminal for splice ${sp.id}`}

@@ -218,9 +218,9 @@ export default function RealisticPanel({ slots, selected, assignments, onSelect,
         // These are visual paths only: terminal assignments are untouched.
         const entryX=114 + (Math.floor(index/2)%3)*9;
         const entryY=43;
-        const conductorOffset=wire.conductor==="black"?0:wire.conductor==="red"?5:wire.conductor==="white"?10:15;
+x        const conductorOffset=wire.conductor==="white"?0:wire.conductor==="black"?7:wire.conductor==="red"?11:14;
         const startX=entryX+conductorOffset;
-        const targetX=hot?(left?282:318):endX;
+        const targetX=hot?(left?154:446):endX;
         const targetY=hot?y+22:endY;
         // Neutral stays down the left side, ground travels along the top
         // then down the right side, and hots descend in an inner raceway.
@@ -228,11 +228,14 @@ export default function RealisticPanel({ slots, selected, assignments, onSelect,
           ? `M ${startX} ${entryY} V 84 H 52 Q 45 84 45 93 V ${targetY} Q 45 ${targetY+8} 54 ${targetY+8} H ${targetX-9} Q ${targetX} ${targetY+8} ${targetX} ${targetY}`
           : ground
           ? `M ${startX} ${entryY} V 75 Q ${startX} 87 ${startX+12} 87 H 548 Q 558 87 558 98 V ${targetY} Q 558 ${targetY+8} 548 ${targetY+8} H ${targetX+9} Q ${targetX} ${targetY+8} ${targetX} ${targetY}`
-          : `M ${startX} ${entryY} V ${Math.max(100,targetY-17)} Q ${startX} ${targetY-7} ${startX+10} ${targetY-7} H ${targetX-12} Q ${targetX} ${targetY-7} ${targetX} ${targetY}`;
+          : `M ${startX} ${entryY} V ${targetY-14} Q ${startX} ${targetY} ${startX+14} ${targetY} H ${targetX}`;
         return <g key={wire.id} aria-label={`${wire.conductor} wire from top entry for breaker ${wire.slot} to ${wire.terminal}`}>
           <path d={path} stroke="#0c1318" strokeWidth="8" fill="none" strokeLinejoin="round" strokeLinecap="round" pointerEvents="none"/>
           <path d={path} stroke={color} strokeWidth="4.5" fill="none" strokeLinejoin="round" strokeLinecap="round" pointerEvents="none"/>
-          <circle cx={targetX} cy={targetY} r="5" fill={valid?"#9df1c3":"#ff805f"} stroke="#17202a" strokeWidth="2" pointerEvents="none"/>
+          {hot ? <g pointerEvents="none" aria-label="Front-facing breaker terminal">
+            <circle cx={targetX} cy={targetY} r="8" fill={valid?"#c6d5dd":"#ff805f"} stroke="#172b38" strokeWidth="2.5"/>
+            <path d={`M ${targetX-4} ${targetY} H ${targetX+4}`} stroke="#405663" strokeWidth="2"/>
+          </g> : <circle cx={targetX} cy={targetY} r="5" fill={valid?"#9df1c3":"#ff805f"} stroke="#17202a" strokeWidth="2" pointerEvents="none"/>}
           {!valid&&<text x={targetX+7} y={targetY-7} fill="#ff9a80" fontSize="12">!</text>}
           <title>{`Breaker #${wire.slot}: ${wire.conductor} → ${wire.terminal}${valid?"":" (check termination)"}`}</title>
         </g>;

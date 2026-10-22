@@ -218,7 +218,7 @@ export default function RealisticPanel({ slots, selected, assignments, onSelect,
         // These are visual paths only: terminal assignments are untouched.
         const entryX=114 + (Math.floor(index/2)%3)*9;
         const entryY=43;
-x        const conductorOffset=wire.conductor==="white"?0:wire.conductor==="black"?7:wire.conductor==="red"?11:14;
+        const conductorOffset=wire.conductor==="white"?0:wire.conductor==="black"?7:wire.conductor==="red"?11:14;
         const startX=entryX+conductorOffset;
         const targetX=hot?(left?154:446):endX;
         const targetY=hot?y+22:endY;

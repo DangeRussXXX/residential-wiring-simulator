@@ -242,9 +242,12 @@ export function LiveWiringDiagram({cable,end,device,allCables,onTerminate,front=
         const startX=90+(i-(colorsList.length-1)/2)*10;
         const dragTip=dragging===c?dragPosition:null;
         const endX=dragTip?.x??targetX, endY=dragTip?.y??targetY;
-        const path=splice
-          ?`M ${startX} 41 C ${startX} 78 ${endX-32} ${endY-33} ${endX} ${endY}`
-          :`M ${startX} 41 C ${startX} 82 ${endX-38} ${endY-36} ${dragTip?endX:isCapped?targetX-4:targetX} ${endY}`;
+        // Keep wires in visible horizontal/vertical lanes like the full
+        // distribution panel, instead of fanning diagonally over its labels.
+        // During dragging, keep the free end attached to the pointer.
+        const laneY=68+i*24;
+        const laneX=164+i*11;
+        const path=`M ${startX} 41 V ${laneY} Q ${startX} ${laneY+8} ${startX+8} ${laneY+8} H ${laneX-8} Q ${laneX} ${laneY+8} ${laneX} ${laneY+16} V ${endY-8} Q ${laneX} ${endY} ${laneX+8} ${endY} H ${endX}`;
         return <g key={c} onPointerDown={e=>{e.stopPropagation();setSelected(c);onSelectConductor?.(c);setDragging(c);e.currentTarget.ownerSVGElement?.setPointerCapture(e.pointerId);}} onClick={()=>{setSelected(c);onSelectConductor?.(c)}} style={{cursor:"grab"}}>
           <path d={path} fill="none" stroke={c==="white"?"#263c49":"#d2e5ee"} strokeWidth="12" strokeLinecap="round"/>
           <path d={path} fill="none" stroke={colors[c]} strokeWidth="7" strokeLinecap="round"/>
@@ -271,7 +274,7 @@ export function LiveWiringDiagram({cable,end,device,allCables,onTerminate,front=
         // then turning right to its actual device terminal.
         // The pigtail begins inside the connector mouth, exits alongside the
         // other conductors, and curves to the real saved terminal.
-        const path=destination?`M ${sx+10} ${sy+7} C ${sx+36} ${sy+27} ${destination.x-40} ${destination.y+26} ${destination.x} ${destination.y}`:"";
+        const path=destination?`M ${sx+10} ${sy+7} H ${sx+26} Q ${sx+34} ${sy+7} ${sx+34} ${sy+15} V ${destination.y-8} Q ${sx+34} ${destination.y} ${sx+42} ${destination.y} H ${destination.x}`:"";
         return <g key={sp.id}>
           {destination&&<>
             <path d={path} fill="none" stroke={family==="white"?"#263c49":"#d2e5ee"} strokeWidth="12" strokeLinecap="round"/>

@@ -213,17 +213,22 @@ export default function RealisticPanel({ slots, selected, assignments, onSelect,
         const endY=neutral||ground?309+(terminalRow-1)*49:y+22;
         const color=wire.conductor==="black"?"#15191c":wire.conductor==="red"?"#df484e":wire.conductor==="white"?"#f0f1ed":"#b7804b";
         const valid=wire.conductor==="white"?neutral:wire.conductor==="bare"?ground:wire.terminal===`breaker-${wire.slot}-hot-${wire.conductor==="red"?"b":"a"}`;
-        const circuitIndex=Math.floor(index/2);
-        const entryX=left?114:486;
+        // A shared top cable entry; the conductors then follow separate,
+        // deliberate perimeter routes to their saved panel terminals.
+        // These are visual paths only: terminal assignments are untouched.
+        const entryX=114 + (Math.floor(index/2)%3)*9;
         const entryY=43;
-        const outerX=left?112+Math.min(15,circuitIndex*2):488-Math.min(15,circuitIndex*2);
-        const laneX=left?119+Math.min(14,circuitIndex*2):481-Math.min(14,circuitIndex*2);
-        const offset=wire.conductor==="black"?0:wire.conductor==="red"?4:wire.conductor==="white"?8:12;
-        const corridorX=left?laneX+offset:laneX-offset;
-        const approachY=hot?y+12:endY;
+        const conductorOffset=wire.conductor==="black"?0:wire.conductor==="red"?5:wire.conductor==="white"?10:15;
+        const startX=entryX+conductorOffset;
         const targetX=hot?(left?282:318):endX;
         const targetY=hot?y+22:endY;
-        const path=`M ${entryX} ${entryY} L ${outerX} 70 L ${corridorX} 94 L ${corridorX} ${approachY} Q ${corridorX} ${targetY} ${corridorX+(targetX>corridorX?9:-9)} ${targetY} L ${targetX} ${targetY}`;
+        // Neutral stays down the left side, ground travels along the top
+        // then down the right side, and hots descend in an inner raceway.
+        const path=neutral
+          ? `M ${startX} ${entryY} V 84 H 52 Q 45 84 45 93 V ${targetY} Q 45 ${targetY+8} 54 ${targetY+8} H ${targetX-9} Q ${targetX} ${targetY+8} ${targetX} ${targetY}`
+          : ground
+          ? `M ${startX} ${entryY} V 75 Q ${startX} 87 ${startX+12} 87 H 548 Q 558 87 558 98 V ${targetY} Q 558 ${targetY+8} 548 ${targetY+8} H ${targetX+9} Q ${targetX} ${targetY+8} ${targetX} ${targetY}`
+          : `M ${startX} ${entryY} V ${Math.max(100,targetY-17)} Q ${startX} ${targetY-7} ${startX+10} ${targetY-7} H ${targetX-12} Q ${targetX} ${targetY-7} ${targetX} ${targetY}`;
         return <g key={wire.id} aria-label={`${wire.conductor} wire from top entry for breaker ${wire.slot} to ${wire.terminal}`}>
           <path d={path} stroke="#0c1318" strokeWidth="8" fill="none" strokeLinejoin="round" strokeLinecap="round" pointerEvents="none"/>
           <path d={path} stroke={color} strokeWidth="4.5" fill="none" strokeLinejoin="round" strokeLinecap="round" pointerEvents="none"/>

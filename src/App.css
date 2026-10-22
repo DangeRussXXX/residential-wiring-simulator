@@ -531,3 +531,17 @@
 }
 .nova-double-text-sidebar .nova-unified-service-panel[open] > summary::before {content:"▼";}
 .nova-double-text-sidebar .nova-unified-service-panel > summary:hover {background:#23536a !important;}
+
+/* Breaker inventory now belongs under Component Library. */
+.nova-breaker-library-target { min-width: 0; }
+.nova-breaker-library-subpanel .nova-service-section { margin-top: 10px; }
+.nova-breaker-library-subpanel .nova-service-section > summary {
+  font-size: 28px !important;
+  line-height: 1.35;
+  color: #87e7ff;
+  background: #193e52;
+  border: 1px solid #397b99;
+  border-radius: 5px;
+  padding: 12px;
+  cursor: pointer;
+}

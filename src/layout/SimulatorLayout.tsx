@@ -68,6 +68,7 @@ export default function SimulatorLayout() {
   const [deviceInspectorTarget,setDeviceInspectorTarget]=useState<HTMLElement|null>(null);
   const [wallLocationTarget,setWallLocationTarget]=useState<HTMLElement|null>(null);
   const [serviceControlsTarget,setServiceControlsTarget]=useState<HTMLElement|null>(null);
+  const [breakerLibraryTarget,setBreakerLibraryTarget]=useState<HTMLElement|null>(null);
   const [expandAllService,setExpandAllService]=useState(false);
   const toggleAllPanels = (open: boolean) => {
     setShowExplorer(open); setShowLibrary(open); setShowPanelControls(open);
@@ -573,7 +574,7 @@ export default function SimulatorLayout() {
 
           {project && showBlueprint && <WholeHouseBlueprint project={project} onChange={changeProject} onOpenRoom={areaId=>{changeProject({...project,activeAreaId:areaId});setShowBlueprint(false);setShowService(false);setWorkspaceScope(`${project.id}:${areaId}:OVERVIEW`);setActiveWall(null);}} onOpenPanel={()=>{setShowBlueprint(false);setShowService(true);setShowElectricalService(false);setWorkspaceScope("SERVICE");setActiveWall(null);}} />}
           {project && !showBlueprint && showService && showElectricalService && <ElectricalServiceWorkspace project={project} onChange={changeProject} />}
-          {project && !showBlueprint && showService && !showElectricalService && <ServiceOverview project={project} onChange={changeProject} controlsTarget={serviceControlsTarget} expandRevision={allPanelsRevision} expandAll={expandAllService} onOpenDestination={(areaId, wall) => { changeProject({...project, activeAreaId: areaId}); setWorkspaceScope(`${project.id}:${areaId}:${wall}`); setActiveWall(wall); setShowService(false); }} />}
+          {project && !showBlueprint && showService && !showElectricalService && <ServiceOverview project={project} onChange={changeProject} controlsTarget={serviceControlsTarget} breakerLibraryTarget={breakerLibraryTarget} expandRevision={allPanelsRevision} expandAll={expandAllService} onOpenDestination={(areaId, wall) => { changeProject({...project, activeAreaId: areaId}); setWorkspaceScope(`${project.id}:${areaId}:${wall}`); setActiveWall(wall); setShowService(false); }} />}
           {project && !showBlueprint && !showService && project.activeAreaId && !activeWall && <RoomLayout area={project.areas.find(a => a.id === project.activeAreaId)!} onOpenWall={wall => { setWorkspaceScope(`${project.id}:${project.activeAreaId}:${wall}`); setActiveWall(wall); }} />}
           {project && !showBlueprint && !showService && project.activeAreaId && activeWall && <>
             <Workspace key={workspaceScope} ref={workspaceRef} onSelectDevice={setSelectedDevice} onCircuitPathsChange={setCircuitPaths} liveProject={project} onProjectChange={changeProject} liveAreaId={project.activeAreaId} liveWall={activeWall} />
@@ -673,6 +674,7 @@ export default function SimulatorLayout() {
                 <summary>Component Library</summary>
                 <div className="nova-control-body">
                   {!showService && !!activeWall ? <ComponentLibrary workspaceRef={workspaceRef}/> : <div style={{padding:10,fontSize:12,color:"#aacbd7"}}>Open a room wall to place components.</div>}
+                  {showService && !showElectricalService && <div className="nova-breaker-library-target" ref={setBreakerLibraryTarget} />}
                 </div>
               </details>
             </div>

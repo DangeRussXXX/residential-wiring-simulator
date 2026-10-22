@@ -13,7 +13,7 @@ const frame: React.CSSProperties = { background: "#101b27", border: "1px solid #
 const button: React.CSSProperties = { background: "#163c52", border: "1px solid #397b99", color: "#e7f7ff", borderRadius: 6, padding: "8px 12px", cursor: "pointer" };
 const field: React.CSSProperties = { background: "#0b1824", color: "white", border: "1px solid #397b99", borderRadius: 5, padding: 8, maxWidth: "100%" };
 
-export default function ServiceOverview({ project, onChange, onOpenDestination, controlsTarget, expandRevision, expandAll }: { project: ServiceProject; onChange: (next: ServiceProject) => void; onOpenDestination?: (areaId: string, wall: "NORTH" | "SOUTH" | "EAST" | "WEST") => void; controlsTarget?: HTMLElement | null; expandRevision?: number; expandAll?: boolean }) {
+export default function ServiceOverview({ project, onChange, onOpenDestination, controlsTarget, breakerLibraryTarget, expandRevision, expandAll }: { project: ServiceProject; onChange: (next: ServiceProject) => void; onOpenDestination?: (areaId: string, wall: "NORTH" | "SOUTH" | "EAST" | "WEST") => void; controlsTarget?: HTMLElement | null; breakerLibraryTarget?: HTMLElement | null; expandRevision?: number; expandAll?: boolean }) {
   const panelSections = ["connections", "install", "selected", "routing", "labs", "circuits"] as const;
   type SectionId = typeof panelSections[number];
   const [expanded, setExpanded] = useState<Record<SectionId, boolean>>({ connections: false, install: false, selected: false, routing: false, labs: false, circuits: false });
@@ -127,7 +127,31 @@ export default function ServiceOverview({ project, onChange, onOpenDestination, 
         </div>
         {accordion("connections", "Service Connections · Lugs & Feeder", <ServiceConnectionView project={project} />)}
 
-    {accordion("install", "Breaker Library · Drag into Empty Slots", <>
+    {breakerLibraryTarget ? createPortal(<div className="nova-breaker-library-subpanel">{accordion("install", "Breaker Library · Drag into Empty Slots", <>
+      <div style={{border:"1px solid #376a84",padding:12,borderRadius:8,marginBottom:12}}>
+        <strong style={{color:"#8be4ff"}}>Main Breaker Library — Dedicated Main Position</strong>
+        <p style={{fontSize:12,color:"#b6cfdd"}}>Optional distribution-panel main breaker. This is separate from your existing upstream 200A service disconnect. Select a rating or drag the main-breaker card to the dedicated MAIN position on the realistic panel.</p>
+        <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+          {[60,100,125,150,200].filter(r=>r<=project.service.amperage).map(r=><button key={r} type="button" draggable onDragStart={e=>{e.dataTransfer.setData("application/x-nova-main-breaker",String(r));e.dataTransfer.setData("text/plain",`Main breaker ${r}A`);}} onClick={()=>installMain(r)} style={button}>▣ {r}A · 2-pole MAIN</button>)}
+        </div>
+        {distributionMain?.installed && <div style={{marginTop:10,fontSize:12}}>Installed: {distributionMain.amperage}A · {distributionMain.closed?"CLOSED":"OPEN"} <button type="button" style={{...button,marginLeft:8}} onClick={()=>onChange({...project,distributionMain:{...distributionMain,closed:!distributionMain.closed}})}>Toggle simulated handle</button> <button type="button" style={{...button,marginLeft:8}} onClick={removeMain}>Remove main</button></div>}
+      </div>
+      <p style={{fontSize:12,color:"#b2cbd8",marginTop:0}}>Drag a breaker onto an empty position at left. You can also select a breaker below, choose a position, and click Install (keyboard/touch alternative). These are generic training models; panel listing and physical bus compatibility are not yet verified.</p>
+      <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10}}>
+        <label>Position <select style={field} value={slot} onChange={e=>setSlot(Number(e.target.value))}>{slots.filter(s=>!s.installed).map(s=><option key={s.slot} value={s.slot}>{s.slot}</option>)}</select></label>
+        <button style={button} onClick={install}>Install selected breaker</button>
+      </div>
+      <div style={{maxHeight:320,overflowY:"auto",display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(145px,1fr))",gap:7}}>
+        {breakerCatalog.map(item=><button type="button" key={`${item.amps}-${item.poles}-${item.kind}`} draggable
+          onDragStart={e=>{setDraggedBreaker(item); e.dataTransfer.effectAllowed="copy";e.dataTransfer.setData("text/plain",`${item.amps}A ${item.poles}P ${item.kind}`);}}
+          onDragEnd={()=>setDraggedBreaker(null)}
+          onClick={()=>{setAmps(item.amps);setPoles(item.poles);setKind(item.kind);}}
+          style={{...button,textAlign:"left",background:amps===item.amps&&poles===item.poles&&kind===item.kind?"#155a79":"#142938",display:"flex",gap:9,alignItems:"center"}}>
+          <span aria-hidden="true" style={{background:"#293843",border:"2px solid #8fa6b5",borderRadius:4,padding:"8px 5px",fontSize:11,whiteSpace:"nowrap"}}>▣ {item.poles}P</span>
+          <span><strong>{item.amps}A</strong><br/><span style={{fontSize:11}}>{item.kind.replace("_"," ")}</span></span>
+        </button>)}
+      </div>
+    </>)}}</div>, breakerLibraryTarget) : {accordion("install", "Breaker Library · Drag into Empty Slots", <>
       <div style={{border:"1px solid #376a84",padding:12,borderRadius:8,marginBottom:12}}>
         <strong style={{color:"#8be4ff"}}>Main Breaker Library — Dedicated Main Position</strong>
         <p style={{fontSize:12,color:"#b6cfdd"}}>Optional distribution-panel main breaker. This is separate from your existing upstream 200A service disconnect. Select a rating or drag the main-breaker card to the dedicated MAIN position on the realistic panel.</p>
@@ -152,6 +176,7 @@ export default function ServiceOverview({ project, onChange, onOpenDestination, 
         </button>)}
       </div>
     </>)}
+}
     {accordion("selected", `Selected Breaker · Position ${selected}`, <>          <h3 style={{ color: "#86e1ff" }}>Selected position {selected}</h3>
           {active?.breaker ? <>
             <div style={{ marginBottom: 12 }}>{active.breaker.amperage}A · {active.breaker.poles}-pole · {active.breaker.breakerType}</div>
